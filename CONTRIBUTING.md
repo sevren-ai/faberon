@@ -21,7 +21,8 @@ Read the design docs:
 
 - When a change makes a new decision or changes an existing one, update the docs in the same PR: `docs/design/roadmap.md` for plan changes, `docs/design/design.md` only when the stable architecture genuinely changes.
 - The current WIP release doc stays editable until it ships.
-- Never edit `docs/design/vX.Y.Z.md` for a version that has already shipped (a git tag with that version exists). 
+- Never edit `docs/design/vX.Y.Z.md` for a version that has already shipped (a git tag with that version exists).
+- Progress on the current WIP release is tracked as a checklist in that release's design doc. Check off items in the same commit/PR that lands the work. 
 
 ## GitHub Actions
 

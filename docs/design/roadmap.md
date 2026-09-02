@@ -8,7 +8,7 @@
 
 A version is a milestone release, not the whole roadmap. Each phase becomes its own version with its own design doc when its design review happens.
 
-- **Phase 0: scaffold.** `uv` monorepo (console package joins as sibling in Phase 2); quarantined schema module; Postgres setup scripts for dev machine and login node. Status: PR #1 in review.
+- **Phase 0: scaffold.** `uv` monorepo (console package joins as sibling in Phase 2); quarantined schema module; Postgres setup scripts for dev machine and login node.
 - **Phase 1: skeleton.** One thin path through every tier. Ships as **v0.1.0**.
 - **Phase 2: console v0.1 (planned v0.2.0).** Pi extension: drafter intake, `inject_idea`, `runs_status`, `approve`, live SSE widget (runs, budget burn, pending approvals).
 - **Phase 3: scale and safety (planned v0.3.0).** Concurrency-limited queue for ablations; budget caps and approval gates; epilog webhook once egress is verified; restart drills as routine.
