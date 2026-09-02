@@ -1,0 +1,27 @@
+# Secrets & local env
+.env
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+*.egg-info/
+
+# Node (console, Phase 2)
+node_modules/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Faberon runtime state (local dev deployments)
+.faberon/
+pgdata/
