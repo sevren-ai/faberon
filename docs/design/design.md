@@ -1,6 +1,6 @@
 # Faberon: System Design
 
-**Status:** stable document. Changes rarely, and only through design review. Planned work, open questions, and the decision log live in [roadmap.md](roadmap.md). Release scopes live in per-version docs (for example [v0.1.0](v0.1.0.md)).
+**Status:** stable document. Changes rarely, and only through design review. Near-term plans live in [roadmap.md](roadmap.md); speculative future ideas in [future.md](future.md). Release scopes live in per-version docs (`docs/design/vX.Y.Z.md`).
 
 ## 1. Purpose
 
@@ -23,30 +23,35 @@ Terminology:
 Three tiers connected by explicit contracts (typed JSON over HTTP/SSE, plus JSONL files). Any tier is replaceable without touching the others.
 
 ```
-┌───────────────────┐      REST + SSE     ┌────────────────────────────────┐
-│ Console           │◄──(bearer token────►│ Control plane: the only brain  │
-│ (Pi ext., TS;     │    once off-host)   │ Pydantic AI · DBOS · FastAPI   │
-│ hosts the drafter)│                     │ · Postgres · on the login node │
-└───────────────────┘                     └──────┬───────────────▲─────────┘
-                                          submit ▼ local sbatch  │ sacct poll
-                                          ┌────────────────────────────────┐
-                                          │ Slurm cluster (execution)      │
-                                          └────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Login node                                                               │
+│  ┌─────────────────┐  REST+SSE   ┌────────────────────────────────────┐  │
+│  │ Console         │◄─localhost─►│ Control plane: the only brain      │  │
+│  │ (Pi ext., TS;   │             │ Pydantic AI · DBOS · FastAPI       │  │
+│  │ hosts drafter)  │             │ · Postgres                         │  │
+│  └─────────────────┘             └──────┬───────────────▲─────────────┘  │
+│                                  submit ▼ local sbatch  │ sacct poll     │
+│  experiment repo (shared FS, visible to compute nodes)                   │
+└──────────────────────────────────────┬──────────────────┼────────────────┘
+                                       │                  │
+                              ┌────────▼──────────────────┴────────┐
+                              │ Slurm cluster (execution)          │
+                              └────────────────────────────────────┘
 ```
 
-- **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. The control plane runs on the cluster login node, so Slurm calls are local subprocesses with no SSH transport.
-- **Console**: a Pi extension. Hosts the drafter, live status, idea injection, and approvals. It reasons conversationally, but every write is a human-initiated API call.
-- **Execution**: the Slurm cluster.
+- **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the console is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps console and brain independently replaceable.
+- **Console**: a Pi extension. Hosts the drafter, live status, idea injection, and approvals. It reasons conversationally, but every write is a human-initiated API call. Default: runs on the login node next to the brain.
+- **Execution**: the Slurm cluster. The experiment repo (for example `autoresearch`) lives on the cluster filesystem so compute nodes and the brain see the same tree.
 
 Design rule: **one brain**. The console and the drafter propose; the brain disposes; the ledger remembers.
 
-**Deployment model.** Self-hosted per deployment. All state (Postgres, JSONL, notes, artifacts) lives on the operator's machines, and there is no central Faberon server. Trust is single-operator: one optional bearer token (`FABERON_API_TOKEN`) guards the API once it is reachable off-host, which happens early since console and brain typically run on different machines. Multi-user is deferred. Dev loop: workstation → GitHub → login node.
+**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, console (when present), and the experiment checkout. All state (Postgres, JSONL, notes, artifacts) lives there; there is no central Faberon server. FastAPI binds to localhost. An optional bearer token (`FABERON_API_TOKEN`) guards the API only if the port is ever opened off-host. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote console, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
 
 ## 3. Key Mechanisms
 
 **Durable Slurm loop.** Workflow: submit (idempotent, dedup-keyed) → wait → judge → decide next. Completion detection is **poll-first** (`DBOS.sleep` + local `sacct`) because compute-node to login-node HTTP egress is unverified. The Slurm-epilog `curl` webhook (`DBOS.send` → `recv`) drops in later as a fast path with no workflow changes. The executor sits behind a narrow `submit`/`status`/`cancel` interface: the real Slurm adapter first, a fake-subprocess shim for off-cluster unit tests. A DBOS queue (`concurrency=N`) caps parallel jobs.
 
-**Event ledger.** Append-only, dual-written: Postgres (queryable) plus JSONL (portable). Families: `campaign.*`, `experiment.*`, `intervention.*`, `idea.injected`, `expectation.judged`, `budget.*`, `approval.*`. Every event carries actor, justification, and a plan-clause reference. The ledger, plus a living research-notes file, is the source of truth a fresh agent re-orients from. No process's memory is authoritative.
+**Event ledger.** Append-only, dual-written: Postgres (queryable) plus JSONL (portable). Families: `campaign.*`, `experiment.*`, `intervention.*`, `idea.injected`, `budget.*`, `approval.*`. Every event carries actor, justification, and a plan-clause reference. The ledger, plus a living research-notes file, is the source of truth a fresh agent re-orients from. No process's memory is authoritative.
 
 **Why not JSONL-only?** (1) Durability *is* Postgres: DBOS checkpoints every step, sleep, and signal there, and files would mean re-implementing durable execution. (2) The design needs atomicity (dedup keys, queue-slot claims, exactly-once on retry), which files cannot provide, especially on the NFS home directories typical of login nodes. (3) The ledger is queried ("what worked, budget burned"), not just read. JSONL stays as the portable copy.
 
@@ -74,4 +79,3 @@ Contracts are **skeleton-first**: shapes live as Pydantic models in one quaranti
 | Console | Pi extension (TS) | Open-source (MIT), European, extensible; npm-distributed. Replaceable through the API contract.                                                                                     |
 | Models | Provider-agnostic env config (`FABERON_MODEL`) | Local/open models first-class. Tests use `TestModel`.                                                                                                     |
 | Database | Postgres via `FABERON_DATABASE_URL` | Native install on dev machines; scripted userspace install (no root) on login nodes.                                                                |
-| Scale-up path | Temporal | Same Pydantic AI integration interface; only on genuine scale triggers.                                                                                                             |

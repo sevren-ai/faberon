@@ -2,27 +2,44 @@
 
 Process rules for every contributor, human or agent.
 
-## Before you start
+## What to work on
 
-Read the design docs:
+Read the design docs before starting, in this order:
 
 1. `docs/design/design.md`: the stable system design.
 2. `docs/design/roadmap.md`: features planned for the near future, plus open questions.
 3. The current WIP release doc: the `docs/design/vX.Y.Z.md` whose status line reads "current WIP".
 
-## Repository workflow
+How to use them:
 
-- Work happens on feature branches merged by PR. Keep PRs small and self-contained.
-- Work targets the current WIP release. When starting work toward a new release, bump the version at the start of the feature branch (`packages/control-plane/pyproject.toml` and `faberon.__version__`), so every artifact knows what it is working toward. Do not wait until merge time.
-- A release is cut by merging to `main` and tagging `vX.Y.Z`.
+- Work targets the current WIP release. Its progress checklist is the to-do list.
+- Check off items in the same commit/PR that implements the work.
+- Update docs in the same commit/PR that changes a decision: `roadmap.md` for plan changes, `design.md` only when the stable architecture genuinely changes.
+- Speculative ideas belong in `docs/design/future.md`, not in the roadmap or in code comments.
+- The current WIP release doc stays editable until it ships. Never edit a `vX.Y.Z.md` after that version has shipped.
+- When starting work toward a new release, bump the version at the start of the feature branch (`packages/control-plane/pyproject.toml` and `faberon.__version__`), so every artifact knows what it is working toward. Do not wait until merge time.
+
+## Git and pull requests
+
+- Work on feature branches. Keep PRs small and self-contained.
+- Agents must not commit, push, or open PRs. A human reviews the changes, commits, pushes, and opens the PR.
+- Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Explain briefly what the PR does and why. If an agent helped with the implementation, disclose that under an `## AI Disclaimer` subheader in the PR body.
 - `main` stays green. CI (`.github/workflows/test.yml`) runs the test suite on every PR and on `main`; a red run blocks the merge.
+- A release is cut by merging to `main` and tagging `vX.Y.Z`.
 
-## Keeping docs in sync
+## Testing
 
-- When a change makes a new decision or changes an existing one, update the docs in the same PR: `docs/design/roadmap.md` for plan changes, `docs/design/design.md` only when the stable architecture genuinely changes.
-- The current WIP release doc stays editable until it ships.
-- Never edit `docs/design/vX.Y.Z.md` for a version that has already shipped (a git tag with that version exists).
-- Progress on the current WIP release is tracked as a checklist in that release's design doc. Check off items in the same commit/PR that lands the work. 
+From `packages/control-plane/`:
+
+```bash
+uv sync --locked
+uv run pytest
+```
+
+- Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
+- Keep tests small and focused. One behaviour per test when practical.
+- Roughly one test file per Python module, mirroring the package layout (for example `schema/plan.py` → `tests/test_schema/test_plan.py`).
+- Every test should protect a behaviour we care about. Prefer a few meaningful tests over many trivial ones that only restate the implementation.
 
 ## GitHub Actions
 
@@ -31,4 +48,3 @@ Read the design docs:
 ## Writing style
 
 - Docs in this repo are written plainly: short sentences, no em-dashes, no hype. Agents follow the detailed style guide in `AGENTS.md`; human-written prose follows the same spirit.
-- PR descriptions should be concise and readable, no long LLM-generated walls of text. Explain briefly what the PR does and why.

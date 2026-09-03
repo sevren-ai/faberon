@@ -1,6 +1,6 @@
 # AGENTS.md
 
-You are a contributor: follow [CONTRIBUTING.md](CONTRIBUTING.md) for process (workflow, doc sync, CI). This file adds what is specific to working as an agent.
+You are a contributor: follow [CONTRIBUTING.md](CONTRIBUTING.md) for process (what to work on, git/PRs, testing, CI). This file adds what is specific to working as an agent.
 
 ## Context loading
 
@@ -23,6 +23,7 @@ Applies to everything you produce: design docs, READMEs, code comments, commit m
   - Sentences that restate the heading or the previous sentence.
 - Banned words: "seam" and "load-bearing". Say "contract" or "boundary" instead of "seam", and "critical" or "essential" instead of "load-bearing".
 - Prefer concrete statements over abstract framing.
+- Code comments and docstrings document what is there and, when useful, why. Do not use them to plan future work; that belongs in the design docs.
 
 Examples:
 

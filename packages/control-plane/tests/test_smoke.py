@@ -1,5 +1,5 @@
 import faberon
 
 
-def test_version():
-    assert faberon.__version__ == "0.1.0"
+def test_package_importable():
+    assert faberon.__version__
