@@ -24,7 +24,7 @@ How to use them:
 - Work on feature branches. Keep PRs small and self-contained.
 - Agents must not commit, push, or open PRs. A human reviews the changes, commits, pushes, and opens the PR.
 - Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Explain briefly what the PR does and why. If an agent helped with the implementation, disclose that under an `## AI Disclaimer` subheader in the PR body.
-- `main` stays green. CI runs ruff (`.github/workflows/lint.yml`) and the test suite (`.github/workflows/test.yml`) on every PR and on `main`; a red run blocks the merge.
+- `main` stays green. CI runs ruff, ty, and the test suite (`.github/workflows/lint.yml`, `.github/workflows/test.yml`) on every PR and on `main`; a red run blocks the merge.
 - A release is cut by merging to `main` and tagging `vX.Y.Z`.
 
 ## Testing
@@ -46,6 +46,16 @@ uv run ruff check src tests
 ```
 
 CI runs `ruff format --check` and `ruff check` on every PR. A red run blocks the merge. Run the commands above before pushing.
+
+## Type checking
+
+`ty` type-checks the Python code. From `packages/control-plane/`:
+
+```bash
+uv run ty check src tests
+```
+
+CI runs `ty check` on every PR. A red run blocks the merge. Run the command above before pushing.
 
 - Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
 - Keep tests small and focused. One behaviour per test when practical.

@@ -1,7 +1,5 @@
 """Tests for faberon.executor."""
 
-from typing import assert_type
-
 import pytest
 
 from faberon.executor import Executor, JobState, SubmitRequest
@@ -19,7 +17,9 @@ def _request(**overrides) -> SubmitRequest:
 
 def test_inmemory_executor():
     executor = InMemoryExecutor()
-    assert_type(InMemoryExecutor(), Executor)
+
+    # Verify InMemoryExecutor satisfies the Executor protocol
+    _check: Executor = executor
 
     # submit -> RUNNING
     job_id = executor.submit(_request(submission_key="my_bestest_job"))
