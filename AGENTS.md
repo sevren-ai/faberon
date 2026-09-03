@@ -1,6 +1,6 @@
 # AGENTS.md
 
-You are a contributor: follow [CONTRIBUTING.md](CONTRIBUTING.md) for process (workflow, doc sync, CI). This file adds what is specific to working as an agent.
+You are a contributor: follow [CONTRIBUTING.md](CONTRIBUTING.md) for process (what to work on, git/PRs, testing, CI). This file adds what is specific to working as an agent.
 
 ## Context loading
 
