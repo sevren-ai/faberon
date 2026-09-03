@@ -24,6 +24,20 @@ Read the design docs:
 - Never edit `docs/design/vX.Y.Z.md` for a version that has already shipped (a git tag with that version exists).
 - Progress on the current WIP release is tracked as a checklist in that release's design doc. Check off items in the same commit/PR that lands the work. 
 
+## Testing
+
+From `packages/control-plane/`:
+
+```bash
+uv sync --locked
+uv run pytest
+```
+
+- Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
+- Keep tests small and focused. One behaviour per test when practical.
+- Roughly one test file per Python module, mirroring the package layout (for example `schema/plan.py` → `tests/test_schema/test_plan.py`).
+- Every test should protect a behaviour we care about. Prefer a few meaningful tests over many trivial ones that only restate the implementation.
+
 ## GitHub Actions
 
 - Pin actions to full-length commit SHAs with a version comment (for example `actions/checkout@3d3c42e5... # v7.0.1`), never to moving tags.

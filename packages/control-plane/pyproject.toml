@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Faberon: Autonomous ML Research Harness"
 requires-python = ">=3.14"
 license = { text = "MIT" }
-dependencies = []
+dependencies = [
+    "pydantic>=2.13.5",
+]
 
 [build-system]
 requires = ["uv_build>=0.11.0,<0.12.0"]
