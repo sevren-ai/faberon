@@ -8,9 +8,6 @@ from faberon.executor import JobState, SubmitRequest, Executor
 
 from mock_up import InMemoryExecutor
 
-# Verify InMemoryExecutor satisfies the Executor protocol at import time.
-assert_type(InMemoryExecutor(), Executor)
-
 
 def _request(**overrides) -> SubmitRequest:
     data = {
@@ -21,33 +18,35 @@ def _request(**overrides) -> SubmitRequest:
     return SubmitRequest.model_validate(data)
 
 
-def test_submit_status_complete():
+def test_inmemory_executor():
     executor = InMemoryExecutor()
-    job_id = executor.submit(_request())
+    assert_type(InMemoryExecutor(), Executor)
+
+    # submit -> RUNNING
+    job_id = executor.submit(_request(submission_key="my_bestest_job"))
     assert executor.status(job_id).state == JobState.RUNNING
 
+    # complete -> COMPLETED
     executor.complete(job_id, exit_code=0)
     done = executor.status(job_id)
     assert done.state == JobState.COMPLETED
     assert done.exit_code == 0
+    assert executor.status(job_id).state == JobState.COMPLETED
 
+    # submit duplicate -> idempotent
+    job_id_2 = executor.submit(_request(submission_key="my_bestest_job"))
+    assert job_id == job_id_2
+    assert executor.status(job_id_2).state == JobState.COMPLETED
 
-def test_submit_is_idempotent_on_submission_key():
-    executor = InMemoryExecutor()
-    first = executor.submit(_request(submission_key="same"))
-    second = executor.submit(_request(submission_key="same", command=["echo", "other"]))
-    assert first == second
-    assert executor.status(first).state == JobState.RUNNING
+    # submit new job -> different ID
+    job_id_3 = executor.submit(_request(submission_key="some_awful_job"))
+    assert job_id != job_id_3
+    assert executor.status(job_id_3).state == JobState.RUNNING
 
+    # cancel -> CANCELED
+    executor.cancel(job_id_3)
+    assert executor.status(job_id_3).state == JobState.CANCELLED
 
-def test_cancel_running_job():
-    executor = InMemoryExecutor()
-    job_id = executor.submit(_request())
-    executor.cancel(job_id)
-    assert executor.status(job_id).state == JobState.CANCELLED
-
-
-def test_status_unknown_job_raises():
-    executor = InMemoryExecutor()
+    # unknown ID -> raises
     with pytest.raises(KeyError):
-        executor.status("missing")
+        executor.status("weird_ID")
