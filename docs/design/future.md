@@ -25,6 +25,7 @@ Default is Pi on the login node next to the brain (see [design.md](design.md)).
 ## Durability and scale
 
 - Migrate from DBOS to Temporal if multi-service scale or team-platform needs appear. Same Pydantic AI integration interface; bounded rearchitecture.
+- Retention policy for the ledger and run artifacts (what to keep, for how long, and who decides).
 
 ## Research loop extensions
 
