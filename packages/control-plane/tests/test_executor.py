@@ -1,11 +1,10 @@
 """Tests for faberon.executor."""
 
-import pytest
-
 from typing import assert_type
 
-from faberon.executor import JobState, SubmitRequest, Executor
+import pytest
 
+from faberon.executor import Executor, JobState, SubmitRequest
 from mock_up import InMemoryExecutor
 
 
