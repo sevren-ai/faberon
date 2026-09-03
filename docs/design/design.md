@@ -1,6 +1,6 @@
 # Faberon: System Design
 
-**Status:** stable document. Changes rarely, and only through design review. Near-term plans live in [roadmap.md](roadmap.md); speculative future ideas in [future.md](future.md). Release scopes live in per-version docs (for example [v0.1.0](v0.1.0.md)).
+**Status:** stable document. Changes rarely, and only through design review. Near-term plans live in [roadmap.md](roadmap.md); speculative future ideas in [future.md](future.md). Release scopes live in per-version docs (`docs/design/vX.Y.Z.md`).
 
 ## 1. Purpose
 
@@ -39,7 +39,7 @@ Three tiers connected by explicit contracts (typed JSON over HTTP/SSE, plus JSON
                               └────────────────────────────────────┘
 ```
 
-- **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the console is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps console and brain independently replaceable. For v0.1.0 there is no console yet; intake is `curl` against the same API.
+- **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the console is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps console and brain independently replaceable.
 - **Console**: a Pi extension. Hosts the drafter, live status, idea injection, and approvals. It reasons conversationally, but every write is a human-initiated API call. Default: runs on the login node next to the brain.
 - **Execution**: the Slurm cluster. The experiment repo (for example `autoresearch`) lives on the cluster filesystem so compute nodes and the brain see the same tree.
 
