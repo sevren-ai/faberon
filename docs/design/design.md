@@ -1,6 +1,6 @@
 # Faberon: System Design
 
-**Status:** stable document. Changes rarely, and only through design review. Planned work, open questions, and the decision log live in [roadmap.md](roadmap.md). Release scopes live in per-version docs (for example [v0.1.0](v0.1.0.md)).
+**Status:** stable document. Changes rarely, and only through design review. Near-term plans live in [roadmap.md](roadmap.md); speculative future ideas in [future.md](future.md). Release scopes live in per-version docs (for example [v0.1.0](v0.1.0.md)).
 
 ## 1. Purpose
 
@@ -45,7 +45,7 @@ Three tiers connected by explicit contracts (typed JSON over HTTP/SSE, plus JSON
 
 Design rule: **one brain**. The console and the drafter propose; the brain disposes; the ledger remembers.
 
-**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, console (when present), and the experiment checkout. All state (Postgres, JSONL, notes, artifacts) lives there; there is no central Faberon server. FastAPI binds to localhost. An optional bearer token (`FABERON_API_TOKEN`) guards the API only if the port is ever opened off-host. A remote console (laptop talking to the login node) is optional later, not the default. Multi-user is deferred. Dev loop for Faberon itself: workstation → GitHub → pull on the login node.
+**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, console (when present), and the experiment checkout. All state (Postgres, JSONL, notes, artifacts) lives there; there is no central Faberon server. FastAPI binds to localhost. An optional bearer token (`FABERON_API_TOKEN`) guards the API only if the port is ever opened off-host. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote console, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
 
 ## 3. Key Mechanisms
 
@@ -79,4 +79,3 @@ Contracts are **skeleton-first**: shapes live as Pydantic models in one quaranti
 | Console | Pi extension (TS) | Open-source (MIT), European, extensible; npm-distributed. Replaceable through the API contract.                                                                                     |
 | Models | Provider-agnostic env config (`FABERON_MODEL`) | Local/open models first-class. Tests use `TestModel`.                                                                                                     |
 | Database | Postgres via `FABERON_DATABASE_URL` | Native install on dev machines; scripted userspace install (no root) on login nodes.                                                                |
-| Scale-up path | Temporal | Same Pydantic AI integration interface; only on genuine scale triggers.                                                                                                             |
