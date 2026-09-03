@@ -24,17 +24,36 @@ How to use them:
 - Work on feature branches. Keep PRs small and self-contained.
 - Agents must not commit, push, or open PRs. A human reviews the changes, commits, pushes, and opens the PR.
 - Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Explain briefly what the PR does and why. If an agent helped with the implementation, disclose that under an `## AI Disclaimer` subheader in the PR body.
-- `main` stays green. CI (`.github/workflows/test.yml`) runs the test suite on every PR and on `main`; a red run blocks the merge.
+- `main` stays green. CI runs `ruff`, `ty`, and the test suite (`.github/workflows/lint.yml`, `.github/workflows/test.yml`) on every PR and on `main`; a red run blocks the merge.
 - A release is cut by merging to `main` and tagging `vX.Y.Z`.
 
 ## Testing
 
-From `packages/control-plane/`:
+From the repo root:
 
 ```bash
-uv sync --locked
-uv run pytest
+scripts/test.sh
 ```
+
+This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, mirroring `.github/workflows/test.yml`.
+
+## Formatting and linting
+
+Ruff formats and lints the Python code. From the repo root:
+
+```bash
+scripts/lint.sh
+```
+
+This runs `uv sync --locked`, `ruff format --check`, `ruff check`, and `ty check` in `packages/control-plane/`, mirroring `.github/workflows/lint.yml`. To apply formatting and lint fixes instead of just checking:
+
+```bash
+cd packages/control-plane
+uv run ruff format src tests
+uv run ruff check --fix src tests
+```
+
+CI runs `ruff format --check`, `ruff check`, and `ty check` on every PR. A red run blocks the merge. Run `scripts/lint.sh` before pushing.
 
 - Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
 - Keep tests small and focused. One behaviour per test when practical.

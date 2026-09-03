@@ -2,10 +2,7 @@
 
 import pytest
 
-from typing import assert_type
-
-from faberon.executor import JobState, SubmitRequest, Executor
-
+from faberon.executor import Executor, JobState, SubmitRequest
 from mock_up import InMemoryExecutor
 
 
@@ -20,7 +17,9 @@ def _request(**overrides) -> SubmitRequest:
 
 def test_inmemory_executor():
     executor = InMemoryExecutor()
-    assert_type(InMemoryExecutor(), Executor)
+
+    # Verify InMemoryExecutor satisfies the Executor protocol
+    _check: Executor = executor
 
     # submit -> RUNNING
     job_id = executor.submit(_request(submission_key="my_bestest_job"))

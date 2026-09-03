@@ -1,6 +1,6 @@
 """Ledger event record and event type vocabulary."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
@@ -26,7 +26,7 @@ class Event(BaseModel):
     """Append-only ledger record."""
 
     id: UUID = Field(default_factory=uuid4)
-    ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    ts: datetime = Field(default_factory=lambda: datetime.now(UTC))
     campaign_id: UUID
     actor: Actor
     type: EventType

@@ -1,6 +1,5 @@
 """In-memory mock-ups for testing."""
 
-
 from faberon.executor import JobInfo, JobState, SubmitRequest
 
 
@@ -36,4 +35,6 @@ class InMemoryExecutor:
         """Test helper: mark a running job finished."""
         job = self.status(job_id)
         state = JobState.COMPLETED if exit_code == 0 else JobState.FAILED
-        self._jobs[job_id] = job.model_copy(update={"state": state, "exit_code": exit_code})
+        self._jobs[job_id] = job.model_copy(
+            update={"state": state, "exit_code": exit_code}
+        )
