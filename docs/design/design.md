@@ -23,24 +23,29 @@ Terminology:
 Three tiers connected by explicit contracts (typed JSON over HTTP/SSE, plus JSONL files). Any tier is replaceable without touching the others.
 
 ```
-┌───────────────────┐      REST + SSE     ┌────────────────────────────────┐
-│ Console           │◄──(bearer token────►│ Control plane: the only brain  │
-│ (Pi ext., TS;     │    once off-host)   │ Pydantic AI · DBOS · FastAPI   │
-│ hosts the drafter)│                     │ · Postgres · on the login node │
-└───────────────────┘                     └──────┬───────────────▲─────────┘
-                                          submit ▼ local sbatch  │ sacct poll
-                                          ┌────────────────────────────────┐
-                                          │ Slurm cluster (execution)      │
-                                          └────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Login node                                                               │
+│  ┌─────────────────┐  REST+SSE   ┌────────────────────────────────────┐  │
+│  │ Console         │◄─localhost─►│ Control plane: the only brain      │  │
+│  │ (Pi ext., TS;   │             │ Pydantic AI · DBOS · FastAPI       │  │
+│  │ hosts drafter)  │             │ · Postgres                         │  │
+│  └─────────────────┘             └──────┬───────────────▲─────────────┘  │
+│                                  submit ▼ local sbatch  │ sacct poll     │
+│  experiment repo (shared FS, visible to compute nodes)                   │
+└──────────────────────────────────────┬──────────────────┼────────────────┘
+                                       │                  │
+                              ┌────────▼──────────────────┴────────┐
+                              │ Slurm cluster (execution)          │
+                              └────────────────────────────────────┘
 ```
 
-- **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. The control plane runs on the cluster login node, so Slurm calls are local subprocesses with no SSH transport.
-- **Console**: a Pi extension. Hosts the drafter, live status, idea injection, and approvals. It reasons conversationally, but every write is a human-initiated API call.
-- **Execution**: the Slurm cluster.
+- **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the console is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps console and brain independently replaceable. For v0.1.0 there is no console yet; intake is `curl` against the same API.
+- **Console**: a Pi extension. Hosts the drafter, live status, idea injection, and approvals. It reasons conversationally, but every write is a human-initiated API call. Default: runs on the login node next to the brain.
+- **Execution**: the Slurm cluster. The experiment repo (for example `autoresearch`) lives on the cluster filesystem so compute nodes and the brain see the same tree.
 
 Design rule: **one brain**. The console and the drafter propose; the brain disposes; the ledger remembers.
 
-**Deployment model.** Self-hosted per deployment. All state (Postgres, JSONL, notes, artifacts) lives on the operator's machines, and there is no central Faberon server. Trust is single-operator: one optional bearer token (`FABERON_API_TOKEN`) guards the API once it is reachable off-host, which happens early since console and brain typically run on different machines. Multi-user is deferred. Dev loop: workstation → GitHub → login node.
+**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, console (when present), and the experiment checkout. All state (Postgres, JSONL, notes, artifacts) lives there; there is no central Faberon server. FastAPI binds to localhost. An optional bearer token (`FABERON_API_TOKEN`) guards the API only if the port is ever opened off-host. A remote console (laptop talking to the login node) is optional later, not the default. Multi-user is deferred. Dev loop for Faberon itself: workstation → GitHub → pull on the login node.
 
 ## 3. Key Mechanisms
 
