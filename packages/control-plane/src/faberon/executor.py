@@ -1,0 +1,39 @@
+"""Job executor: submit, poll status, cancel."""
+
+from enum import StrEnum
+from typing import Protocol
+
+from pydantic import BaseModel, Field
+
+
+class JobState(StrEnum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class SubmitRequest(BaseModel):
+    """Request to start a job."""
+
+    command: list[str] = Field(min_length=1)
+    submission_key: str = Field(min_length=1)
+
+
+class JobInfo(BaseModel):
+    """All current info of a certain job."""
+
+    job_id: str
+    state: JobState
+    exit_code: int | None = None
+
+
+class Executor(Protocol):
+    def submit(self, request: SubmitRequest) -> str:
+        """Start a job. Returns a job id. Same submission_key returns the same id."""
+
+    def status(self, job_id: str) -> JobInfo:
+        """Return the current status of a job."""
+
+    def cancel(self, job_id: str) -> None:
+        """Cancel a job if it is still running."""
