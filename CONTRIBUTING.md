@@ -23,7 +23,7 @@ How to use them:
 
 - Work on feature branches. Keep PRs small and self-contained.
 - Agents must not commit, push, or open PRs. A human reviews the changes, commits, pushes, and opens the PR.
-- Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Explain briefly what the PR does and why. If an agent helped with the implementation, disclose that under an `## AI Disclaimer` subheader in the PR body.
+- Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Follow the PR template in `.github/PULL_REQUEST_TEMPLATE.md` (summary, AI disclaimer, and the on-cluster Slurm integration test output).
 - `main` stays green. CI runs `ruff`, `ty`, and the test suite (`.github/workflows/lint.yml`, `.github/workflows/test.yml`) on every PR and on `main`; a red run blocks the merge.
 - A release is cut by merging to `main` and tagging `vX.Y.Z`.
 
@@ -37,6 +37,16 @@ scripts/test.sh
 
 This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, mirroring `.github/workflows/test.yml`.
 
+### On-cluster Slurm tests
+
+Tests that submit real jobs to Slurm live in `tests/test_executor/test_slurm_integration.py`. They are skipped by default so a plain `pytest` run never submits jobs, in CI or on a login node. To run them on a login node that has `sbatch` on `PATH`:
+
+```bash
+FABERON_SLURM_ACCOUNT=<account> scripts/test_slurm.sh
+```
+
+`FABERON_SLURM_ACCOUNT` is the Slurm account jobs are billed to; the cluster requires it. The script sets `FABERON_SLURM_INTEGRATION=1` to opt in and runs `pytest -m slurm`. These verify actual behaviour on the cluster.
+
 ## Formatting and linting
 
 Ruff formats and lints the Python code. From the repo root:
@@ -45,15 +55,13 @@ Ruff formats and lints the Python code. From the repo root:
 scripts/lint.sh
 ```
 
-This runs `uv sync --locked`, `ruff format --check`, `ruff check`, and `ty check` in `packages/control-plane/`, mirroring `.github/workflows/lint.yml`. To apply formatting and lint fixes instead of just checking:
+This runs `uv sync --locked`, `ruff format`, `ruff check --fix`, and `ty check` in `packages/control-plane/`. It writes formatting and lint fixes back to the source. CI (`.github/workflows/lint.yml`) runs the check-only variants (`ruff format --check`, `ruff check`, `ty check`) and blocks the merge on a red run. Run `scripts/lint.sh` before pushing.
 
-```bash
-cd packages/control-plane
-uv run ruff format src tests
-uv run ruff check --fix src tests
-```
+## Imports
 
-CI runs `ruff format --check`, `ruff check`, and `ty check` on every PR. A red run blocks the merge. Run `scripts/lint.sh` before pushing.
+Use relative imports inside a package (`from .events import Event`), not absolute (`from faberon.schema.events import Event`). This keeps packages relocatable and signals the sibling relationship at the call site.
+
+Absolute imports are for cross-package boundaries (`from faberon.executor import Executor`). The test suite is itself a package: use relative imports within it, absolute imports to reach `faberon`.
 
 - Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
 - Keep tests small and focused. One behaviour per test when practical.
