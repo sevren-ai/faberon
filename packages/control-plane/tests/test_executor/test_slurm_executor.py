@@ -21,7 +21,7 @@ from faberon.executor.slurm import (
 
 def test_render_script():
     script = _render_script(["echo", "a b", "$X"])
-    assert script.startswith("#!/bin/bash\nset -euo pipefail\nexec ")
+    assert script.startswith("#!/bin/sh\nset -eu\nexec ")
     assert "echo 'a b' '$X'" in script
 
 

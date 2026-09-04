@@ -15,8 +15,8 @@ _CANCELLED_STATES = {"CANCELLED", "REVOKED"}
 
 
 def _render_script(command: Sequence[str]) -> str:
-    script = "#!/bin/bash\n"
-    script += "set -euo pipefail\n"  # fail loudly & early
+    script = "#!/bin/sh\n"
+    script += "set -eu\n"  # fail loudly & early
 
     quoted = " ".join(shlex.quote(a) for a in command)
     script += "exec " + quoted + "\n"
