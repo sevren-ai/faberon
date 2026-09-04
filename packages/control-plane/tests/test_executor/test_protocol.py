@@ -1,4 +1,4 @@
-"""Tests for faberon.executor."""
+"""Tests for faberon.executor.protocol."""
 
 import pytest
 
