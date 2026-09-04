@@ -3,7 +3,8 @@
 import pytest
 
 from faberon.executor import Executor, JobState, SubmitRequest
-from mock_up import InMemoryExecutor
+
+from .mock_up import InMemoryExecutor
 
 
 def _request(**overrides) -> SubmitRequest:
