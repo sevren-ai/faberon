@@ -25,3 +25,8 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slurm: requires a real Slurm cluster; opt in with FABERON_SLURM_INTEGRATION=1",
+]
