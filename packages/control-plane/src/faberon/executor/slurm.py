@@ -23,10 +23,11 @@ def _render_script(command: Sequence[str]) -> str:
     return script
 
 
-def _render_sbatch(job_name: str, command: Sequence[str]) -> list[str]:
+def _render_sbatch(job_name: str, account: str, command: Sequence[str]) -> list[str]:
     return [
         "sbatch",
         "--parsable",
+        f"--account={account}",
         f"--job-name={job_name}",
         "--wrap",
         _render_script(command),
@@ -66,13 +67,18 @@ class SlurmExecutor:
     Job state lives in Slurm, so submission_key idempotency survives restarts.
     """
 
+    def __init__(self, account: str) -> None:
+        self._account = account
+
     def submit(self, request: SubmitRequest) -> str:
         job_name = JOB_NAME_PREFIX + request.submission_key
         existing = self._find_job_by_name(job_name)
         if existing is not None:
             return existing
         result = subprocess.run(
-            _render_sbatch(job_name, request.command), capture_output=True, text=True
+            _render_sbatch(job_name, self._account, request.command),
+            capture_output=True,
+            text=True,
         )
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or "sbatch failed")

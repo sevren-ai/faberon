@@ -19,4 +19,4 @@ A version is a milestone release, not the whole roadmap. Each phase becomes its 
 Questions that affect near-term work. Broader deferred ideas belong in [future.md](future.md).
 
 - Compute-node to login-node HTTP egress (gates the Phase 3 epilog webhook).
-- Cluster specifics for v0.1.0: partition, GPU type/count, account/QoS, walltime limits; login-node internet for data prep.
+- Cluster specifics for v0.1.0: partition, GPU type/count, QoS, walltime limits; login-node internet for data prep.

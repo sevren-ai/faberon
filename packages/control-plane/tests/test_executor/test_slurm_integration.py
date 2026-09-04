@@ -27,10 +27,19 @@ pytestmark = [
         not os.environ.get("FABERON_SLURM_INTEGRATION"),
         reason="set FABERON_SLURM_INTEGRATION=1 to run on-cluster Slurm tests",
     ),
+    pytest.mark.skipif(
+        not os.environ.get("FABERON_SLURM_ACCOUNT"),
+        reason="set FABERON_SLURM_ACCOUNT to the Slurm account to bill jobs to",
+    ),
 ]
 
 _POLL_DEADLINE_S = 120
 _POLL_INTERVAL_S = 1.0
+
+
+@pytest.fixture
+def executor() -> SlurmExecutor:
+    return SlurmExecutor(account=os.environ["FABERON_SLURM_ACCOUNT"])
 
 
 def _wait_for_terminal(executor: SlurmExecutor, job_id: str) -> JobState:
@@ -48,32 +57,28 @@ def _request(command: list[str], key: str) -> SubmitRequest:
     return SubmitRequest.model_validate({"command": command, "submission_key": key})
 
 
-def test_submit_success():
-    executor = SlurmExecutor()
+def test_submit_success(executor: SlurmExecutor):
     key = f"test-true-{uuid.uuid4().hex[:8]}"
     job_id = executor.submit(_request(["true"], key))
     assert _wait_for_terminal(executor, job_id) == JobState.COMPLETED
     assert executor.status(job_id).exit_code == 0
 
 
-def test_submit_failure():
-    executor = SlurmExecutor()
+def test_submit_failure(executor: SlurmExecutor):
     key = f"test-false-{uuid.uuid4().hex[:8]}"
     job_id = executor.submit(_request(["false"], key))
     assert _wait_for_terminal(executor, job_id) == JobState.FAILED
     assert executor.status(job_id).exit_code != 0
 
 
-def test_cancell():
-    executor = SlurmExecutor()
+def test_cancel(executor: SlurmExecutor):
     key = f"test-sleep-{uuid.uuid4().hex[:8]}"
     job_id = executor.submit(_request(["sleep", "300"], key))
     executor.cancel(job_id)
     assert _wait_for_terminal(executor, job_id) == JobState.CANCELLED
 
 
-def test_submit_same_key():
-    executor = SlurmExecutor()
+def test_submit_same_key(executor: SlurmExecutor):
     key = f"test-idem-{uuid.uuid4().hex[:8]}"
     first = executor.submit(_request(["true"], key))
     second = executor.submit(_request(["true"], key))
