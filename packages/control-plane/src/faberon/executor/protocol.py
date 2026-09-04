@@ -1,4 +1,4 @@
-"""Job executor: submit, poll status, cancel."""
+"""Job executor contract: submit, poll status, cancel."""
 
 from enum import StrEnum
 from typing import Protocol

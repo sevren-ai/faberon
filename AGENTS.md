@@ -32,3 +32,10 @@ Good: "The control plane is the only component that decides. It runs the experim
 
 Bad: "Moreover, it's worth noting that the ledger is append-only."
 Good: "The ledger is append-only."
+
+## Code standards
+
+- Prefer the simplest implementation that works. Do not add optional fields, defaults, or forward-looking abstractions until the current feature needs them.
+- Production code is written for production, not for the tests. Keep test accommodations out of the main package:
+  - Do not add parameters, constructors, or protocols whose primary purpose is to let a test substitute a fake.
+  - Do not add test-only defaults, flags, or branches that exist solely so a test can reach in.

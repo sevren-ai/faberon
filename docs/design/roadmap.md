@@ -19,4 +19,5 @@ A version is a milestone release, not the whole roadmap. Each phase becomes its 
 Questions that affect near-term work. Broader deferred ideas belong in [future.md](future.md).
 
 - Compute-node to login-node HTTP egress (gates the Phase 3 epilog webhook).
-- Cluster specifics for v0.1.0: partition, GPU type/count, account/QoS, walltime limits; login-node internet for data prep.
+- Cluster specifics for v0.1.0: partition, GPU type/count, QoS, walltime limits; login-node internet for data prep.
+- Constraint-aware judgment: today judgment scores one metric movement with a confidence measure. Constraint-driven search (e.g. edge models that must fit a size or memory budget) needs a hard gate distinct from the scored objective: keep only if the metric moves AND the run satisfies a budget. Settles where the constraint lives (plan schema field vs. judgment step) and whether it is a per-run gate or a campaign-level rule.

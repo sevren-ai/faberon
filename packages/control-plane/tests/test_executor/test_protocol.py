@@ -1,9 +1,10 @@
-"""Tests for faberon.executor."""
+"""Tests for faberon.executor.protocol."""
 
 import pytest
 
 from faberon.executor import Executor, JobState, SubmitRequest
-from mock_up import InMemoryExecutor
+
+from .mock_up import InMemoryExecutor
 
 
 def _request(**overrides) -> SubmitRequest:

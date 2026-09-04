@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Run the lint checks CI runs, locally. Exits non-zero on the first failure.
-# Mirrors .github/workflows/lint.yml.
+# Run the lint checks CI runs, locally, and apply fixes. Exits non-zero on
+# the first failure. Unlike .github/workflows/lint.yml, which checks only,
+# this script writes fixes back to the source.
 #
 # Usage: scripts/lint.sh
 
@@ -16,11 +17,11 @@ cd "$pkg"
 echo ">> uv sync --locked"
 uv sync --locked
 
-echo ">> ruff format --check src tests"
-uv run ruff format --check src tests
+echo ">> ruff format src tests"
+uv run ruff format src tests
 
-echo ">> ruff check src tests"
-uv run ruff check src tests
+echo ">> ruff check --fix src tests"
+uv run ruff check --fix src tests
 
 echo ">> ty check src tests"
 uv run ty check src tests
