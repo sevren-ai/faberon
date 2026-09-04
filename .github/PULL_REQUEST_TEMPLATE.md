@@ -17,9 +17,11 @@ Run on the login node:
 
 Paste the full output, including the summary line, for example:
 
+```
     collected 31 items / 27 deselected / 4 selected
     tests/test_executor/test_slurm_integration.py ....                                                                                                                                               [100%]
     4 passed, 27 deselected in 12.84s
+```
 
 If you do not have cluster access, state that explicitly here.
 -->

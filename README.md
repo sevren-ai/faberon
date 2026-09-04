@@ -9,3 +9,29 @@ Sevren's autonomous ML Research Harness
 - `AGENTS.md`: agent-specific rules (context loading, writing style), read first by any coding agent
 
 The console (Pi extension, TypeScript) joins as a sibling package in upcoming work.
+
+## Setup
+
+The control plane stores its ledger in Postgres. You need a local Postgres to run Faberon (and to run the ledger tests).
+
+On Fedora:
+
+```bash
+sudo dnf install postgresql-server postgresql-contrib
+sudo postgresql-setup --initdb          # creates the data dir with peer auth
+sudo systemctl enable --now postgresql  # start it, and on boot
+sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
+scripts/setup-db.sh                     # creates the faberon database
+export FABERON_DATABASE_URL=postgres:///faberon
+```
+
+On Ubuntu:
+
+```bash
+sudo apt install postgresql postgresql-contrib   # package inits the cluster and starts the service
+sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
+scripts/setup-db.sh                             # creates the faberon database
+export FABERON_DATABASE_URL=postgres:///faberon
+```
+
+`postgres:///faberon` connects over the local unix socket using peer auth (you are authenticated as your OS user, no password, no network). Data persists on disk under the Postgres data directory.
