@@ -24,6 +24,7 @@ Default is Pi on the login node next to the brain (see [design.md](design.md)).
 
 ## Durability and scale
 
+- **JSONL mirror of the ledger.** v0.1.0 writes the ledger to Postgres only. A JSONL copy (the portable, human-readable export described in `design.md` §3) is deferred until there's a real consumer: an export job, an off-system reader, or a need to ship events somewhere Postgres doesn't reach. Adding it later is a `Ledger.append` change (write a line alongside the INSERT); the schema and `seq` ordering are unaffected.
 - Migrate from DBOS to Temporal if multi-service scale or team-platform needs appear. Same Pydantic AI integration interface; bounded rearchitecture.
 - Retention policy for the ledger and run artifacts (what to keep, for how long, and who decides).
 
