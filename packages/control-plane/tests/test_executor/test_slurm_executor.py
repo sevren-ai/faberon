@@ -56,6 +56,7 @@ def test_parse_exit_code(exit_string, expected):
     [
         ("COMPLETED|0:0", ("COMPLETED", "0:0")),
         ("FAILED|2:0", ("FAILED", "2:0")),
+        ("CANCELLED by 1807600296|0:0", ("CANCELLED by 1807600296", "0:0")),
     ],
 )
 def test_parse_sacct_line(line, expected):
@@ -68,10 +69,18 @@ def test_parse_sacct_line(line, expected):
         ("COMPLETED", "0:0", JobState.COMPLETED, 0),
         ("FAILED", "2:0", JobState.FAILED, 2),
         ("CANCELLED", "0:0", JobState.CANCELLED, None),
+        ("CANCELLED by 1807600296", "0:0", JobState.CANCELLED, None),
         ("TIMEOUT", "0:0", JobState.FAILED, 0),
+        ("OUT_OF_MEMORY", "0:0", JobState.FAILED, 0),
         ("RUNNING", "0:0", JobState.RUNNING, None),
         ("PENDING", "0:0", JobState.RUNNING, None),
+        ("PREEMPTED", "0:0", JobState.RUNNING, None),
     ],
 )
 def test_map_state(slurm_state, exit_string, expected_state, expected_exit):
     assert _map_state(slurm_state, exit_string) == (expected_state, expected_exit)
+
+
+def test_map_state_unknown_raises():
+    with pytest.raises(ValueError):
+        _map_state("UNKNOWN_ISSUE", "0:0")

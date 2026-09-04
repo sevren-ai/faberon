@@ -10,8 +10,23 @@ from .protocol import JobInfo, JobState, SubmitRequest
 JOB_NAME_PREFIX = "faberon:"
 
 # Slurm states grouped by how we map them onto JobState
-_LIVE_STATES = {"PENDING", "RUNNING", "CONFIGURING", "COMPLETING", "REQUEUED"}
+_LIVE_STATES = {
+    "PENDING",
+    "RUNNING",
+    "CONFIGURING",
+    "COMPLETING",
+    "REQUEUED",
+    "PREEMPTED",  # preempted jobs are requeued, so still live
+}
 _CANCELLED_STATES = {"CANCELLED", "REVOKED"}
+_FAILED_STATES = {
+    "FAILED",
+    "TIMEOUT",
+    "OUT_OF_MEMORY",
+    "NODE_FAIL",
+    "BOOT_FAIL",
+    "DEADLINE",
+}
 
 
 def _render_script(command: Sequence[str]) -> str:
@@ -50,14 +65,17 @@ def _parse_sacct_line(line: str) -> tuple[str, str]:
 
 
 def _map_state(slurm_state: str, exit_string: str) -> tuple[JobState, int | None]:
+    # Match by substring
     exit_code = _parse_exit_code(exit_string)
-    if slurm_state in _CANCELLED_STATES:
+    if any(s in slurm_state for s in _CANCELLED_STATES):
         return JobState.CANCELLED, None  # cancelled: no meaningful app exit code
-    if slurm_state == "COMPLETED":
+    if "COMPLETED" in slurm_state:
         return JobState.COMPLETED, exit_code if exit_code is not None else 0
-    if slurm_state in _LIVE_STATES:
+    if any(s in slurm_state for s in _LIVE_STATES):
         return JobState.RUNNING, None
-    return JobState.FAILED, exit_code
+    if any(s in slurm_state for s in _FAILED_STATES):
+        return JobState.FAILED, exit_code
+    raise ValueError(f"unrecognized Slurm state: {slurm_state!r}")
 
 
 class SlurmExecutor:
