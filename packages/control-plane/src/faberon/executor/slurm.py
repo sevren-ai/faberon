@@ -39,7 +39,7 @@ def _render_script(command: Sequence[str]) -> str:
 
 
 def _render_sbatch(
-    job_name: str, account: str, command: Sequence[str], output: str | None = None
+    job_name: str, account: str, command: Sequence[str], *, output: str | None = None
 ) -> list[str]:
     args = [
         "sbatch",
@@ -89,7 +89,7 @@ class SlurmExecutor:
     Job state lives in Slurm, so submission_key idempotency survives restarts.
     """
 
-    def __init__(self, account: str, output: str | None = None) -> None:
+    def __init__(self, account: str, *, output: str | None = None) -> None:
         self._account = account
         self._output = output
 
@@ -99,7 +99,9 @@ class SlurmExecutor:
         if existing is not None:
             return existing
         result = subprocess.run(
-            _render_sbatch(job_name, self._account, request.command, self._output),
+            _render_sbatch(
+                job_name, self._account, request.command, output=self._output
+            ),
             capture_output=True,
             text=True,
         )

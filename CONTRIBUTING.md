@@ -37,6 +37,11 @@ scripts/test.sh
 
 This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, mirroring `.github/workflows/test.yml`.
 
+- Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
+- Keep tests small and focused. One behaviour per test when practical.
+- Roughly one test file per Python module, mirroring the package layout (for example `schema/plan.py` → `tests/test_schema/test_plan.py`).
+- Every test should protect a behaviour we care about. Prefer a few meaningful tests over many trivial ones that only restate the implementation.
+
 ### Ledger tests
 
 The ledger tests need a local Postgres and `FABERON_DATABASE_URL` exported in your shell (see `## Prerequisites` and the `## Setup` section of `README.md`). They skip themselves when `FABERON_DATABASE_URL` is unset, so a plain `scripts/test.sh` run doesn't need a database.
@@ -61,16 +66,20 @@ scripts/lint.sh
 
 This runs `uv sync --locked`, `ruff format`, `ruff check --fix`, and `ty check` in `packages/control-plane/`. It writes formatting and lint fixes back to the source. CI (`.github/workflows/lint.yml`) runs the check-only variants (`ruff format --check`, `ruff check`, `ty check`) and blocks the merge on a red run. Run `scripts/lint.sh` before pushing.
 
-## Imports
+## Coding style
+
+- Prefer the simplest implementation that works. Do not add optional fields, defaults, or forward-looking abstractions until the current feature needs them.
+- Production code is written for production, not for the tests. Keep test accommodations out of the main package:
+  - Do not add parameters, constructors, or protocols whose primary purpose is to let a test substitute a fake.
+  - Do not add test-only defaults, flags, or branches that exist solely so a test can reach in.
+- Optional parameters (those with defaults) are typically keyword-only, separated from required parameters by `*` in the function declaration. 
+
+### Imports
 
 Use relative imports inside a package (`from .events import Event`), not absolute (`from faberon.schema.events import Event`). This keeps packages relocatable and signals the sibling relationship at the call site.
 
 Absolute imports are for cross-package boundaries (`from faberon.executor import Executor`). The test suite is itself a package: use relative imports within it, absolute imports to reach `faberon`.
 
-- Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
-- Keep tests small and focused. One behaviour per test when practical.
-- Roughly one test file per Python module, mirroring the package layout (for example `schema/plan.py` → `tests/test_schema/test_plan.py`).
-- Every test should protect a behaviour we care about. Prefer a few meaningful tests over many trivial ones that only restate the implementation.
 
 ## GitHub Actions
 
