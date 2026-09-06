@@ -38,8 +38,12 @@ _POLL_INTERVAL_S = 1.0
 
 
 @pytest.fixture
-def executor() -> SlurmExecutor:
-    return SlurmExecutor(account=os.environ["FABERON_SLURM_ACCOUNT"])
+def executor(tmp_path) -> SlurmExecutor:
+    # Redirect job stdout, %j expands to the Slurm job id.
+    return SlurmExecutor(
+        account=os.environ["FABERON_SLURM_ACCOUNT"],
+        output=str(tmp_path / "slurm-%j.out"),
+    )
 
 
 def _wait_for_terminal(executor: SlurmExecutor, job_id: str) -> JobState:
