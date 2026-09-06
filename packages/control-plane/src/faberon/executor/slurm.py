@@ -38,15 +38,19 @@ def _render_script(command: Sequence[str]) -> str:
     return script
 
 
-def _render_sbatch(job_name: str, account: str, command: Sequence[str]) -> list[str]:
-    return [
+def _render_sbatch(
+    job_name: str, account: str, command: Sequence[str], output: str | None = None
+) -> list[str]:
+    args = [
         "sbatch",
         "--parsable",
         f"--account={account}",
         f"--job-name={job_name}",
-        "--wrap",
-        _render_script(command),
     ]
+    if output is not None:
+        args.append(f"--output={output}")
+    args += ["--wrap", _render_script(command)]
+    return args
 
 
 def _parse_exit_code(exit_string: str) -> int | None:
@@ -85,8 +89,9 @@ class SlurmExecutor:
     Job state lives in Slurm, so submission_key idempotency survives restarts.
     """
 
-    def __init__(self, account: str) -> None:
+    def __init__(self, account: str, output: str | None = None) -> None:
         self._account = account
+        self._output = output
 
     def submit(self, request: SubmitRequest) -> str:
         job_name = JOB_NAME_PREFIX + request.submission_key
@@ -94,7 +99,7 @@ class SlurmExecutor:
         if existing is not None:
             return existing
         result = subprocess.run(
-            _render_sbatch(job_name, self._account, request.command),
+            _render_sbatch(job_name, self._account, request.command, self._output),
             capture_output=True,
             text=True,
         )
