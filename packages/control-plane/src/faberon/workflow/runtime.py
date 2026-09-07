@@ -1,0 +1,161 @@
+"""Durable experiment workflow: submit, poll, parse, judge, record."""
+
+import json
+import re
+import shlex
+import subprocess
+from uuid import UUID
+
+from dbos import DBOS
+from sqlalchemy import text
+
+from ..executor import Executor, JobInfo, JobState, SubmitRequest
+from ..schema.events import Actor, Event, EventType
+
+
+@DBOS.dbos_class()
+class Runtime:
+    """Owns the executor and the durable experiment workflow.
+
+    Construct one at process startup, register it with
+    `DBOS.register_instance`, then `DBOS.launch()`.
+    `config_name` uniquely identifies the instance for workflow recovery.
+    """
+
+    def __init__(self, executor: Executor, config_name: str) -> None:
+        self.executor = executor
+        self.config_name = config_name
+
+    @DBOS.step()
+    def submit_step(self, command: list[str], submission_key: str) -> str:
+        """Start the job on the cluster. Idempotent on submission_key."""
+        request = SubmitRequest(command=command, submission_key=submission_key)
+        return self.executor.submit(request)
+
+    @DBOS.step()
+    def status_step(self, job_id: str) -> JobInfo:
+        """Read the current status of the job from the cluster."""
+        return self.executor.status(job_id)
+
+    @DBOS.step()
+    def parse_metric_step(self, metric_command: str, metric_name: str) -> float | None:
+        """Run the metric command locally and parse the metric value.
+
+        Returns None if the metric command fails or no float could be
+        parsed. The command is expected to print a line containing the
+        metric name followed by a float, for example `val_bpb: 1.10`.
+        """
+        result = subprocess.run(
+            shlex.split(metric_command), capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            return None
+        return _parse_metric(result.stdout, metric_name)
+
+    @DBOS.step()
+    def judge_step(self, metric_value: float | None, baseline: float) -> str:
+        """Apply the v0.1.0 keep/discard rule: lower is better (keep)."""
+        if metric_value is None:
+            return "discard"
+        return "keep" if metric_value < baseline else "discard"
+
+    @DBOS.transaction()
+    def record_event_step(self, event: Event) -> int:
+        """Append one event to the ledger. Exactly-once via DBOS transaction."""
+
+        row = DBOS.sql_session.execute(
+            text(
+                """
+                INSERT INTO events
+                    (ts, campaign_id, actor, type, justification, payload)
+                VALUES
+                    (:ts, :campaign_id, :actor, :type, :justification,
+                     cast(:payload as jsonb))
+                RETURNING seq
+                """
+            ),
+            {
+                "ts": event.ts,
+                "campaign_id": str(event.campaign_id),
+                "actor": str(event.actor),
+                "type": str(event.type),
+                "justification": event.justification,
+                "payload": json.dumps(event.payload),
+            },
+        ).scalar_one()
+        return int(row)
+
+    @DBOS.workflow()
+    def run_experiment(
+        self,
+        campaign_id: UUID,
+        command: list[str],
+        submission_key: str,
+        metric_command: str,
+        metric_name: str,
+        baseline: float,
+        poll_interval_seconds: float,
+    ) -> str:
+        """Run one experiment durably: submit, poll, parse, judge, record."""
+        job_id = self.submit_step(command, submission_key)
+
+        info = self.status_step(job_id)
+        while not info.state.is_terminal:
+            DBOS.sleep(poll_interval_seconds)
+            info = self.status_step(job_id)
+
+        metric_value: float | None = None
+        if info.state == JobState.COMPLETED and info.exit_code == 0:
+            metric_value = self.parse_metric_step(metric_command, metric_name)
+
+        judgment = self.judge_step(metric_value, baseline)
+        exit_code_str = str(info.exit_code) if info.exit_code is not None else "n/a"
+        metric_value_str = str(metric_value) if metric_value is not None else "n/a"
+
+        self.record_event_step(
+            Event(
+                campaign_id=campaign_id,
+                actor=Actor.AGENT,
+                type=EventType.EXPERIMENT_COMPLETED,
+                justification=f"job {job_id} {info.state.value} exit={exit_code_str}",
+                payload={
+                    "job_id": job_id,
+                    "state": info.state.value,
+                    "exit_code": info.exit_code,
+                },
+            )
+        )
+        self.record_event_step(
+            Event(
+                campaign_id=campaign_id,
+                actor=Actor.AGENT,
+                type=EventType.EXPERIMENT_JUDGED,
+                justification=(
+                    f"metric={metric_value_str} baseline={baseline} judgment={judgment}"
+                ),
+                payload={
+                    "job_id": job_id,
+                    "metric_value": metric_value,
+                    "baseline": baseline,
+                    "judgment": judgment,
+                },
+            )
+        )
+        return judgment
+
+
+# -XXX.YYe-Z
+_FLOAT_RE = re.compile(r"-?\d+\.?\d*(?:[eE][-+]?\d+)?")
+
+
+def _parse_metric(stdout: str, metric_name: str) -> float | None:
+    """Return the last float on the last line that names the metric.
+
+    Returns None if no line names the metric or no float is on it.
+    """
+    for line in reversed(stdout.splitlines()):
+        if metric_name in line:
+            nums = _FLOAT_RE.findall(line)
+            if nums:
+                return float(nums[-1])
+    return None
