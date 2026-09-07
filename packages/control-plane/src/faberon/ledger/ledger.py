@@ -10,7 +10,7 @@ from collections.abc import Iterator
 import psycopg
 from psycopg.types.json import Jsonb
 
-from faberon.schema.events import Event
+from ..schema.events import Event
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS events (
