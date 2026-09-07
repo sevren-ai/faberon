@@ -72,7 +72,8 @@ This runs `uv sync --locked`, `ruff format`, `ruff check --fix`, and `ty check` 
 - Production code is written for production, not for the tests. Keep test accommodations out of the main package:
   - Do not add parameters, constructors, or protocols whose primary purpose is to let a test substitute a fake.
   - Do not add test-only defaults, flags, or branches that exist solely so a test can reach in.
-- Optional parameters (those with defaults) are typically keyword-only, separated from required parameters by `*` in the function declaration. 
+- Optional parameters (those with defaults) are typically keyword-only, separated from required parameters by `*` in the function declaration.
+- Do not use `from __future__ import annotations`. The project requires Python 3.14, so modern annotation syntax (`X | Y`, `list[str]`, etc.) works natively at runtime. Write annotations directly.
 
 ### Imports
 
