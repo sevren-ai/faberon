@@ -1,29 +1,29 @@
 """Durable experiment workflow: submit, poll, parse, judge, record."""
 
-import json
 import re
 import shlex
 import subprocess
 from uuid import UUID
 
 from dbos import DBOS
-from sqlalchemy import text
 
 from ..executor import Executor, JobInfo, JobState, SubmitRequest
+from ..ledger import Ledger
 from ..schema.events import Actor, Event, EventType
 
 
 @DBOS.dbos_class()
 class Runtime:
-    """Owns the executor and the durable experiment workflow.
+    """Owns the executor, the ledger, and the durable experiment workflow.
 
     Construct one at process startup, register it with
     `DBOS.register_instance`, then `DBOS.launch()`.
     `config_name` uniquely identifies the instance for workflow recovery.
     """
 
-    def __init__(self, executor: Executor, config_name: str) -> None:
+    def __init__(self, executor: Executor, ledger: Ledger, config_name: str) -> None:
         self.executor = executor
+        self.ledger = ledger
         self.config_name = config_name
 
     @DBOS.step()
@@ -62,28 +62,7 @@ class Runtime:
     @DBOS.transaction()
     def record_event_step(self, event: Event) -> int:
         """Append one event to the ledger. Exactly-once via DBOS transaction."""
-
-        row = DBOS.sql_session.execute(
-            text(
-                """
-                INSERT INTO events
-                    (ts, campaign_id, actor, type, justification, payload)
-                VALUES
-                    (:ts, :campaign_id, :actor, :type, :justification,
-                     cast(:payload as jsonb))
-                RETURNING seq
-                """
-            ),
-            {
-                "ts": event.ts,
-                "campaign_id": str(event.campaign_id),
-                "actor": str(event.actor),
-                "type": str(event.type),
-                "justification": event.justification,
-                "payload": json.dumps(event.payload),
-            },
-        ).scalar_one()
-        return int(row)
+        return self.ledger.append_with_session(DBOS.sql_session, event)
 
     @DBOS.workflow()
     def run_experiment(
