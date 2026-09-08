@@ -78,4 +78,4 @@ Contracts are **skeleton-first**: shapes live as Pydantic models in one quaranti
 | Durability | DBOS Transact (MIT) | Durable sleep, signals, SQL state, flow-controlled queues, step audit, with only Postgres to operate. Youngest dependency, mitigated by the tier boundaries and operator-owned state. |
 | Console | Pi extension (TS) | Open-source (MIT), European, extensible; npm-distributed. Replaceable through the API contract.                                                                                     |
 | Models | Provider-agnostic env config (`FABERON_MODEL`) | Local/open models first-class. Tests use `TestModel`.                                                                                                     |
-| Database | Postgres via `FABERON_DATABASE_URL` | Native install on dev machines; scripted userspace install (no root) on login nodes.                                                                |
+| Database | Postgres via `FABERON_DATABASE_URL` | Native install on dev machines; scripted no-sudo install on login nodes. |

@@ -12,7 +12,14 @@ The console (Pi extension, TypeScript) joins as a sibling package in upcoming wo
 
 ## Setup
 
-The control plane stores its ledger in Postgres. You need a local Postgres to run Faberon (and to run the ledger tests).
+The control plane stores its ledger in Postgres. Setup is two layers:
+
+1. **Install a Postgres server** (once per machine).
+2. **Create the `faberon` database** with `scripts/create-faberon-db.sh` (once per server, with Postgres running).
+
+How you do step 1 depends on the machine. Run the `scripts/` commands from the Faberon repo root.
+
+### Dev machine (system Postgres)
 
 On Fedora:
 
@@ -21,7 +28,7 @@ sudo dnf install postgresql-server postgresql-contrib
 sudo postgresql-setup --initdb          # creates the data dir with peer auth
 sudo systemctl enable --now postgresql  # start it, and on boot
 sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-scripts/setup-db.sh                     # creates the faberon database
+scripts/create-faberon-db.sh
 export FABERON_DATABASE_URL=postgres:///faberon
 ```
 
@@ -30,8 +37,39 @@ On Ubuntu:
 ```bash
 sudo apt install postgresql postgresql-contrib   # package inits the cluster and starts the service
 sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-scripts/setup-db.sh                             # creates the faberon database
+scripts/create-faberon-db.sh
 export FABERON_DATABASE_URL=postgres:///faberon
 ```
 
 `postgres:///faberon` connects over the local unix socket using peer auth (you are authenticated as your OS user, no password, no network). Data persists on disk under the Postgres data directory.
+
+### Login node (no sudo)
+
+Login nodes typically have no working sudo. Install a personal Postgres instead of the system package.
+
+Once:
+
+```bash
+scripts/install-postgres-no-sudo.sh     # binaries + initdb + env file
+```
+
+To start it (each session, from the repo root):
+
+```bash
+source ~/.config/faberon/postgres.env
+pg_ctl -D "$FABERON_PGDATA" -l "$FABERON_PGDATA/../log/pg.log" start
+```
+
+Once (with Postgres running):
+
+```bash
+scripts/create-faberon-db.sh            # creates the Faberon database
+```
+
+To stop it:
+
+```bash
+pg_ctl -D "$FABERON_PGDATA" stop
+```
+
+PGDATA sits next to the binaries on your home filesystem. On many clusters that is a network FS (for example Weka); that is fine for Faberon's small ledger and DBOS state.
