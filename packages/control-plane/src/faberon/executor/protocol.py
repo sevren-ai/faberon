@@ -12,6 +12,10 @@ class JobState(StrEnum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
+    @property
+    def is_terminal(self) -> bool:
+        return self in (JobState.COMPLETED, JobState.FAILED, JobState.CANCELLED)
+
 
 class SubmitRequest(BaseModel):
     """Request to start a job."""

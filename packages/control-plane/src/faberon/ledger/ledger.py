@@ -1,16 +1,22 @@
 """Append-only event ledger backed by Postgres.
 
 Postgres is the source of truth. The ledger owns the `events` table and the
-`seq` ordering key. `append` writes one event; `tail` reads events in order
-for the SSE stream and for replay.
+`seq` ordering key. `append` writes one event through the ledger's own
+psycopg connection; `append_with_session` writes through a caller-supplied
+SQLAlchemy session, used by the DBOS workflow so the insert commits with
+the DBOS transaction (exactly-once under recovery). `tail` reads events in
+order for the SSE stream and for replay.
 """
 
+import json
 from collections.abc import Iterator
 
 import psycopg
 from psycopg.types.json import Jsonb
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from faberon.schema.events import Event
+from ..schema.events import Event
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS events (
@@ -57,6 +63,32 @@ class Ledger:
         if row is None:
             raise RuntimeError("INSERT did not return a seq")
         return event.model_copy(update={"seq": row[0]})
+
+    def append_with_session(self, session: Session, event: Event) -> int:
+        """Append an event through a caller-supplied SQLAlchemy session.
+        Returns the assigned seq.
+        """
+        row = session.execute(
+            text(
+                """
+                INSERT INTO events
+                    (ts, campaign_id, actor, type, justification, payload)
+                VALUES
+                    (:ts, :campaign_id, :actor, :type, :justification,
+                     cast(:payload as jsonb))
+                RETURNING seq
+                """
+            ),
+            {
+                "ts": event.ts,
+                "campaign_id": str(event.campaign_id),
+                "actor": str(event.actor),
+                "type": str(event.type),
+                "justification": event.justification,
+                "payload": json.dumps(event.payload),
+            },
+        ).scalar_one()
+        return int(row)
 
     def tail(self, after: int = 0) -> Iterator[Event]:
         """Yield events with seq > after, in order. after=0 starts from the first."""
