@@ -21,17 +21,7 @@ import pytest
 from faberon.executor import JobState, SubmitRequest
 from faberon.executor.slurm import SlurmExecutor
 
-pytestmark = [
-    pytest.mark.slurm,
-    pytest.mark.skipif(
-        not os.environ.get("FABERON_SLURM_INTEGRATION"),
-        reason="set FABERON_SLURM_INTEGRATION=1 to run on-cluster Slurm tests",
-    ),
-    pytest.mark.skipif(
-        not os.environ.get("FABERON_SLURM_ACCOUNT"),
-        reason="set FABERON_SLURM_ACCOUNT to the Slurm account to bill jobs to",
-    ),
-]
+pytestmark = pytest.mark.slurm
 
 _POLL_DEADLINE_S = 120
 _POLL_INTERVAL_S = 1.0

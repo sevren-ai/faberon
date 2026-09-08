@@ -9,10 +9,7 @@ import pytest
 from faberon.ledger import Ledger
 from faberon.schema.events import Actor, Event, EventType
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("FABERON_DATABASE_URL"),
-    reason="set FABERON_DATABASE_URL to a Postgres instance to run ledger tests",
-)
+pytestmark = pytest.mark.postgres
 
 
 @pytest.fixture

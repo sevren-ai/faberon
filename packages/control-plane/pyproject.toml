@@ -30,5 +30,6 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 markers = [
+    "postgres: requires a real Postgres; set FABERON_DATABASE_URL",
     "slurm: requires a real Slurm cluster; opt in with FABERON_SLURM_INTEGRATION=1",
 ]
