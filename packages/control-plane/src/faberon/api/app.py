@@ -20,7 +20,12 @@ from .models import CampaignCreate, CampaignCreated, CampaignStatus
 
 
 def create_app(executor: Executor, *, config_name: str = "default") -> FastAPI:
-    """Build the Faberon HTTP app. Requires ``FABERON_DATABASE_URL``."""
+    """Build the Faberon HTTP app. Requires ``FABERON_DATABASE_URL``.
+
+    Configures the process-global DBOS singleton (destroying any prior
+    instance). One DBOS per process: do not call concurrently or alongside
+    other DBOS users in the same process.
+    """
     db_url = os.environ.get("FABERON_DATABASE_URL")
     if not db_url:
         raise RuntimeError("FABERON_DATABASE_URL is not set")
