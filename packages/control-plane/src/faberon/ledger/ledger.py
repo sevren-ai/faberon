@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS events (
 )
 """
 
+_CREATE_EVENTS_INDEX = """
+CREATE INDEX IF NOT EXISTS events_campaign_id_seq_idx
+ON events (campaign_id, seq)
+"""
+
 _CREATE_CAMPAIGNS = """
 CREATE TABLE IF NOT EXISTS campaigns (
     campaign_id  UUID        PRIMARY KEY,
@@ -53,6 +58,7 @@ class Ledger:
     def __init__(self, db_url: str) -> None:
         self._conn = psycopg.connect(db_url, autocommit=True)
         self._conn.execute(_CREATE_EVENTS)
+        self._conn.execute(_CREATE_EVENTS_INDEX)
         self._conn.execute(_CREATE_CAMPAIGNS)
 
     def close(self) -> None:
@@ -152,6 +158,19 @@ class Ledger:
         )
         for row in rows:
             yield _row_to_event(row)
+
+    def campaign_events(self, campaign_id: UUID) -> list[Event]:
+        """Return all events for one campaign, in seq order."""
+        rows = self._conn.execute(
+            """
+            SELECT seq, ts, campaign_id, actor, type, justification, payload
+            FROM events
+            WHERE campaign_id = %s
+            ORDER BY seq
+            """,
+            (str(campaign_id),),
+        )
+        return [_row_to_event(row) for row in rows]
 
 
 def _row_to_event(row: tuple) -> Event:

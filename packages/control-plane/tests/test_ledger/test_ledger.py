@@ -82,3 +82,17 @@ def test_create_campaign_idempotent(ledger):
     events = list(ledger.tail())
     assert len(events) == 1
     assert events[0].type == EventType.CAMPAIGN_CREATED
+
+
+def test_campaign_events(ledger):
+    camp_a = uuid.uuid4()
+    camp_b = uuid.uuid4()
+    ledger.append(_event(campaign_id=camp_a))
+    ledger.append(_event(campaign_id=camp_b))
+    ledger.append(_event(campaign_id=camp_a))
+
+    a_events = ledger.campaign_events(camp_a)
+    assert [e.campaign_id for e in a_events] == [camp_a, camp_a]
+    assert [e.seq for e in a_events] == [1, 3]
+    assert len(ledger.campaign_events(camp_b)) == 1
+    assert ledger.campaign_events(uuid.uuid4()) == []

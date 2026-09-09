@@ -101,7 +101,7 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/v0/campaigns/{campaign_id}", response_model=CampaignStatus)
     def get_campaign(campaign_id: UUID) -> CampaignStatus:
         ledger: Ledger = app.state.ledger
-        events = [e for e in ledger.tail() if e.campaign_id == campaign_id]
+        events = ledger.campaign_events(campaign_id)
         if not events:
             raise HTTPException(status_code=404, detail="campaign not found")
         return CampaignStatus(campaign_id=campaign_id, events=events)
