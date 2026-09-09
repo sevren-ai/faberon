@@ -25,7 +25,7 @@ from uuid import UUID
 from dbos import DBOS, DBOSConfig, SetWorkflowID
 
 from faberon.ledger import Ledger
-from faberon.workflow import Runtime
+from faberon.workflow import ExperimentSetup, Runtime
 
 from ._fake_file_executor import FakeFileExecutor
 
@@ -50,16 +50,16 @@ def _make_runtime() -> Runtime:
     return runtime
 
 
-def _experiment_args() -> dict:
-    return {
-        "campaign_id": UUID(os.environ["FABERON_TEST_CAMPAIGN_ID"]),
-        "command": ["sleep", "30"],
-        "submission_key": os.environ["FABERON_TEST_WF_ID"],
-        "metric_command": f"cat {os.environ['FABERON_TEST_RUN_DIR']}/metric.txt",
-        "metric_name": "val_bpb",
-        "baseline": 1.23,
-        "poll_interval_seconds": 0.05,
-    }
+def _experiment_setup() -> ExperimentSetup:
+    return ExperimentSetup(
+        campaign_id=UUID(os.environ["FABERON_TEST_CAMPAIGN_ID"]),
+        command=["sleep", "30"],
+        submission_key=os.environ["FABERON_TEST_WF_ID"],
+        metric_command=f"cat {os.environ['FABERON_TEST_RUN_DIR']}/metric.txt",
+        metric_name="val_bpb",
+        baseline=1.23,
+        poll_interval_seconds=0.05,
+    )
 
 
 def _start() -> None:
@@ -72,7 +72,7 @@ def _start() -> None:
         "TRUNCATE events RESTART IDENTITY"
     )
     with SetWorkflowID(os.environ["FABERON_TEST_WF_ID"]):
-        DBOS.start_workflow(runtime.run_experiment, **_experiment_args())
+        DBOS.start_workflow(runtime.run_experiment, _experiment_setup())
     # Stay alive so the parent can kill us mid-poll.
     while True:
         time.sleep(1)

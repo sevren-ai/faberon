@@ -1,5 +1,6 @@
 """Durable experiment workflow."""
 
 from .runtime import Runtime
+from .models import ExperimentSetup
 
-__all__ = ["Runtime"]
+__all__ = ["ExperimentSetup", "Runtime"]
