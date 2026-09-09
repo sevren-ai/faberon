@@ -20,7 +20,7 @@ from dbos import DBOS, DBOSConfig
 from faberon.executor.slurm import SlurmExecutor
 from faberon.ledger import Ledger
 from faberon.schema.events import EventType
-from faberon.workflow import Runtime
+from faberon.workflow import ExperimentSetup, Runtime
 
 pytestmark = [pytest.mark.postgres, pytest.mark.slurm]
 
@@ -61,13 +61,15 @@ def test_experiment_on_slurm(dbos, tmp_path):
     DBOS.launch()
 
     judgment = runtime.run_experiment(
-        campaign_id=uuid.UUID("00000000-0342-0342-0342-000000000000"),
-        command=command,
-        submission_key=f"slurm-{uuid.uuid4().hex}",
-        metric_command=f"cat {metric_file}",
-        metric_name="val_bpb",
-        baseline=1.23,
-        poll_interval_seconds=5.0,
+        ExperimentSetup(
+            campaign_id=uuid.UUID("00000000-0342-0342-0342-000000000000"),
+            command=command,
+            submission_key=f"slurm-{uuid.uuid4().hex}",
+            metric_command=f"cat {metric_file}",
+            metric_name="val_bpb",
+            baseline=1.23,
+            poll_interval_seconds=5.0,
+        )
     )
     assert judgment == "keep"
 

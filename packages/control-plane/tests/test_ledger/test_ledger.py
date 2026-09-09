@@ -17,6 +17,7 @@ def ledger() -> Iterator[Ledger]:
     db = Ledger(os.environ["FABERON_DATABASE_URL"])
     # Test isolation: start each test from an empty log at seq 1.
     db._conn.execute("TRUNCATE events RESTART IDENTITY")
+    db._conn.execute("TRUNCATE campaigns")
     yield db
     db.close()
 
@@ -61,3 +62,37 @@ def test_append_preserves_fields(ledger):
     assert again == stored
     assert again.justification == "plan accepted"
     assert again.payload == {"k": "v"}
+
+
+def test_create_campaign_idempotent(ledger):
+    from faberon.schema.plan import ResearchPlan
+
+    camp_id = uuid.uuid4()
+    plan = ResearchPlan(
+        goal="g",
+        metric_name="val_bpb",
+        metric_command="cat x",
+        baseline=1.0,
+        budget_gpu_hours=1.0,
+        max_concurrency=1,
+        stop_conditions=["s"],
+    )
+    assert ledger.create_campaign(camp_id, str(camp_id), plan) is True
+    assert ledger.create_campaign(camp_id, str(camp_id), plan) is False
+    events = list(ledger.tail())
+    assert len(events) == 1
+    assert events[0].type == EventType.CAMPAIGN_CREATED
+
+
+def test_campaign_events(ledger):
+    camp_a = uuid.uuid4()
+    camp_b = uuid.uuid4()
+    ledger.append(_event(campaign_id=camp_a))
+    ledger.append(_event(campaign_id=camp_b))
+    ledger.append(_event(campaign_id=camp_a))
+
+    a_events = ledger.campaign_events(camp_a)
+    assert [e.campaign_id for e in a_events] == [camp_a, camp_a]
+    assert [e.seq for e in a_events] == [1, 3]
+    assert len(ledger.campaign_events(camp_b)) == 1
+    assert ledger.campaign_events(uuid.uuid4()) == []

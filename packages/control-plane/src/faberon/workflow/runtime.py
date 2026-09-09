@@ -3,13 +3,13 @@
 import re
 import shlex
 import subprocess
-from uuid import UUID
 
 from dbos import DBOS
 
 from ..executor import Executor, JobInfo, JobState, SubmitRequest
 from ..ledger import Ledger
 from ..schema.events import Actor, Event, EventType
+from .models import ExperimentSetup
 
 
 @DBOS.dbos_class()
@@ -54,7 +54,7 @@ class Runtime:
 
     @DBOS.step()
     def judge_step(self, metric_value: float | None, baseline: float) -> str:
-        """Apply the v0.1.0 keep/discard rule: lower is better (keep)."""
+        """Apply a simple keep/discard rule: lower is better (keep)."""
         if metric_value is None:
             return "discard"
         return "keep" if metric_value < baseline else "discard"
@@ -65,35 +65,28 @@ class Runtime:
         return self.ledger.append_with_session(DBOS.sql_session, event)
 
     @DBOS.workflow()
-    def run_experiment(
-        self,
-        campaign_id: UUID,
-        command: list[str],
-        submission_key: str,
-        metric_command: str,
-        metric_name: str,
-        baseline: float,
-        poll_interval_seconds: float,
-    ) -> str:
+    def run_experiment(self, setup: ExperimentSetup) -> str:
         """Run one experiment durably: submit, poll, parse, judge, record."""
-        job_id = self.submit_step(command, submission_key)
+        job_id = self.submit_step(setup.command, setup.submission_key)
 
         info = self.status_step(job_id)
         while not info.state.is_terminal:
-            DBOS.sleep(poll_interval_seconds)
+            DBOS.sleep(setup.poll_interval_seconds)
             info = self.status_step(job_id)
 
         metric_value: float | None = None
         if info.state == JobState.COMPLETED and info.exit_code == 0:
-            metric_value = self.parse_metric_step(metric_command, metric_name)
+            metric_value = self.parse_metric_step(
+                setup.metric_command, setup.metric_name
+            )
 
-        judgment = self.judge_step(metric_value, baseline)
+        judgment = self.judge_step(metric_value, setup.baseline)
         exit_code_str = str(info.exit_code) if info.exit_code is not None else "n/a"
         metric_value_str = str(metric_value) if metric_value is not None else "n/a"
 
         self.record_event_step(
             Event(
-                campaign_id=campaign_id,
+                campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_COMPLETED,
                 justification=f"job {job_id} {info.state.value} exit={exit_code_str}",
@@ -106,16 +99,17 @@ class Runtime:
         )
         self.record_event_step(
             Event(
-                campaign_id=campaign_id,
+                campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_JUDGED,
                 justification=(
-                    f"metric={metric_value_str} baseline={baseline} judgment={judgment}"
+                    f"metric={metric_value_str} baseline={setup.baseline} "
+                    f"judgment={judgment}"
                 ),
                 payload={
                     "job_id": job_id,
                     "metric_value": metric_value,
-                    "baseline": baseline,
+                    "baseline": setup.baseline,
                     "judgment": judgment,
                 },
             )
