@@ -51,7 +51,7 @@ The ledger tests need a local Postgres and `FABERON_DATABASE_URL` exported in yo
 Tests that submit real jobs to Slurm live in `tests/test_executor/test_slurm_integration.py`. They are skipped by default so a plain `pytest` run never submits jobs, in CI or on a login node. To run them on a login node that has `sbatch` on `PATH`:
 
 ```bash
-FABERON_SLURM_ACCOUNT=<account> scripts/test_slurm.sh
+FABERON_SLURM_ACCOUNT=<account> scripts/slurm-test.sh
 ```
 
 `FABERON_SLURM_ACCOUNT` is the Slurm account jobs are billed to; the cluster requires it. The script sets `FABERON_SLURM_INTEGRATION=1` to opt in and runs `pytest -m slurm`. These verify actual behaviour on the cluster.
