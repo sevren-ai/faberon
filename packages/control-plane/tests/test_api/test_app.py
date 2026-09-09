@@ -53,6 +53,7 @@ def api(tmp_path) -> Iterator[ApiFixture]:
     DBOS.destroy()
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
     ledger._conn.execute("TRUNCATE events RESTART IDENTITY")
+    ledger._conn.execute("TRUNCATE campaigns")
     ledger.close()
 
     metric = tmp_path / "metric.txt"
@@ -70,8 +71,9 @@ def api(tmp_path) -> Iterator[ApiFixture]:
     DBOS.destroy()
 
 
-def _create_body(metric_path: str) -> dict:
+def _create_body(metric_path: str, campaign_id: str) -> dict:
     return {
+        "campaign_id": campaign_id,
         "plan": {
             "goal": "Beat baseline val_bpb.",
             "metric_name": "val_bpb",
@@ -87,7 +89,10 @@ def _create_body(metric_path: str) -> dict:
 
 
 def test_create_campaign(api: ApiFixture):
-    response = api.client.post("/v0/campaigns", json=_create_body(api.metric_path))
+    camp_id = str(uuid.uuid4())
+    response = api.client.post(
+        "/v0/campaigns", json=_create_body(api.metric_path, camp_id)
+    )
     assert response.status_code == 201
     body = response.json()
     assert "campaign_id" in body
@@ -111,6 +116,25 @@ def test_get_unknown_campaign(api: ApiFixture):
     assert response.status_code == 404
 
 
+def test_create_campaign_idempotent(api: ApiFixture):
+    camp_id = str(uuid.uuid4())
+    body = _create_body(api.metric_path, camp_id)
+    first = api.client.post("/v0/campaigns", json=body)
+    assert first.status_code == 201
+    DBOS.retrieve_workflow(first.json()["workflow_id"]).get_result()
+
+    # Retry with the same campaign_id: no duplicate workflow, no duplicate event.
+    second = api.client.post("/v0/campaigns", json=body)
+    assert second.status_code == 201
+    assert second.json()["campaign_id"] == first.json()["campaign_id"]
+    assert second.json()["workflow_id"] == first.json()["workflow_id"]
+    assert api.executor.submit_count == 1
+
+    status = api.client.get(f"/v0/campaigns/{camp_id}")
+    types = [e["type"] for e in status.json()["events"]]
+    assert types.count(EventType.CAMPAIGN_CREATED) == 1
+
+
 @dataclass
 class LiveServer:
     base_url: str
@@ -124,6 +148,7 @@ def live_server(tmp_path) -> Iterator[LiveServer]:
     DBOS.destroy()
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
     ledger._conn.execute("TRUNCATE events RESTART IDENTITY")
+    ledger._conn.execute("TRUNCATE campaigns")
     ledger.close()
 
     metric = tmp_path / "metric.txt"
@@ -174,9 +199,10 @@ def _read_sse_until(client: httpx2.Client, path: str, marker: str) -> list[str]:
 
 def test_events_stream_resume(live_server: LiveServer):
     timeout = httpx2.Timeout(10.0, read=10.0)
+    camp_id = str(uuid.uuid4())
     with httpx2.Client(base_url=live_server.base_url, timeout=timeout) as client:
         response = client.post(
-            "/v0/campaigns", json=_create_body(live_server.metric_path)
+            "/v0/campaigns", json=_create_body(live_server.metric_path, camp_id)
         )
         assert response.status_code == 201
         campaign_id = response.json()["campaign_id"]

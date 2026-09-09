@@ -4,10 +4,10 @@ import asyncio
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import anyio.to_thread
-from dbos import DBOS, DBOSConfig
+from dbos import DBOS, DBOSConfig, SetWorkflowID
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
@@ -15,7 +15,6 @@ from .. import __version__
 from ..executor import Executor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
-from ..schema.events import Actor, Event, EventType
 from ..workflow import ExperimentSetup, Runtime
 from .models import CampaignCreate, CampaignCreated, CampaignStatus
 
@@ -76,29 +75,24 @@ def _register_routes(app: FastAPI) -> None:
     def create_campaign(body: CampaignCreate) -> CampaignCreated:
         runtime: Runtime = app.state.runtime
         ledger: Ledger = app.state.ledger
-        campaign_id = uuid4()
-
-        # A campaign is always created/initialized by a human
-        ledger.append(
-            Event(
-                campaign_id=campaign_id,
-                actor=Actor.HUMAN,
-                type=EventType.CAMPAIGN_CREATED,
-                justification="plan accepted",
-                payload=body.plan.model_dump(mode="json"),
-            )
-        )
+        campaign_id = body.campaign_id
+        workflow_id = str(campaign_id)
 
         setup = ExperimentSetup(
             campaign_id=campaign_id,
             command=body.command,
-            submission_key=str(campaign_id),
+            submission_key=workflow_id,
             metric_command=body.plan.metric_command,
             metric_name=body.plan.metric_name,
             baseline=body.plan.baseline,
             poll_interval_seconds=body.poll_interval_seconds,
         )
-        handle = DBOS.start_workflow(runtime.run_experiment, setup)
+        # Idempotent: DBOS dedupes on workflow id, the ledger dedupes on
+        # the campaigns row. A retry with the same campaign_id returns the
+        # existing campaign instead of creating a new one.
+        with SetWorkflowID(workflow_id):
+            handle = DBOS.start_workflow(runtime.run_experiment, setup)
+        ledger.create_campaign(campaign_id, workflow_id, body.plan)
         return CampaignCreated(
             campaign_id=campaign_id,
             workflow_id=handle.workflow_id,

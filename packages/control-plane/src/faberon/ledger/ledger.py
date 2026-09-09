@@ -6,19 +6,26 @@ psycopg connection; `append_with_session` writes through a caller-supplied
 SQLAlchemy session, used by the DBOS workflow so the insert commits with
 the DBOS transaction (exactly-once under recovery). `tail` reads events in
 order for the SSE stream and for replay.
+
+The `campaigns` table records campaign-level state.
+`create_campaign` inserts the campaign row and the `campaign.created` event
+in one transaction so a retry never duplicates either.
 """
 
 import json
 from collections.abc import Iterator
+from datetime import UTC, datetime
+from uuid import UUID
 
 import psycopg
 from psycopg.types.json import Jsonb
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ..schema.events import Event
+from ..schema.events import Actor, Event, EventType
+from ..schema.plan import ResearchPlan
 
-_CREATE_TABLE = """
+_CREATE_EVENTS = """
 CREATE TABLE IF NOT EXISTS events (
     seq           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     ts            TIMESTAMPTZ NOT NULL,
@@ -30,13 +37,23 @@ CREATE TABLE IF NOT EXISTS events (
 )
 """
 
+_CREATE_CAMPAIGNS = """
+CREATE TABLE IF NOT EXISTS campaigns (
+    campaign_id  UUID        PRIMARY KEY,
+    workflow_id   TEXT        NOT NULL,
+    plan          JSONB       NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL
+)
+"""
+
 
 class Ledger:
     """Append-only event ledger. Postgres is the source of truth."""
 
     def __init__(self, db_url: str) -> None:
         self._conn = psycopg.connect(db_url, autocommit=True)
-        self._conn.execute(_CREATE_TABLE)
+        self._conn.execute(_CREATE_EVENTS)
+        self._conn.execute(_CREATE_CAMPAIGNS)
 
     def close(self) -> None:
         """Close the database connection."""
@@ -63,6 +80,38 @@ class Ledger:
         if row is None:
             raise RuntimeError("INSERT did not return a seq")
         return event.model_copy(update={"seq": row[0]})
+
+    def create_campaign(
+        self, campaign_id: UUID, workflow_id: str, plan: ResearchPlan
+    ) -> bool:
+        """Atomically insert a campaign row and the ``campaign.created`` event.
+
+        Returns True if the campaign was newly created, False if it already
+        existed (idempotent retry).
+        """
+        plan_json = plan.model_dump(mode="json")
+        with self._conn.transaction():
+            row = self._conn.execute(
+                """
+                INSERT INTO campaigns (campaign_id, workflow_id, plan, created_at)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (campaign_id) DO NOTHING
+                RETURNING campaign_id
+                """,
+                (str(campaign_id), workflow_id, Jsonb(plan_json), datetime.now(UTC)),
+            ).fetchone()
+            if row is None:
+                return False
+            self.append(
+                Event(
+                    campaign_id=campaign_id,
+                    actor=Actor.HUMAN,
+                    type=EventType.CAMPAIGN_CREATED,
+                    justification="plan accepted",
+                    payload=plan_json,
+                )
+            )
+            return True
 
     def append_with_session(self, session: Session, event: Event) -> int:
         """Append an event through a caller-supplied SQLAlchemy session.

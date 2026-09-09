@@ -11,6 +11,7 @@ from ..schema.plan import ResearchPlan
 class CampaignCreate(BaseModel):
     """POST /v0/campaigns body."""
 
+    campaign_id: UUID
     plan: ResearchPlan
     command: list[str] = Field(min_length=1)
     poll_interval_seconds: float = Field(default=30.0, gt=0)
