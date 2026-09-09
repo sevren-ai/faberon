@@ -116,6 +116,39 @@ def test_get_unknown_campaign(api: ApiFixture):
     assert response.status_code == 404
 
 
+def test_healthz(api: ApiFixture):
+    response = api.client.get("/healthz")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_auth(tmp_path):
+    DBOS.destroy()
+    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger._conn.execute("TRUNCATE events RESTART IDENTITY")
+    ledger._conn.execute("TRUNCATE campaigns")
+    ledger.close()
+
+    metric = tmp_path / "metric.txt"
+    metric.write_text("val_bpb: 1.10\n")
+    executor = FakeExecutor(JobState.COMPLETED, exit_code=0)
+    app = create_app(
+        executor=executor,
+        config_name=f"api-test-{uuid.uuid4().hex}",
+        auth_token="my-secret-token",
+    )
+    headers = {"Authorization": "Bearer my-secret-token"}
+    body = _create_body(str(metric), str(uuid.uuid4()))
+    with TestClient(app) as client:
+        # healthz is always open
+        assert client.get("/healthz").status_code == 200
+        # without token: rejected
+        assert client.post("/v0/campaigns", json=body).status_code == 401
+        # with token: accepted
+        assert client.post("/v0/campaigns", json=body, headers=headers).status_code == 201
+    DBOS.destroy()
+
+
 def test_create_campaign_idempotent(api: ApiFixture):
     camp_id = str(uuid.uuid4())
     body = _create_body(api.metric_path, camp_id)

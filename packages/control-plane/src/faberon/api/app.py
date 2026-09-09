@@ -2,14 +2,19 @@
 
 import asyncio
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from uuid import UUID
 
 import anyio.to_thread
 from dbos import DBOS, DBOSConfig, SetWorkflowID
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.middleware import Middleware
+from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import Response
+from starlette.types import ASGIApp
 
 from .. import __version__
 from ..executor import Executor
@@ -18,8 +23,35 @@ from ..ledger import Ledger
 from ..workflow import ExperimentSetup, Runtime
 from .models import CampaignCreate, CampaignCreated, CampaignStatus
 
+_HEALTHZ_PATH = "/healthz"
+RequestResponseEndpoint = Callable[[StarletteRequest], Awaitable[Response]]
 
-def create_app(executor: Executor, *, config_name: str = "default") -> FastAPI:
+
+class BearerAuthMiddleware(BaseHTTPMiddleware):
+    """Reject requests missing the expected bearer token."""
+
+    def __init__(self, app: ASGIApp, token: str) -> None:
+        super().__init__(app)
+        self._token = token
+
+    async def dispatch(
+        self, request: StarletteRequest, call_next: RequestResponseEndpoint
+    ) -> Response:
+        # health checks do not need the token
+        if request.url.path == _HEALTHZ_PATH:
+            return await call_next(request)
+        auth = request.headers.get("Authorization", "")
+        if auth == f"Bearer {self._token}":
+            return await call_next(request)
+        return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+
+
+def create_app(
+    executor: Executor,
+    *,
+    config_name: str = "default",
+    auth_token: str | None = None,
+) -> FastAPI:
     """Build the Faberon HTTP app. Requires ``FABERON_DATABASE_URL``.
 
     Configures the process-global DBOS singleton (destroying any prior
@@ -54,7 +86,17 @@ def create_app(executor: Executor, *, config_name: str = "default") -> FastAPI:
             DBOS.destroy()
             ledger.close()
 
-    app = FastAPI(title="Faberon", version=__version__, lifespan=lifespan)
+    middleware = (
+        [Middleware(BearerAuthMiddleware, token=auth_token)]
+        if auth_token is not None
+        else []
+    )
+    app = FastAPI(
+        title="Faberon",
+        version=__version__,
+        lifespan=lifespan,
+        middleware=middleware,
+    )
     _register_routes(app)
     return app
 
@@ -62,20 +104,31 @@ def create_app(executor: Executor, *, config_name: str = "default") -> FastAPI:
 def create_app_slurm() -> FastAPI:
     """Uvicorn entrypoint: Slurm executor from the environment.
 
-    Requires ``FABERON_DATABASE_URL`` and ``FABERON_SLURM_ACCOUNT``.
+    Requires ``FABERON_DATABASE_URL``, ``FABERON_SLURM_ACCOUNT``, and
+    ``FABERON_API_TOKEN``.
     Optional ``FABERON_SLURM_OUTPUT`` sets the Slurm ``--output`` path.
     """
     account = os.environ.get("FABERON_SLURM_ACCOUNT")
     if not account:
         raise RuntimeError("FABERON_SLURM_ACCOUNT is not set")
+    token = os.environ.get("FABERON_API_TOKEN")
+    if not token:
+        raise RuntimeError(
+            "FABERON_API_TOKEN is not set. On a shared login node, "
+            "localhost is reachable by other users; the API must be guarded."
+        )
     executor = SlurmExecutor(
         account=account,
         output=os.environ.get("FABERON_SLURM_OUTPUT"),
     )
-    return create_app(executor=executor)
+    return create_app(executor=executor, auth_token=token)
 
 
 def _register_routes(app: FastAPI) -> None:
+    @app.get(_HEALTHZ_PATH)
+    def healthz() -> dict[str, str]:
+        return {"status": "ok"}
+
     @app.post("/v0/campaigns", response_model=CampaignCreated, status_code=201)
     def create_campaign(body: CampaignCreate) -> CampaignCreated:
         runtime: Runtime = app.state.runtime

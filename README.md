@@ -80,10 +80,20 @@ With Postgres up and `FABERON_DATABASE_URL` set, start the control plane:
 
 ```bash
 export FABERON_SLURM_ACCOUNT=<account>
+export FABERON_API_TOKEN=<random_token>
 cd packages/control-plane
 uv run uvicorn --factory faberon.api:create_app_slurm --host 127.0.0.1 --port 8000
 ```
 
+`FABERON_API_TOKEN` is mandatory for the Slurm entrypoint. 
+
+You can generate a random token with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+- `GET /healthz`: liveness check (no auth required)
 - `POST /v0/campaigns`: accept a plan + command, append `campaign.created`, start `run_experiment`
 - `GET /v0/campaigns/{id}`: ledger events for that campaign
 - `GET /v0/events?after=0`: SSE ledger tail
