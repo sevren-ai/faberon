@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID, uuid4
 
+import anyio.to_thread
 from dbos import DBOS, DBOSConfig
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -123,7 +124,10 @@ def _register_routes(app: FastAPI) -> None:
             while True:
                 if await request.is_disconnected():
                     break
-                batch = list(ledger.tail(after=cursor))
+                # Sync psycopg call; keep it off the event loop.
+                batch = await anyio.to_thread.run_sync(
+                    lambda: list(ledger.tail(after=cursor))
+                )
                 for event in batch:
                     assert event.seq is not None
                     cursor = event.seq
