@@ -145,7 +145,9 @@ def test_auth(tmp_path):
         # without token: rejected
         assert client.post("/v0/campaigns", json=body).status_code == 401
         # with token: accepted
-        assert client.post("/v0/campaigns", json=body, headers=headers).status_code == 201
+        assert (
+            client.post("/v0/campaigns", json=body, headers=headers).status_code == 201
+        )
     DBOS.destroy()
 
 
