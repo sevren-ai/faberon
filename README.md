@@ -4,7 +4,7 @@ Sevren's autonomous ML Research Harness
 ## Layout
 
 - `packages/control-plane/`: the brain (Python, `uv`-managed, import name `faberon`)
-- `docs/design/`: [system design](docs/design/design.md), [roadmap](docs/design/roadmap.md), [future ideas](docs/design/future.md), and one doc per release, starting at [v0.1.0](docs/design/v0.1.0.md)
+- `docs/design/`: [system design](docs/design/design.md), [roadmap](docs/design/roadmap.md), [future ideas](docs/design/future.md), and one doc per release (shipped releases in [archive/](docs/design/archive/))
 - `CONTRIBUTING.md`: the process rules for every contributor, human or agent
 - `AGENTS.md`: agent-specific rules (context loading, writing style), read first by any coding agent
 
