@@ -2,8 +2,6 @@
 # Run the on-cluster Slurm integration tests. These submit real jobs to Slurm,
 # so they require a login node with sbatch on PATH and opt-in env vars.
 #
-# Usage: scripts/slurm-test.sh
-#
 # Required env:
 #   FABERON_SLURM_ACCOUNT   Slurm account to bill jobs to.
 

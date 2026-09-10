@@ -4,8 +4,6 @@
 # This only installs the server, it does not create the faberon database:
 # after you start Postgres, run scripts/create-faberon-db.sh for that.
 #
-# Usage: scripts/install-postgres-no-sudo.sh
-#
 # Optional env:
 #   FABERON_PG_PREFIX   install root (default: $HOME/faberon/postgres)
 #   FABERON_PG_PORT     listen port (default: 54329)
@@ -143,7 +141,7 @@ To start it:
 
 Once (with Postgres running, from the Faberon repo root):
 
-    scripts/create-faberon-db.sh
+    bash scripts/create-faberon-db.sh
 
 To stop it:
 

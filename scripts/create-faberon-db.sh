@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # Create the Faberon database inside an already-running Postgres.
 # Postgres itself must already be installed and started (see README).
-#
-# Usage: scripts/create-faberon-db.sh
 
 set -euo pipefail
 

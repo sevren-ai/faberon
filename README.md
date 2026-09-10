@@ -28,7 +28,7 @@ sudo dnf install postgresql-server postgresql-contrib
 sudo postgresql-setup --initdb          # creates the data dir with peer auth
 sudo systemctl enable --now postgresql  # start it, and on boot
 sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-scripts/create-faberon-db.sh
+bash scripts/create-faberon-db.sh
 export FABERON_DATABASE_URL=postgres:///faberon
 ```
 
@@ -37,7 +37,7 @@ On Ubuntu:
 ```bash
 sudo apt install postgresql postgresql-contrib   # package inits the cluster and starts the service
 sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-scripts/create-faberon-db.sh
+bash scripts/create-faberon-db.sh
 export FABERON_DATABASE_URL=postgres:///faberon
 ```
 
@@ -50,7 +50,7 @@ Login nodes typically have no working sudo. Install a personal Postgres instead 
 Once:
 
 ```bash
-scripts/install-postgres-no-sudo.sh     # binaries + initdb + env file
+bash scripts/install-postgres-no-sudo.sh     # binaries + initdb + env file
 ```
 
 To start it (each session, from the repo root):
@@ -63,7 +63,7 @@ pg_ctl -D "$FABERON_PGDATA" -l "$FABERON_PGDATA/../log/pg.log" start
 Once (with Postgres running):
 
 ```bash
-scripts/create-faberon-db.sh            # creates the Faberon database
+bash scripts/create-faberon-db.sh            # creates the Faberon database
 ```
 
 To stop it:

@@ -32,7 +32,7 @@ How to use them:
 From the repo root:
 
 ```bash
-scripts/test.sh
+bash scripts/test.sh
 ```
 
 This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, mirroring `.github/workflows/test.yml`.
@@ -52,7 +52,7 @@ so a plain `scripts/test.sh` run doesn't need a database.
 Tests that submit real jobs to Slurm live in `tests/test_executor/test_slurm_integration.py`. They are skipped by default so a plain `pytest` run never submits jobs, in CI or on a login node. To run them on a login node that has `sbatch` on `PATH`:
 
 ```bash
-FABERON_SLURM_ACCOUNT=<account> scripts/slurm-test.sh
+FABERON_SLURM_ACCOUNT=<account> bash scripts/slurm-test.sh
 ```
 
 `FABERON_SLURM_ACCOUNT` is the Slurm account jobs are billed to; the cluster requires it. The script sets `FABERON_SLURM_INTEGRATION=1` to opt in and runs `pytest -m slurm`. These verify actual behaviour on the cluster.
@@ -62,7 +62,7 @@ FABERON_SLURM_ACCOUNT=<account> scripts/slurm-test.sh
 Ruff formats and lints the Python code. From the repo root:
 
 ```bash
-scripts/lint.sh
+bash scripts/lint.sh
 ```
 
 This runs `uv sync --locked`, `ruff format`, `ruff check --fix`, and `ty check` in `packages/control-plane/`. It writes formatting and lint fixes back to the source. CI (`.github/workflows/lint.yml`) runs the check-only variants (`ruff format --check`, `ruff check`, `ty check`) and blocks the merge on a red run. Run `scripts/lint.sh` before pushing.
