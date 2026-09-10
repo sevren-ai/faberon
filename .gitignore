@@ -14,7 +14,7 @@ htmlcov/
 dist/
 *.egg-info/
 
-# Node (console, Phase 2)
+# Node (console)
 node_modules/
 
 # IDE / OS
