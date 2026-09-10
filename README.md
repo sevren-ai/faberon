@@ -76,13 +76,11 @@ PGDATA sits next to the binaries on your home filesystem. On many clusters that 
 
 ## Running the API
 
-With Postgres up and `FABERON_DATABASE_URL` set, start the control plane:
+Ensure the following vars are set:
 
 ```bash
 export FABERON_SLURM_ACCOUNT=<account>
 export FABERON_API_TOKEN=<random_token>
-cd packages/control-plane
-uv run uvicorn --factory faberon.api:create_app_slurm --host 127.0.0.1 --port 8000
 ```
 
 `FABERON_API_TOKEN` is mandatory for the Slurm entrypoint. 
@@ -91,6 +89,20 @@ You can generate a random token with:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Now start the control plane, either by running it directly: 
+
+```bash
+cd packages/control-plane
+uv run uvicorn --factory faberon.api:create_app_slurm --host 127.0.0.1 --port 8000
+```
+
+Or install the `faberon` command once and run it from anywhere:
+
+```bash
+uv tool install packages/control-plane
+faberon
 ```
 
 - `GET /healthz`: liveness check (no auth required)
