@@ -107,6 +107,7 @@ def create_app_slurm() -> FastAPI:
     Requires ``FABERON_DATABASE_URL``, ``FABERON_SLURM_ACCOUNT``, and
     ``FABERON_API_TOKEN``.
     Optional ``FABERON_SLURM_OUTPUT`` sets the Slurm ``--output`` path.
+    Optional ``FABERON_SLURM_GPUS`` sets the GPU count per job (default 1).
     """
     account = os.environ.get("FABERON_SLURM_ACCOUNT")
     if not account:
@@ -117,9 +118,11 @@ def create_app_slurm() -> FastAPI:
             "FABERON_API_TOKEN is not set. On a shared login node, "
             "localhost is reachable by other users; the API must be guarded."
         )
+    gpus = int(os.environ.get("FABERON_SLURM_GPUS", "1"))
     executor = SlurmExecutor(
         account=account,
         output=os.environ.get("FABERON_SLURM_OUTPUT"),
+        gpus=gpus,
     )
     return create_app(executor=executor, auth_token=token)
 
