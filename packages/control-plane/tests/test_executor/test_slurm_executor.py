@@ -28,13 +28,14 @@ def test_render_script():
 def test_render_sbatch():
     args = _render_sbatch("faberon:exp-1", "minerva", ["uv", "run", "train.py"])
     assert args[0] == "sbatch"
-    assert args[1:5] == [
+    assert args[1:6] == [
         "--parsable",
         "--account=minerva",
         "--job-name=faberon:exp-1",
+        "--gres=gpu:1",
         "--wrap",
     ]
-    assert args[5] == _render_script(["uv", "run", "train.py"])
+    assert args[6] == _render_script(["uv", "run", "train.py"])
 
 
 @pytest.mark.parametrize(

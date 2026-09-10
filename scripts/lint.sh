@@ -2,8 +2,6 @@
 # Run the lint checks CI runs, locally, and apply fixes. Exits non-zero on
 # the first failure. Unlike .github/workflows/lint.yml, which checks only,
 # this script writes fixes back to the source.
-#
-# Usage: scripts/lint.sh
 
 set -euo pipefail
 

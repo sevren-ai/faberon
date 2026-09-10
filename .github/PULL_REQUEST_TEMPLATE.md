@@ -13,7 +13,7 @@ Every PR must run the on-cluster Slurm integration suite and paste the output be
 
 Run on the login node:
 
-    bash FABERON_SLURM_ACCOUNT=<account> scripts/slurm-test.sh
+    FABERON_SLURM_ACCOUNT=<account> bash scripts/slurm-test.sh
 
 Paste the full output, including the summary line, for example:
 

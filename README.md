@@ -4,7 +4,7 @@ Sevren's autonomous ML Research Harness
 ## Layout
 
 - `packages/control-plane/`: the brain (Python, `uv`-managed, import name `faberon`)
-- `docs/design/`: [system design](docs/design/design.md), [roadmap](docs/design/roadmap.md), [future ideas](docs/design/future.md), and one doc per release, starting at [v0.1.0](docs/design/v0.1.0.md)
+- `docs/design/`: [system design](docs/design/design.md), [roadmap](docs/design/roadmap.md), [future ideas](docs/design/future.md), and one doc per release (shipped releases in [archive/](docs/design/archive/))
 - `CONTRIBUTING.md`: the process rules for every contributor, human or agent
 - `AGENTS.md`: agent-specific rules (context loading, writing style), read first by any coding agent
 
@@ -28,7 +28,7 @@ sudo dnf install postgresql-server postgresql-contrib
 sudo postgresql-setup --initdb          # creates the data dir with peer auth
 sudo systemctl enable --now postgresql  # start it, and on boot
 sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-scripts/create-faberon-db.sh
+bash scripts/create-faberon-db.sh
 export FABERON_DATABASE_URL=postgres:///faberon
 ```
 
@@ -37,7 +37,7 @@ On Ubuntu:
 ```bash
 sudo apt install postgresql postgresql-contrib   # package inits the cluster and starts the service
 sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-scripts/create-faberon-db.sh
+bash scripts/create-faberon-db.sh
 export FABERON_DATABASE_URL=postgres:///faberon
 ```
 
@@ -50,7 +50,7 @@ Login nodes typically have no working sudo. Install a personal Postgres instead 
 Once:
 
 ```bash
-scripts/install-postgres-no-sudo.sh     # binaries + initdb + env file
+bash scripts/install-postgres-no-sudo.sh     # binaries + initdb + env file
 ```
 
 To start it (each session, from the repo root):
@@ -63,7 +63,7 @@ pg_ctl -D "$FABERON_PGDATA" -l "$FABERON_PGDATA/../log/pg.log" start
 Once (with Postgres running):
 
 ```bash
-scripts/create-faberon-db.sh            # creates the Faberon database
+bash scripts/create-faberon-db.sh            # creates the Faberon database
 ```
 
 To stop it:
@@ -76,13 +76,11 @@ PGDATA sits next to the binaries on your home filesystem. On many clusters that 
 
 ## Running the API
 
-With Postgres up and `FABERON_DATABASE_URL` set, start the control plane:
+Ensure the following vars are set:
 
 ```bash
 export FABERON_SLURM_ACCOUNT=<account>
 export FABERON_API_TOKEN=<random_token>
-cd packages/control-plane
-uv run uvicorn --factory faberon.api:create_app_slurm --host 127.0.0.1 --port 8000
 ```
 
 `FABERON_API_TOKEN` is mandatory for the Slurm entrypoint. 
@@ -91,6 +89,20 @@ You can generate a random token with:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Now start the control plane, either by running it directly: 
+
+```bash
+cd packages/control-plane
+uv run uvicorn --factory faberon.api:create_app_slurm --host 127.0.0.1 --port 8000
+```
+
+Or install the `faberon` command once and run it from anywhere:
+
+```bash
+uv tool install packages/control-plane
+faberon
 ```
 
 - `GET /healthz`: liveness check (no auth required)

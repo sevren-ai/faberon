@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Create the Faberon database inside an already-running Postgres.
 # Postgres itself must already be installed and started (see README).
-#
-# Usage: scripts/create-faberon-db.sh
 
 set -euo pipefail
 
 db="faberon"
+
+# Source the no-sudo Postgres env if present (puts psql on PATH, sets PGPORT).
+if [ -f ~/.config/faberon/postgres.env ]; then
+    # shellcheck disable=SC1091
+    source ~/.config/faberon/postgres.env
+fi
 
 echo ">> checking postgres"
 if ! command -v psql >/dev/null 2>&1; then

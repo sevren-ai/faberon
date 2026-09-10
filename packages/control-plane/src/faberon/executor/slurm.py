@@ -39,13 +39,19 @@ def _render_script(command: Sequence[str]) -> str:
 
 
 def _render_sbatch(
-    job_name: str, account: str, command: Sequence[str], *, output: str | None = None
+    job_name: str,
+    account: str,
+    command: Sequence[str],
+    *,
+    output: str | None = None,
+    gpus: int = 1,
 ) -> list[str]:
     args = [
         "sbatch",
         "--parsable",
         f"--account={account}",
         f"--job-name={job_name}",
+        f"--gres=gpu:{gpus}",
     ]
     if output is not None:
         args.append(f"--output={output}")
@@ -89,9 +95,12 @@ class SlurmExecutor:
     Job state lives in Slurm, so submission_key idempotency survives restarts.
     """
 
-    def __init__(self, account: str, *, output: str | None = None) -> None:
+    def __init__(
+        self, account: str, *, output: str | None = None, gpus: int = 1
+    ) -> None:
         self._account = account
         self._output = output
+        self._gpus = gpus
 
     def submit(self, request: SubmitRequest) -> str:
         job_name = JOB_NAME_PREFIX + request.submission_key
@@ -100,7 +109,11 @@ class SlurmExecutor:
             return existing
         result = subprocess.run(
             _render_sbatch(
-                job_name, self._account, request.command, output=self._output
+                job_name,
+                self._account,
+                request.command,
+                output=self._output,
+                gpus=self._gpus,
             ),
             capture_output=True,
             text=True,
