@@ -12,7 +12,7 @@ A version is a milestone release, not the whole roadmap. Each phase becomes its 
 - **Phase 1: skeleton.** One thin path through every tier. Ships as **v0.1.0**.
 - **Phase 2: console v0.1 (planned v0.2.0).** Pi extension on the login node: drafter intake, `inject_idea`, `runs_status`, `approve`, live SSE widget (runs, budget burn, pending approvals).
 - **Phase 3: scale and safety (planned v0.3.0).** Concurrency-limited queue for ablations; budget caps and approval gates; epilog webhook once egress is verified; restart drills as routine.
-- **Phase 4: research policy (planned v0.4.0).** The full propose → run → judge → keep/discard loop with agent-authored `train.py` edits; living notes file; plan stop-conditions honored end-to-end.
+- **Phase 4: research policy (planned v0.4.0).** The full propose → run → judge → keep/discard loop with agent-authored `train.py` edits; living notes file; plan stop-conditions honored end-to-end. Lineage is git commits: each edit is a commit, keep promotes it to the lineage head, discard reverts to the parent, branch forks from a kept commit. The ledger records parent and new sha so the tree is reconstructable. Parallel experiments (concurrency > 1) use `git worktree` (one linked working tree per job on its own commit, sharing the object store), with a shared venv and data so worktrees don't re-setup.
 
 ## Open Questions
 
