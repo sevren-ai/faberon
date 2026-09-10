@@ -19,4 +19,4 @@ def main() -> None:
     """
     host = os.environ.get("FABERON_HOST", _DEFAULT_HOST)
     port = int(os.environ.get("FABERON_PORT", str(_DEFAULT_PORT)))
-    uvicorn.run(create_app_slurm, host=host, port=port)
+    uvicorn.run(create_app_slurm, host=host, port=port, factory=True)
