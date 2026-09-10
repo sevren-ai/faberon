@@ -67,7 +67,7 @@ Design rule: **one brain**. The console and the drafter propose; the brain dispo
 
 `POST /campaigns` · `POST /campaigns/{id}/ideas` · `POST /campaigns/{id}/amendments` · `POST /approvals/{id}` · `GET /campaigns` · `GET /campaigns/{id}` · `GET /campaigns/{id}/runs` · `GET /runs/{id}` · `GET /events` (SSE ledger tail).
 
-Contracts are **skeleton-first**: shapes live as Pydantic models in one quarantined module from day one and are frozen into versioned artifacts (JSON Schema / OpenAPI goldens) after Phase 1. This contract keeps console and brain independently replaceable.
+Contracts are **skeleton-first**: shapes live as Pydantic models in one quarantined module from day one and are frozen into versioned artifacts (JSON Schema / OpenAPI goldens) after the first release. This contract keeps console and brain independently replaceable.
 
 ## 5. Technology Choices
 
