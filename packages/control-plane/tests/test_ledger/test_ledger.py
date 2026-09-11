@@ -75,6 +75,7 @@ def test_create_campaign_idempotent(ledger):
         baseline=1.0,
         budget_gpu_hours=1.0,
         max_concurrency=1,
+        walltime=10,
         stop_conditions=["s"],
     )
     assert ledger.create_campaign(camp_id, str(camp_id), plan) is True

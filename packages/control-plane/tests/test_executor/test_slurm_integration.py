@@ -33,6 +33,7 @@ def executor(tmp_path) -> SlurmExecutor:
     return SlurmExecutor(
         account=os.environ["FABERON_SLURM_ACCOUNT"],
         output=str(tmp_path / "slurm-%j.out"),
+        max_walltime=10,
     )
 
 
@@ -48,7 +49,9 @@ def _wait_for_terminal(executor: SlurmExecutor, job_id: str) -> JobState:
 
 
 def _request(command: list[str], key: str) -> SubmitRequest:
-    return SubmitRequest.model_validate({"command": command, "submission_key": key})
+    return SubmitRequest.model_validate(
+        {"command": command, "submission_key": key, "walltime": 10}
+    )
 
 
 def test_submit_success(executor: SlurmExecutor):

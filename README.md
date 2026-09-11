@@ -83,7 +83,13 @@ export FABERON_SLURM_ACCOUNT=<account>
 export FABERON_API_TOKEN=<random_token>
 ```
 
-`FABERON_API_TOKEN` is mandatory for the Slurm entrypoint. 
+`FABERON_API_TOKEN` is mandatory for the Slurm entrypoint.
+
+Optional deployment-side knobs:
+
+- `FABERON_SLURM_GPUS`: GPU count per job (default 1).
+- `FABERON_SLURM_MAX_TIME`: walltime cap in minutes. Each job's walltime comes from its campaign plan; this cap can only lower it, never raise it. Set it to protect the cluster from runaway jobs.
+- `FABERON_SLURM_OUTPUT`: Slurm `--output` path for job stdout/stderr.
 
 You can generate a random token with:
 

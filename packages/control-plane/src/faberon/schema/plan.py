@@ -12,4 +12,5 @@ class ResearchPlan(BaseModel):
     baseline: float
     budget_gpu_hours: float = Field(gt=0)
     max_concurrency: int = Field(default=1, ge=1)
+    walltime: int = Field(gt=0)  # in  minutes
     stop_conditions: list[str] = Field(min_length=1)

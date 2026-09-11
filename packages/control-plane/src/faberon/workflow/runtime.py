@@ -27,9 +27,13 @@ class Runtime:
         self.config_name = config_name
 
     @DBOS.step()
-    def submit_step(self, command: list[str], submission_key: str) -> str:
+    def submit_step(
+        self, command: list[str], submission_key: str, walltime: int
+    ) -> str:
         """Start the job on the cluster. Idempotent on submission_key."""
-        request = SubmitRequest(command=command, submission_key=submission_key)
+        request = SubmitRequest(
+            command=command, submission_key=submission_key, walltime=walltime
+        )
         return self.executor.submit(request)
 
     @DBOS.step()
@@ -67,7 +71,7 @@ class Runtime:
     @DBOS.workflow()
     def run_experiment(self, setup: ExperimentSetup) -> str:
         """Run one experiment durably: submit, poll, parse, judge, record."""
-        job_id = self.submit_step(setup.command, setup.submission_key)
+        job_id = self.submit_step(setup.command, setup.submission_key, setup.walltime)
 
         info = self.status_step(job_id)
         while not info.state.is_terminal:
