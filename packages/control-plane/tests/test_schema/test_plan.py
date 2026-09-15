@@ -14,6 +14,7 @@ def _minimal_plan(**overrides) -> ResearchPlan:
         "baseline": 1.23,
         "budget_gpu_hours": 10.0,
         "max_concurrency": 1,
+        "walltime": 10,
         "stop_conditions": ["budget exhausted"],
     }
     data.update(overrides)

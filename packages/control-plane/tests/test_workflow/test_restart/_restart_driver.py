@@ -59,6 +59,7 @@ def _experiment_setup() -> ExperimentSetup:
         metric_name="val_bpb",
         baseline=1.23,
         poll_interval_seconds=0.05,
+        walltime=10,
     )
 
 

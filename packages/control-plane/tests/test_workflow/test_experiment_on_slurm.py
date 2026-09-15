@@ -54,6 +54,7 @@ def test_experiment_on_slurm(dbos, tmp_path):
     executor = SlurmExecutor(
         account=os.environ["FABERON_SLURM_ACCOUNT"],
         output=str(tmp_path / "slurm-%j.out"),
+        max_walltime=10,
     )
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
     runtime = Runtime(executor, ledger, config_name=f"slurm-{uuid.uuid4().hex}")
@@ -69,6 +70,7 @@ def test_experiment_on_slurm(dbos, tmp_path):
             metric_name="val_bpb",
             baseline=1.23,
             poll_interval_seconds=5.0,
+            walltime=10,
         )
     )
     assert judgment == "keep"

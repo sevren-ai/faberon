@@ -10,7 +10,9 @@ test_slurm_integration.py.
 import pytest
 
 from faberon.executor import JobState
+from faberon.executor.protocol import SubmitRequest
 from faberon.executor.slurm import (
+    SlurmExecutor,
     _map_state,
     _parse_exit_code,
     _parse_sacct_line,
@@ -26,16 +28,44 @@ def test_render_script():
 
 
 def test_render_sbatch():
-    args = _render_sbatch("faberon:exp-1", "minerva", ["uv", "run", "train.py"])
+    args = _render_sbatch(
+        "faberon:exp-1",
+        "minerva",
+        ["uv", "run", "train.py"],
+        time_limit=240,
+    )
     assert args[0] == "sbatch"
-    assert args[1:6] == [
+    assert args[1:7] == [
         "--parsable",
         "--account=minerva",
         "--job-name=faberon:exp-1",
         "--gres=gpu:1",
+        "--time=240",
         "--wrap",
     ]
-    assert args[6] == _render_script(["uv", "run", "train.py"])
+    assert args[7] == _render_script(["uv", "run", "train.py"])
+
+
+@pytest.mark.parametrize(
+    "walltime,max_walltime,expected",
+    [
+        (120, None, 120),  # no cap set: request passes through
+        (60, 240, 60),  # under the cap: unchanged
+        (240, 120, 120),  # over the cap: clamped
+        (120, 120, 120),  # exactly at the cap: unchanged
+        (1, 1, 1),  # smallest valid values
+    ],
+)
+def test_effective_walltime(walltime, max_walltime, expected):
+    executor = SlurmExecutor("minerva", max_walltime=max_walltime)
+    request = SubmitRequest(command=["true"], submission_key="k", walltime=walltime)
+    assert executor._effective_walltime(request) == expected
+
+
+def test_effective_walltime_no_cap():
+    executor = SlurmExecutor("minerva")
+    request = SubmitRequest(command=["true"], submission_key="k", walltime=90)
+    assert executor._effective_walltime(request) == 90
 
 
 @pytest.mark.parametrize(

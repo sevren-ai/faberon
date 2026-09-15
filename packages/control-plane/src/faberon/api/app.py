@@ -108,6 +108,7 @@ def create_app_slurm() -> FastAPI:
     ``FABERON_API_TOKEN``.
     Optional ``FABERON_SLURM_OUTPUT`` sets the Slurm ``--output`` path.
     Optional ``FABERON_SLURM_GPUS`` sets the GPU count per job (default 1).
+    Optional ``FABERON_SLURM_MAX_TIME`` sets a walltime cap (minutes)..
     """
     account = os.environ.get("FABERON_SLURM_ACCOUNT")
     if not account:
@@ -119,10 +120,14 @@ def create_app_slurm() -> FastAPI:
             "localhost is reachable by other users; the API must be guarded."
         )
     gpus = int(os.environ.get("FABERON_SLURM_GPUS", "1"))
+    max_walltime = os.environ.get("FABERON_SLURM_MAX_TIME")
+    if max_walltime is not None:
+        max_walltime = int(max_walltime)
     executor = SlurmExecutor(
         account=account,
         output=os.environ.get("FABERON_SLURM_OUTPUT"),
         gpus=gpus,
+        max_walltime=max_walltime,
     )
     return create_app(executor=executor, auth_token=token)
 
@@ -147,6 +152,7 @@ def _register_routes(app: FastAPI) -> None:
             metric_name=body.plan.metric_name,
             baseline=body.plan.baseline,
             poll_interval_seconds=body.poll_interval_seconds,
+            walltime=body.plan.walltime,
         )
         # Idempotent: DBOS dedupes on workflow id, the ledger dedupes on
         # the campaigns row. A retry with the same campaign_id returns the

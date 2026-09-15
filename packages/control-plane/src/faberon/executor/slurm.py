@@ -9,7 +9,7 @@ from .protocol import JobInfo, JobState, SubmitRequest
 # Prefix keeps Faberon job names apart from unrelated jobs on a shared cluster
 JOB_NAME_PREFIX = "faberon:"
 
-# Slurm states grouped by how we map them onto JobState
+# Slurm states grouped by how they map onto JobState
 _LIVE_STATES = {
     "PENDING",
     "RUNNING",
@@ -45,6 +45,7 @@ def _render_sbatch(
     *,
     output: str | None = None,
     gpus: int = 1,
+    time_limit: int,
 ) -> list[str]:
     args = [
         "sbatch",
@@ -52,6 +53,7 @@ def _render_sbatch(
         f"--account={account}",
         f"--job-name={job_name}",
         f"--gres=gpu:{gpus}",
+        f"--time={time_limit}",
     ]
     if output is not None:
         args.append(f"--output={output}")
@@ -96,11 +98,23 @@ class SlurmExecutor:
     """
 
     def __init__(
-        self, account: str, *, output: str | None = None, gpus: int = 1
+        self,
+        account: str,
+        *,
+        output: str | None = None,
+        gpus: int = 1,
+        max_walltime: int | None = None,
     ) -> None:
         self._account = account
         self._output = output
         self._gpus = gpus
+        self._max_walltime = max_walltime
+
+    def _effective_walltime(self, request: SubmitRequest) -> int:
+        """Clamp the request's walltime to the deployment-side cap, if set."""
+        if self._max_walltime is None:
+            return request.walltime
+        return min(request.walltime, self._max_walltime)
 
     def submit(self, request: SubmitRequest) -> str:
         job_name = JOB_NAME_PREFIX + request.submission_key
@@ -114,6 +128,7 @@ class SlurmExecutor:
                 request.command,
                 output=self._output,
                 gpus=self._gpus,
+                time_limit=self._effective_walltime(request),
             ),
             capture_output=True,
             text=True,

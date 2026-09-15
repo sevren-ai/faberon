@@ -22,6 +22,7 @@ class SubmitRequest(BaseModel):
 
     command: list[str] = Field(min_length=1)
     submission_key: str = Field(min_length=1)
+    walltime: int = Field(gt=0)  # in minutes
 
 
 class JobInfo(BaseModel):
