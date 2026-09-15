@@ -17,9 +17,19 @@ class EventType(StrEnum):
     """Ledger event types."""
 
     CAMPAIGN_CREATED = "campaign.created"
+    CAMPAIGN_ENDED = "campaign.ended"
+    EXPERIMENT_PROPOSED = "experiment.proposed"
     EXPERIMENT_SUBMITTED = "experiment.submitted"
     EXPERIMENT_COMPLETED = "experiment.completed"
     EXPERIMENT_JUDGED = "experiment.judged"
+
+
+class StopReason(StrEnum):
+    """Why a campaign stopped."""
+
+    CANCELLED = "cancelled"
+    BUDGET_EXHAUSTED = "budget_exhausted"
+    MAX_EXPERIMENTS = "max_experiments"
 
 
 class Event(BaseModel):

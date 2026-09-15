@@ -74,6 +74,7 @@ def test_create_campaign_idempotent(ledger):
         metric_command="cat x",
         baseline=1.0,
         budget_gpu_hours=1.0,
+        max_experiments=6,
         max_concurrency=1,
         walltime=10,
         stop_conditions=["s"],
