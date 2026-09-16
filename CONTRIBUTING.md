@@ -70,6 +70,7 @@ This runs `uv sync --locked`, `ruff format`, `ruff check --fix`, and `ty check` 
 ## Coding style
 
 - Prefer the simplest implementation that works. Do not add optional fields, defaults, or forward-looking abstractions until the current feature needs them.
+- Docstrings are succinct. One short paragraph that says what the unit is and, when useful, why. Do not narrate mechanics, and do not duplicate what design docs, tests, or the type signature already say elsewhere.
 - Production code is written for production, not for the tests. Keep test accommodations out of the main package:
   - Do not add parameters, constructors, or protocols whose primary purpose is to let a test substitute a fake.
   - Do not add test-only defaults, flags, or branches that exist solely so a test can reach in.

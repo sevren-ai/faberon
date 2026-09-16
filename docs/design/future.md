@@ -34,6 +34,7 @@ Default is Pi on the login node next to the brain (see [design.md](design.md)).
 
 ## Research loop extensions
 
+- **Frontier exploration: several live branches per campaign.** The v0.2.0 loop keeps a single best: after every round there is one head to build on. The alternative is to keep several branch tips alive and continue experimenting on each reasonable branch, rather than picking a single winner every round. Each run is then judged against its own branch's parent, not against one global best. The ledger's sha and parent sha per experiment already record a tree, and the worktrees planned for v0.4.0 supply the checkout mechanics. Promotion point: the v0.4.0 design review; its open questions are in [roadmap.md](roadmap.md).
 - Sandboxed code-writing worker (for example OpenHands SDK) once the agent authors enough experiment code to need containment.
 - In-run probes and actuators (live intervention during training) once post-hoc judgment stops sufficing.
 - Adaptive `sacct` poll interval based on queue-wait estimates.
