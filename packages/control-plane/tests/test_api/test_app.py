@@ -80,6 +80,7 @@ def _create_body(metric_path: str, campaign_id: str) -> dict:
             "metric_command": f"cat {metric_path}",
             "baseline": 1.23,
             "budget_gpu_hours": 1.0,
+            "max_experiments": 6,
             "max_concurrency": 1,
             "walltime": 10,
             "stop_conditions": ["budget exhausted"],
