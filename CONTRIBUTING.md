@@ -83,6 +83,21 @@ Use relative imports inside a package (`from .events import Event`), not absolut
 
 Absolute imports are for cross-package boundaries (`from faberon.executor import Executor`). The test suite is itself a package: use relative imports within it, absolute imports to reach `faberon`.
 
+### Package layout
+
+Where things go:
+
+- `faberon/schema/`: contract shapes that cross a process boundary: the research plan, events. 
+- `faberon/workflow/`: durable workflows (runtime, campaign). `models.py` holds internal data shapes passed between workflow modules: `ExperimentSetup`, `ExperimentResult`, `CampaignSetup`.
+- `faberon/executor/`: the executor protocol and its implementations.
+- `faberon/ledger/`: the append-only event ledger.
+- `faberon/api/`: FastAPI routes. Validation and orchestration only, no business logic.
+
+Placement rules:
+
+- Client-facing shapes live in `schema/`; workflow-internal shapes live in `workflow/models.py`.
+- Group a model with its siblings, not inside the module that happens to produce it.
+
 
 ## GitHub Actions
 
