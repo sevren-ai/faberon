@@ -1,8 +1,10 @@
-"""Inputs for a single durable experiment run."""
+"""Internal models used for durable workflow runs."""
 
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+from ..schema.plan import ResearchPlan
 
 
 class ExperimentSetup(BaseModel):
@@ -16,3 +18,14 @@ class ExperimentSetup(BaseModel):
     baseline: float
     poll_interval_seconds: float = Field(gt=0)
     walltime: int = Field(gt=0)  # in minutes
+
+
+class CampaignSetup(BaseModel):
+    """Everything ``run_campaign`` needs. Wraps the accepted plan."""
+
+    campaign_id: UUID
+    plan: ResearchPlan
+    command: list[str] = Field(min_length=1)
+    poll_interval_seconds: float = Field(default=30.0, gt=0)
+    repo_path: str = Field(min_length=1, default=".")
+    target_file: str = Field(min_length=1, default="train.py")
