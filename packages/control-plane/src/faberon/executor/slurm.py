@@ -69,24 +69,32 @@ def _parse_exit_code(exit_string: str) -> int | None:
         return None
 
 
-def _parse_sacct_line(line: str) -> tuple[str, str]:
-    # expecting something like "state|exitcode:signal"
-    fields = line.split("|", 1)
-    assert len(fields) == 2
-    return fields[0], fields[1]
+def _parse_sacct_line(line: str) -> tuple[str, str, str]:
+    # expecting something like "state|exitcode:signal|elapsed_raw_seconds"
+    fields = line.split("|", 2)
+    assert len(fields) == 3
+    return fields[0], fields[1], fields[2]
 
 
-def _map_state(slurm_state: str, exit_string: str) -> tuple[JobState, int | None]:
+def _map_state(
+    slurm_state: str,
+    exit_string: str,
+    elapsed_seconds: float | None = None,
+) -> tuple[JobState, int | None, float | None]:
+    """Map a sacct line to JobState, exit code, and elapsed seconds."""
     # Match by substring
     exit_code = _parse_exit_code(exit_string)
     if any(s in slurm_state for s in _CANCELLED_STATES):
-        return JobState.CANCELLED, None  # cancelled: no meaningful app exit code
+        # cancelled: no meaningful app exit code
+        return JobState.CANCELLED, None, elapsed_seconds
     if "COMPLETED" in slurm_state:
-        return JobState.COMPLETED, exit_code if exit_code is not None else 0
+        code = exit_code if exit_code is not None else 0
+        return JobState.COMPLETED, code, elapsed_seconds
     if any(s in slurm_state for s in _LIVE_STATES):
-        return JobState.RUNNING, None
+        # live jobs have no final elapsed yet
+        return JobState.RUNNING, None, None
     if any(s in slurm_state for s in _FAILED_STATES):
-        return JobState.FAILED, exit_code
+        return JobState.FAILED, exit_code, elapsed_seconds
     raise ValueError(f"unrecognized Slurm state: {slurm_state!r}")
 
 
@@ -189,13 +197,29 @@ class SlurmExecutor:
 
     def _sacct_state(self, job_id: str) -> JobInfo:
         result = subprocess.run(
-            ["sacct", "-X", "-j", job_id, "-P", "-o", "State,ExitCode", "-n"],
+            [
+                "sacct",
+                "-X",
+                "-j",
+                job_id,
+                "-P",
+                "-o",
+                "State,ExitCode,ElapsedRaw",
+                "-n",
+            ],
             capture_output=True,
             text=True,
         )
         lines = result.stdout.strip().splitlines()
         if not lines:
             raise KeyError(job_id)
-        slurm_state, exit_string = _parse_sacct_line(lines[0])
-        state, exit_code = _map_state(slurm_state, exit_string)
-        return JobInfo(job_id=job_id, state=state, exit_code=exit_code)
+        slurm_state, exit_string, elapsed_raw = _parse_sacct_line(lines[0])
+        state, exit_code, elapsed_seconds = _map_state(
+            slurm_state, exit_string, float(elapsed_raw)
+        )
+        return JobInfo(
+            job_id=job_id,
+            state=state,
+            exit_code=exit_code,
+            elapsed_seconds=elapsed_seconds,
+        )
