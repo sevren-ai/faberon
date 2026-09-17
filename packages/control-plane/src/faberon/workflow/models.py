@@ -4,7 +4,16 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from ..executor import JobInfo
 from ..schema.plan import ResearchPlan
+
+
+class ExperimentResult(BaseModel):
+    """Outcome of one experiment: judgment, metric, and the final job info."""
+
+    judgment: str
+    metric_value: float | None
+    job_info: JobInfo
 
 
 class ExperimentSetup(BaseModel):
