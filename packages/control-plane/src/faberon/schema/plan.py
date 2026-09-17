@@ -1,4 +1,4 @@
-"""Research plan: the typed rulebook a campaign is governed by."""
+"""Research plan: the typed rulebook a campaign is governed by (external model)"""
 
 from pydantic import BaseModel, Field
 
