@@ -15,30 +15,13 @@ from dbos import DBOS
 from fastapi.testclient import TestClient
 
 from faberon.api import create_app
-from faberon.executor import JobInfo, JobState, SubmitRequest
+from faberon.executor import JobState
 from faberon.ledger import Ledger
 from faberon.schema.events import EventType
 
+from .._fakes import FakeExecutor
+
 pytestmark = pytest.mark.postgres
-
-
-class FakeExecutor:
-    """Returns a fixed terminal status on first poll"""
-
-    def __init__(self, state: JobState, exit_code: int | None = 0) -> None:
-        self._state = state
-        self._exit_code = exit_code
-        self.submit_count = 0
-
-    def submit(self, request: SubmitRequest) -> str:
-        self.submit_count += 1
-        return "api-job-1"
-
-    def status(self, job_id: str) -> JobInfo:
-        return JobInfo(job_id=job_id, state=self._state, exit_code=self._exit_code)
-
-    def cancel(self, job_id: str) -> None:
-        pass
 
 
 @dataclass
@@ -48,20 +31,26 @@ class ApiFixture:
     metric_path: str
 
 
-@pytest.fixture
-def api(tmp_path) -> Iterator[ApiFixture]:
-    DBOS.destroy()
+def _reset_databases() -> None:
+    """Clear workflow and ledger state between API tests."""
+    DBOS.reset_system_database(truncate=True)
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
     ledger._conn.execute("TRUNCATE events RESTART IDENTITY")
     ledger._conn.execute("TRUNCATE campaigns")
     ledger.close()
+
+
+@pytest.fixture
+def api(tmp_path, repo) -> Iterator[ApiFixture]:
+    DBOS.destroy()
 
     metric = tmp_path / "metric.txt"
     metric.write_text("val_bpb: 1.10\n")
     executor = FakeExecutor(JobState.COMPLETED, exit_code=0)
 
     config_name = f"api-test-{uuid.uuid4().hex}"
-    app = create_app(executor=executor, config_name=config_name)
+    app = create_app(executor=executor, config_name=config_name, repo_path=str(repo))
+    _reset_databases()
     with TestClient(app) as client:
         yield ApiFixture(
             client=client,
@@ -101,9 +90,9 @@ def test_create_campaign(api: ApiFixture):
     assert "workflow_id" in body
 
     handle = DBOS.retrieve_workflow(body["workflow_id"])
-    judgment = handle.get_result()
-    assert judgment == "keep"
-    assert api.executor.submit_count == 1
+    stop_reason = handle.get_result()
+    assert stop_reason == "max_experiments"
+    assert api.executor.submit_count == 6
 
     status = api.client.get(f"/v0/campaigns/{body['campaign_id']}")
     assert status.status_code == 200
@@ -124,12 +113,8 @@ def test_healthz(api: ApiFixture):
     assert response.json() == {"status": "ok"}
 
 
-def test_auth(tmp_path):
+def test_auth(tmp_path, repo):
     DBOS.destroy()
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    ledger._conn.execute("TRUNCATE events RESTART IDENTITY")
-    ledger._conn.execute("TRUNCATE campaigns")
-    ledger.close()
 
     metric = tmp_path / "metric.txt"
     metric.write_text("val_bpb: 1.10\n")
@@ -138,7 +123,9 @@ def test_auth(tmp_path):
         executor=executor,
         config_name=f"api-test-{uuid.uuid4().hex}",
         auth_token="my-secret-token",
+        repo_path=str(repo),
     )
+    _reset_databases()
     headers = {"Authorization": "Bearer my-secret-token"}
     body = _create_body(str(metric), str(uuid.uuid4()))
     with TestClient(app) as client:
@@ -147,9 +134,10 @@ def test_auth(tmp_path):
         # without token: rejected
         assert client.post("/v0/campaigns", json=body).status_code == 401
         # with token: accepted
-        assert (
-            client.post("/v0/campaigns", json=body, headers=headers).status_code == 201
-        )
+        response = client.post("/v0/campaigns", json=body, headers=headers)
+        assert response.status_code == 201
+        handle = DBOS.retrieve_workflow(response.json()["workflow_id"])
+        assert handle.get_result() == "max_experiments"
     DBOS.destroy()
 
 
@@ -165,7 +153,7 @@ def test_create_campaign_idempotent(api: ApiFixture):
     assert second.status_code == 201
     assert second.json()["campaign_id"] == first.json()["campaign_id"]
     assert second.json()["workflow_id"] == first.json()["workflow_id"]
-    assert api.executor.submit_count == 1
+    assert api.executor.submit_count == 6
 
     status = api.client.get(f"/v0/campaigns/{camp_id}")
     types = [e["type"] for e in status.json()["events"]]
@@ -180,13 +168,9 @@ class LiveServer:
 
 
 @pytest.fixture
-def live_server(tmp_path) -> Iterator[LiveServer]:
+def live_server(tmp_path, repo) -> Iterator[LiveServer]:
     """Serve the app over real HTTP on 127.0.0.1."""
     DBOS.destroy()
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    ledger._conn.execute("TRUNCATE events RESTART IDENTITY")
-    ledger._conn.execute("TRUNCATE campaigns")
-    ledger.close()
 
     metric = tmp_path / "metric.txt"
     metric.write_text("val_bpb: 1.10\n")
@@ -195,7 +179,9 @@ def live_server(tmp_path) -> Iterator[LiveServer]:
     app = create_app(
         executor=executor,
         config_name=f"api-test-{uuid.uuid4().hex}",
+        repo_path=str(repo),
     )
+    _reset_databases()
 
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -245,7 +231,7 @@ def test_events_stream_resume(live_server: LiveServer):
         campaign_id = response.json()["campaign_id"]
 
         handle = DBOS.retrieve_workflow(response.json()["workflow_id"])
-        assert handle.get_result() == "keep"
+        assert handle.get_result() == "max_experiments"
 
         # Full replay from the start.
         events = _read_sse_until(client, "/v0/events", "experiment.judged")

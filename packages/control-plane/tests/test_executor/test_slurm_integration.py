@@ -68,6 +68,16 @@ def test_submit_failure(executor: SlurmExecutor):
     assert executor.status(job_id).exit_code != 0
 
 
+def test_terminal_jobs_report_elapsed(executor: SlurmExecutor):
+    """Terminal status carries ElapsedRaw seconds; the budget depends on it."""
+    key = f"test-elapsed-{uuid.uuid4().hex[:8]}"
+    job_id = executor.submit(_request(["sleep", "2"], key))
+    _wait_for_terminal(executor, job_id)
+    info = executor.status(job_id)
+    assert info.elapsed_seconds is not None
+    assert info.elapsed_seconds >= 2.0
+
+
 def test_cancel(executor: SlurmExecutor):
     key = f"test-sleep-{uuid.uuid4().hex[:8]}"
     job_id = executor.submit(_request(["sleep", "300"], key))

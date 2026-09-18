@@ -10,7 +10,7 @@ test_slurm_integration.py.
 import pytest
 
 from faberon.executor import JobState
-from faberon.executor.protocol import SubmitRequest
+from faberon.executor.protocol import JobInfo, SubmitRequest
 from faberon.executor.slurm import (
     SlurmExecutor,
     _map_state,
@@ -85,9 +85,12 @@ def test_parse_exit_code(exit_string, expected):
 @pytest.mark.parametrize(
     "line,expected",
     [
-        ("COMPLETED|0:0", ("COMPLETED", "0:0")),
-        ("FAILED|2:0", ("FAILED", "2:0")),
-        ("CANCELLED by 1807600296|0:0", ("CANCELLED by 1807600296", "0:0")),
+        ("COMPLETED|0:0|90", ("COMPLETED", "0:0", "90")),
+        ("FAILED|2:0|5", ("FAILED", "2:0", "5")),
+        (
+            "CANCELLED by 1807600296|0:0|3723",
+            ("CANCELLED by 1807600296", "0:0", "3723"),
+        ),
     ],
 )
 def test_parse_sacct_line(line, expected):
@@ -109,9 +112,23 @@ def test_parse_sacct_line(line, expected):
     ],
 )
 def test_map_state(slurm_state, exit_string, expected_state, expected_exit):
-    assert _map_state(slurm_state, exit_string) == (expected_state, expected_exit)
+    assert _map_state(slurm_state, exit_string, 60.0) == (
+        expected_state,
+        expected_exit,
+        60.0 if expected_state != JobState.RUNNING else None,
+    )
 
 
 def test_map_state_unknown_raises():
     with pytest.raises(ValueError):
         _map_state("UNKNOWN_ISSUE", "0:0")
+
+
+def test_jobinfo_terminal_requires_elapsed():
+    with pytest.raises(ValueError, match="elapsed_seconds"):
+        JobInfo(job_id="j1", state=JobState.COMPLETED, elapsed_seconds=None)
+
+
+def test_jobinfo_running_allows_no_elapsed():
+    info = JobInfo(job_id="j1", state=JobState.RUNNING, elapsed_seconds=None)
+    assert info.elapsed_seconds is None

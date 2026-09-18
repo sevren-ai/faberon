@@ -10,6 +10,11 @@ Before any contribution, load context in this order:
 2. `docs/design/roadmap.md`: planned features and open questions.
 3. The current WIP release doc: the `docs/design/vX.Y.Z.md` whose status line reads "current WIP".
 
+## Boundaries
+
+- Treat sandbox and permission limits as hard stops. When a command is blocked, report the blocker and wait. Never route around them (no `su`, no alternate paths, no side steps).
+- Do not install infrastructure (databases, services, system packages). If a test needs an external service, stop and ask the user to start it.
+
 ## Writing style
 
 Applies to everything you produce: design docs, READMEs, code comments, commit messages, and chat replies.

@@ -3,10 +3,10 @@
 import asyncio
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-import anyio.to_thread
 from dbos import DBOS, DBOSConfig, SetWorkflowID
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware import Middleware
@@ -20,8 +20,15 @@ from .. import __version__
 from ..executor import Executor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
-from ..workflow import ExperimentSetup, Runtime
-from .models import CampaignCreate, CampaignCreated, CampaignStatus
+from ..schema.events import Actor, Event, EventType
+from ..workflow import CampaignRunner, CampaignSetup, Runtime
+from .models import CampaignCreate, CampaignCreated, CampaignStatus, CancelCampaign
+
+
+def _placeholder_edit(content: str) -> str:
+    """Proposer placeholder: append a marker line so each commit is non-empty."""
+    return content + "\n# proposed by Faberon\n"
+
 
 _HEALTHZ_PATH = "/healthz"
 RequestResponseEndpoint = Callable[[StarletteRequest], Awaitable[Response]]
@@ -51,6 +58,7 @@ def create_app(
     *,
     config_name: str = "default",
     auth_token: str | None = None,
+    repo_path: str = ".",
 ) -> FastAPI:
     """Build the Faberon HTTP app. Requires ``FABERON_DATABASE_URL``.
 
@@ -76,13 +84,25 @@ def create_app(
         assert db_url is not None
         ledger = Ledger(db_url)
         runtime = Runtime(executor, ledger, config_name=config_name)
+        runner = CampaignRunner(runtime, repo_path=repo_path, edit_fn=_placeholder_edit)
         DBOS.register_instance(runtime)
+        DBOS.register_instance(runner)
         DBOS.launch()
+        # The SSE stream polls the (sync) ledger off the event loop. Own pool:
+        # DBOS hands its executor to asyncio.to_thread as the loop default and
+        # a stream worker must not outlive DBOS.destroy() at interpreter exit.
+        sse_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="faberon-sse-")
+        stop_sse = asyncio.Event()
         app.state.runtime = runtime
+        app.state.runner = runner
         app.state.ledger = ledger
+        app.state.sse_pool = sse_pool
+        app.state.stop_sse = stop_sse
         try:
             yield
         finally:
+            stop_sse.set()
+            sse_pool.shutdown(wait=False, cancel_futures=True)
             DBOS.destroy()
             ledger.close()
 
@@ -139,31 +159,48 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.post("/v0/campaigns", response_model=CampaignCreated, status_code=201)
     def create_campaign(body: CampaignCreate) -> CampaignCreated:
-        runtime: Runtime = app.state.runtime
+        runner: CampaignRunner = app.state.runner
         ledger: Ledger = app.state.ledger
         campaign_id = body.campaign_id
         workflow_id = str(campaign_id)
 
-        setup = ExperimentSetup(
+        setup = CampaignSetup(
             campaign_id=campaign_id,
+            plan=body.plan,
             command=body.command,
-            submission_key=workflow_id,
-            metric_command=body.plan.metric_command,
-            metric_name=body.plan.metric_name,
-            baseline=body.plan.baseline,
             poll_interval_seconds=body.poll_interval_seconds,
-            walltime=body.plan.walltime,
+            repo_path=".",
         )
         # Idempotent: DBOS dedupes on workflow id, the ledger dedupes on
         # the campaigns row. A retry with the same campaign_id returns the
         # existing campaign instead of creating a new one.
         with SetWorkflowID(workflow_id):
-            handle = DBOS.start_workflow(runtime.run_experiment, setup)
+            handle = DBOS.start_workflow(runner.run_campaign, setup)
         ledger.create_campaign(campaign_id, workflow_id, body.plan)
         return CampaignCreated(
             campaign_id=campaign_id,
             workflow_id=handle.workflow_id,
         )
+
+    @app.post("/v0/campaigns/{campaign_id}/cancel", status_code=202)
+    def cancel_campaign(campaign_id: UUID, body: CancelCampaign) -> dict[str, str]:
+        ledger: Ledger = app.state.ledger
+        events = ledger.campaign_events(campaign_id)
+        if not events:
+            raise HTTPException(status_code=404, detail="campaign not found")
+        if any(e.type == EventType.CAMPAIGN_ENDED for e in events):
+            raise HTTPException(status_code=409, detail="campaign already ended")
+        ledger.append(
+            Event(
+                campaign_id=campaign_id,
+                actor=Actor.HUMAN,
+                type=EventType.CANCEL_REQUESTED,
+                justification=body.justification,
+                payload={"source": "api"},
+            )
+        )
+        DBOS.send(str(campaign_id), "cancel", "cancel")
+        return {"campaign_id": str(campaign_id), "status": "cancel requested"}
 
     @app.get("/v0/campaigns/{campaign_id}", response_model=CampaignStatus)
     def get_campaign(campaign_id: UUID) -> CampaignStatus:
@@ -179,21 +216,30 @@ def _register_routes(app: FastAPI) -> None:
         after: int = Query(default=0, ge=0),
     ) -> StreamingResponse:
         ledger: Ledger = request.app.state.ledger
+        sse_pool: ThreadPoolExecutor = request.app.state.sse_pool
+        stop_sse: asyncio.Event = request.app.state.stop_sse
+        loop = asyncio.get_running_loop()
 
         async def generate() -> AsyncIterator[str]:
             cursor = after
             while True:
-                if await request.is_disconnected():
+                if stop_sse.is_set() or await request.is_disconnected():
                     break
-                # Sync psycopg call; keep it off the event loop.
-                batch = await anyio.to_thread.run_sync(
-                    lambda: list(ledger.tail(after=cursor))
+                # Sync psycopg call; keep it off the event loop/DBOS executor
+                batch = await loop.run_in_executor(
+                    sse_pool, lambda: list(ledger.tail(after=cursor))
                 )
+                if stop_sse.is_set():
+                    break
                 for event in batch:
                     assert event.seq is not None
                     cursor = event.seq
                     yield f"event: ledger\ndata: {event.model_dump_json()}\n\n"
-                await asyncio.sleep(0.5)
+                # Wake early on shutdown instead of sleeping through it.
+                try:
+                    await asyncio.wait_for(stop_sse.wait(), timeout=0.5)
+                except TimeoutError:
+                    pass
 
         return StreamingResponse(
             generate(),

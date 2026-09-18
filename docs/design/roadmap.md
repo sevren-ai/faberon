@@ -17,8 +17,8 @@ A version is a milestone release, not the whole roadmap. Each phase becomes its 
 
 Questions that affect near-term work. Broader deferred ideas belong in [future.md](future.md).
 
+- Multi-file repo edits: v0.2.0 edits one file (`train.py`); the real proposer should edit many files. Lands with the Pydantic AI agent: `edit_fn` becomes a callable that mutates the working tree, `propose_step` resets to head first so recovery stays deterministic. Commit scoping settles at that design review: plan-listed paths vs. agent-decided commit tool vs. `add -A` with an ignore-file convention for run outputs.
 - Compute-node to login-node HTTP egress (gates the epilog webhook).
-- LLM access from the login node for the v0.2.0 proposer (and later the drafter): hosted API egress vs local model, provider choice, key handling (`FABERON_MODEL` env config is already the design.md choice; the operational path is not).
 - Cluster specifics: partition, GPU type, and QoS are not currently set by the executor. Explicit `--partition` and QoS belong with the scale work (v0.4.0); `--time` walltime is pulled forward to v0.2.0.
 - Constraint-aware judgment: today judgment scores one metric movement with a confidence measure. Constraint-driven search (e.g. edge models that must fit a size or memory budget) needs a hard gate distinct from the scored objective: keep only if the metric moves AND the run satisfies a budget. Settles where the constraint lives (plan schema field vs. judgment step) and whether it is a per-run gate or a campaign-level rule.
 - Frontier exploration: keeping several branch tips alive per campaign instead of one best (idea described in future.md). Settles at the v0.4.0 design review, where worktrees arrive: the pruning rule (when a branch dies: dominated, budget share, age), how the proposer chooses which branch to extend (exploit the leader vs explore the rest), and what `campaign.ended` reports when several branches survive.

@@ -1,4 +1,4 @@
-"""Request and response models for the HTTP API."""
+"""External request and response models for the HTTP API."""
 
 from uuid import UUID
 
@@ -15,6 +15,12 @@ class CampaignCreate(BaseModel):
     plan: ResearchPlan
     command: list[str] = Field(min_length=1)
     poll_interval_seconds: float = Field(default=30.0, gt=0)
+
+
+class CancelCampaign(BaseModel):
+    """POST /v0/campaigns/{id}/cancel body."""
+
+    justification: str = Field(min_length=1)
 
 
 class CampaignCreated(BaseModel):

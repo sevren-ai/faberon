@@ -23,7 +23,7 @@ import pytest
 from faberon.ledger import Ledger
 from faberon.schema.events import EventType
 
-from ._fake_file_executor import FakeFileExecutor
+from ..._fakes import FakeFileExecutor
 
 pytestmark = pytest.mark.postgres
 
@@ -97,7 +97,7 @@ def test_restart_after_kill(tmp_path):
     assert result.returncode == 0, (
         f"recover failed:\nstdout={result.stdout}\nstderr={result.stderr}"
     )
-    assert "JUDGMENT: keep" in result.stdout, (
+    assert "RESULT: keep" in result.stdout, (
         f"unexpected judgment:\n{result.stdout}\n{result.stderr}"
     )
 

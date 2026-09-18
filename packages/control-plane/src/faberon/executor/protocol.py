@@ -3,7 +3,7 @@
 from enum import StrEnum
 from typing import Protocol
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class JobState(StrEnum):
@@ -14,7 +14,10 @@ class JobState(StrEnum):
 
     @property
     def is_terminal(self) -> bool:
-        return self in (JobState.COMPLETED, JobState.FAILED, JobState.CANCELLED)
+        return self in _TERMINAL_STATES
+
+
+_TERMINAL_STATES = frozenset((JobState.COMPLETED, JobState.FAILED, JobState.CANCELLED))
 
 
 class SubmitRequest(BaseModel):
@@ -31,6 +34,14 @@ class JobInfo(BaseModel):
     job_id: str
     state: JobState
     exit_code: int | None = None
+    elapsed_seconds: float | None = None
+
+    @model_validator(mode="after")
+    def _terminal_implies_elapsed(self) -> JobInfo:
+        # terminal state should have elapsed_seconds set
+        if self.state.is_terminal and self.elapsed_seconds is None:
+            raise ValueError("elapsed_seconds is required on terminal jobs")
+        return self
 
 
 class Executor(Protocol):

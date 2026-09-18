@@ -27,7 +27,7 @@ from dbos import DBOS, DBOSConfig, SetWorkflowID
 from faberon.ledger import Ledger
 from faberon.workflow import ExperimentSetup, Runtime
 
-from ._fake_file_executor import FakeFileExecutor
+from ..._fakes import FakeFileExecutor
 
 
 def _config() -> DBOSConfig:
@@ -85,7 +85,7 @@ def _recover() -> None:
     DBOS.launch()  # recovers the pending workflow
     handle = DBOS.retrieve_workflow(os.environ["FABERON_TEST_WF_ID"])
     result = handle.get_result()
-    print("JUDGMENT:", result, flush=True)
+    print("RESULT:", result.judgment, flush=True)
     DBOS.destroy()
 
 

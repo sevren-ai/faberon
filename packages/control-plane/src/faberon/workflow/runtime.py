@@ -9,7 +9,7 @@ from dbos import DBOS
 from ..executor import Executor, JobInfo, JobState, SubmitRequest
 from ..ledger import Ledger
 from ..schema.events import Actor, Event, EventType
-from .models import ExperimentSetup
+from .models import ExperimentResult, ExperimentSetup
 
 
 @DBOS.dbos_class()
@@ -57,11 +57,19 @@ class Runtime:
         return _parse_metric(result.stdout, metric_name)
 
     @DBOS.step()
-    def judge_step(self, metric_value: float | None, baseline: float) -> str:
+    def judge_step(
+        self, metric_value: float | None, baseline: float, info: JobInfo
+    ) -> tuple[str, str]:
         """Apply a simple keep/discard rule: lower is better (keep)."""
+        if info.state != JobState.COMPLETED:
+            return "discard", f"job {info.state.value}"
+        if info.exit_code != 0:
+            return "discard", f"job exit {info.exit_code}"
         if metric_value is None:
-            return "discard"
-        return "keep" if metric_value < baseline else "discard"
+            return "discard", "metric unparseable"
+        if metric_value < baseline:
+            return "keep", f"metric {metric_value} beats best {baseline}"
+        return "discard", f"metric {metric_value} does not beat best {baseline}"
 
     @DBOS.transaction()
     def record_event_step(self, event: Event) -> int:
@@ -69,7 +77,7 @@ class Runtime:
         return self.ledger.append_with_session(DBOS.sql_session, event)
 
     @DBOS.workflow()
-    def run_experiment(self, setup: ExperimentSetup) -> str:
+    def run_experiment(self, setup: ExperimentSetup) -> ExperimentResult:
         """Run one experiment durably: submit, poll, parse, judge, record."""
         job_id = self.submit_step(setup.command, setup.submission_key, setup.walltime)
 
@@ -84,7 +92,7 @@ class Runtime:
                 setup.metric_command, setup.metric_name
             )
 
-        judgment = self.judge_step(metric_value, setup.baseline)
+        judgment, reason = self.judge_step(metric_value, setup.baseline, info)
         exit_code_str = str(info.exit_code) if info.exit_code is not None else "n/a"
         metric_value_str = str(metric_value) if metric_value is not None else "n/a"
 
@@ -98,6 +106,7 @@ class Runtime:
                     "job_id": job_id,
                     "state": info.state.value,
                     "exit_code": info.exit_code,
+                    "elapsed_seconds": info.elapsed_seconds,
                 },
             )
         )
@@ -115,10 +124,13 @@ class Runtime:
                     "metric_value": metric_value,
                     "baseline": setup.baseline,
                     "judgment": judgment,
+                    "reason": reason,
                 },
             )
         )
-        return judgment
+        return ExperimentResult(
+            judgment=judgment, metric_value=metric_value, job_info=info
+        )
 
 
 # -XXX.YYe-Z
