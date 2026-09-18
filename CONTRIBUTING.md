@@ -41,6 +41,7 @@ This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, m
 - Keep tests small and focused. One behaviour per test when practical.
 - Roughly one test file per Python module, mirroring the package layout (for example `schema/plan.py` → `tests/test_schema/test_plan.py`).
 - Every test should protect a behaviour we care about. Prefer a few meaningful tests over many trivial ones that only restate the implementation.
+- Tests that start DBOS workflows must wait for them to finish before DBOS teardown. A running parent can otherwise remain blocked on a child workflow during Python shutdown.
 
 ### Ledger tests
 
