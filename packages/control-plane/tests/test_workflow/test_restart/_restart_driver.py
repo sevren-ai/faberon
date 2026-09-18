@@ -27,7 +27,7 @@ from dbos import DBOS, DBOSConfig, SetWorkflowID
 from faberon.ledger import Ledger
 from faberon.workflow import ExperimentSetup, Runtime
 
-from ._fake_file_executor import FakeFileExecutor
+from ..._fakes import FakeFileExecutor
 
 
 def _config() -> DBOSConfig:

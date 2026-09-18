@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 from faberon.workflow import tree
-from tests.conftest import make_repo
+
+from ..conftest import make_repo
 
 _BASELINE_EXPERIMENT = "baseline"
 

@@ -23,7 +23,7 @@ import pytest
 from faberon.ledger import Ledger
 from faberon.schema.events import EventType
 
-from ._fake_file_executor import FakeFileExecutor
+from ..._fakes import FakeFileExecutor
 
 pytestmark = pytest.mark.postgres
 

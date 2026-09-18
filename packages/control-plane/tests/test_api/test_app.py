@@ -15,35 +15,13 @@ from dbos import DBOS
 from fastapi.testclient import TestClient
 
 from faberon.api import create_app
-from faberon.executor import JobInfo, JobState, SubmitRequest
+from faberon.executor import JobState
 from faberon.ledger import Ledger
 from faberon.schema.events import EventType
 
+from .._fakes import FakeExecutor
+
 pytestmark = pytest.mark.postgres
-
-
-class FakeExecutor:
-    """Returns a fixed terminal status on first poll"""
-
-    def __init__(self, state: JobState, exit_code: int | None = 0) -> None:
-        self._state = state
-        self._exit_code = exit_code
-        self.submit_count = 0
-
-    def submit(self, request: SubmitRequest) -> str:
-        self.submit_count += 1
-        return "api-job-1"
-
-    def status(self, job_id: str) -> JobInfo:
-        return JobInfo(
-            job_id=job_id,
-            state=self._state,
-            exit_code=self._exit_code,
-            elapsed_seconds=60.0,
-        )
-
-    def cancel(self, job_id: str) -> None:
-        pass
 
 
 @dataclass

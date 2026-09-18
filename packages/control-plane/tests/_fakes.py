@@ -1,4 +1,4 @@
-"""File-backed executor for the restart test."""
+"""Shared test fakes implementing the executor protocol."""
 
 import json
 import os
@@ -7,6 +7,38 @@ import tempfile
 from faberon.executor import JobInfo, JobState, SubmitRequest
 
 _STATE_FILE = "executor_state.json"
+
+
+class FakeExecutor:
+    """In-memory executor: fixed status on first poll, counts submissions."""
+
+    def __init__(
+        self,
+        state: JobState = JobState.COMPLETED,
+        *,
+        exit_code: int | None = 0,
+        elapsed_seconds: float = 60.0,
+    ) -> None:
+        self._state = state
+        self._exit_code = exit_code
+        self._elapsed_seconds = elapsed_seconds
+        self.submit_count = 0
+
+    def submit(self, request: SubmitRequest) -> str:
+        self.submit_count += 1
+        return f"fake-{self.submit_count}"
+
+    def status(self, job_id: str) -> JobInfo:
+        elapsed = self._elapsed_seconds if self._state.is_terminal else None
+        return JobInfo(
+            job_id=job_id,
+            state=self._state,
+            exit_code=self._exit_code,
+            elapsed_seconds=elapsed,
+        )
+
+    def cancel(self, job_id: str) -> None:
+        pass
 
 
 class FakeFileExecutor:
