@@ -23,7 +23,6 @@ faberon = "faberon.cli:main"
 dev = [
     "httpx2>=2.12.0",
     "pytest>=8",
-    "pytest-timeout>=2.4",
     "ruff>=0.13",
     "ty>=0.0.78",
 ]
@@ -40,9 +39,6 @@ markers = [
     "postgres: requires a real Postgres; set FABERON_DATABASE_URL",
     "slurm: requires a real Slurm cluster; opt in with FABERON_SLURM_INTEGRATION=1",
 ]
-# Fail loudly instead of hanging forever (threaded DBOS/uvicorn teardown).
-timeout = 120
-timeout_method = "thread"
 filterwarnings = [
     # Starlette TestClient still imports anyio.abc.BlockingPortal; fixed upstream later.
     "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning:starlette.testclient",
