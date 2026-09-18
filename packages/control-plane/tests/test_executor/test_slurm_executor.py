@@ -122,3 +122,13 @@ def test_map_state(slurm_state, exit_string, expected_state, expected_exit):
 def test_map_state_unknown_raises():
     with pytest.raises(ValueError):
         _map_state("UNKNOWN_ISSUE", "0:0")
+
+
+def test_jobinfo_terminal_requires_elapsed():
+    with pytest.raises(ValueError, match="elapsed_seconds"):
+        JobInfo(job_id="j1", state=JobState.COMPLETED, elapsed_seconds=None)
+
+
+def test_jobinfo_running_allows_no_elapsed():
+    info = JobInfo(job_id="j1", state=JobState.RUNNING, elapsed_seconds=None)
+    assert info.elapsed_seconds is None
