@@ -35,7 +35,12 @@ class FakeExecutor:
         return "api-job-1"
 
     def status(self, job_id: str) -> JobInfo:
-        return JobInfo(job_id=job_id, state=self._state, exit_code=self._exit_code)
+        return JobInfo(
+            job_id=job_id,
+            state=self._state,
+            exit_code=self._exit_code,
+            elapsed_seconds=60.0,
+        )
 
     def cancel(self, job_id: str) -> None:
         pass
@@ -49,7 +54,7 @@ class ApiFixture:
 
 
 @pytest.fixture
-def api(tmp_path) -> Iterator[ApiFixture]:
+def api(tmp_path, repo) -> Iterator[ApiFixture]:
     DBOS.destroy()
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
     ledger._conn.execute("TRUNCATE events RESTART IDENTITY")
@@ -61,7 +66,7 @@ def api(tmp_path) -> Iterator[ApiFixture]:
     executor = FakeExecutor(JobState.COMPLETED, exit_code=0)
 
     config_name = f"api-test-{uuid.uuid4().hex}"
-    app = create_app(executor=executor, config_name=config_name)
+    app = create_app(executor=executor, config_name=config_name, repo_path=str(repo))
     with TestClient(app) as client:
         yield ApiFixture(
             client=client,
@@ -101,9 +106,9 @@ def test_create_campaign(api: ApiFixture):
     assert "workflow_id" in body
 
     handle = DBOS.retrieve_workflow(body["workflow_id"])
-    judgment = handle.get_result()
-    assert judgment == "keep"
-    assert api.executor.submit_count == 1
+    stop_reason = handle.get_result()
+    assert stop_reason == "max_experiments"
+    assert api.executor.submit_count == 6
 
     status = api.client.get(f"/v0/campaigns/{body['campaign_id']}")
     assert status.status_code == 200
@@ -124,7 +129,7 @@ def test_healthz(api: ApiFixture):
     assert response.json() == {"status": "ok"}
 
 
-def test_auth(tmp_path):
+def test_auth(tmp_path, repo):
     DBOS.destroy()
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
     ledger._conn.execute("TRUNCATE events RESTART IDENTITY")
@@ -138,6 +143,7 @@ def test_auth(tmp_path):
         executor=executor,
         config_name=f"api-test-{uuid.uuid4().hex}",
         auth_token="my-secret-token",
+        repo_path=str(repo),
     )
     headers = {"Authorization": "Bearer my-secret-token"}
     body = _create_body(str(metric), str(uuid.uuid4()))
@@ -165,7 +171,7 @@ def test_create_campaign_idempotent(api: ApiFixture):
     assert second.status_code == 201
     assert second.json()["campaign_id"] == first.json()["campaign_id"]
     assert second.json()["workflow_id"] == first.json()["workflow_id"]
-    assert api.executor.submit_count == 1
+    assert api.executor.submit_count == 6
 
     status = api.client.get(f"/v0/campaigns/{camp_id}")
     types = [e["type"] for e in status.json()["events"]]
@@ -180,7 +186,7 @@ class LiveServer:
 
 
 @pytest.fixture
-def live_server(tmp_path) -> Iterator[LiveServer]:
+def live_server(tmp_path, repo) -> Iterator[LiveServer]:
     """Serve the app over real HTTP on 127.0.0.1."""
     DBOS.destroy()
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
@@ -195,6 +201,7 @@ def live_server(tmp_path) -> Iterator[LiveServer]:
     app = create_app(
         executor=executor,
         config_name=f"api-test-{uuid.uuid4().hex}",
+        repo_path=str(repo),
     )
 
     with socket.socket() as sock:
@@ -245,7 +252,7 @@ def test_events_stream_resume(live_server: LiveServer):
         campaign_id = response.json()["campaign_id"]
 
         handle = DBOS.retrieve_workflow(response.json()["workflow_id"])
-        assert handle.get_result() == "keep"
+        assert handle.get_result() == "max_experiments"
 
         # Full replay from the start.
         events = _read_sse_until(client, "/v0/events", "experiment.judged")

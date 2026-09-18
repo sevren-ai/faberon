@@ -1,6 +1,8 @@
-"""Shared pytest hooks for the control-plane test suite."""
+"""Shared pytest hooks and fixtures for the control-plane test suite."""
 
 import os
+import subprocess
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -30,3 +32,31 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
             pytest.skip(
                 "set FABERON_SLURM_ACCOUNT to the Slurm account to bill jobs to"
             )
+
+
+def _git(repo: Path, *args: str) -> str:
+    """Run git in a test repo, asserting success."""
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip()
+
+
+def make_repo(tmp_path: Path, baseline: str = "baseline") -> Path:
+    """Create a git repo at ``tmp_path/repo`` with one baseline commit of train.py."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.email", "smith@forge.com")
+    _git(repo, "config", "user.name", "Black")
+    (repo / "train.py").write_text(f"{baseline}\n")
+    _git(repo, "add", "train.py")
+    _git(repo, "commit", "-m", "baseline")
+    return repo
+
+
+@pytest.fixture
+def repo(tmp_path: Path) -> Path:
+    """A git repo at ``tmp_path/repo`` with one baseline commit of train.py."""
+    return make_repo(tmp_path)

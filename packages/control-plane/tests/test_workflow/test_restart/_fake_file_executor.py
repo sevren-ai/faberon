@@ -33,10 +33,12 @@ class FakeFileExecutor:
     def status(self, job_id: str) -> JobInfo:
         state = self._load()
         job = state["jobs"][job_id]
+        state_val = JobState(job["state"])
         return JobInfo(
             job_id=job_id,
-            state=JobState(job["state"]),
+            state=state_val,
             exit_code=job["exit_code"],
+            elapsed_seconds=1.0 if state_val.is_terminal else None,
         )
 
     def cancel(self, job_id: str) -> None:

@@ -73,7 +73,7 @@ def test_experiment_on_slurm(dbos, tmp_path):
             walltime=10,
         )
     )
-    assert judgment == "keep"
+    assert judgment.judgment == "keep"
 
     events = list(ledger.tail())
     ledger.close()

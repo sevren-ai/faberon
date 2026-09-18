@@ -10,7 +10,7 @@ test_slurm_integration.py.
 import pytest
 
 from faberon.executor import JobState
-from faberon.executor.protocol import SubmitRequest
+from faberon.executor.protocol import JobInfo, SubmitRequest
 from faberon.executor.slurm import (
     SlurmExecutor,
     _map_state,
@@ -85,9 +85,12 @@ def test_parse_exit_code(exit_string, expected):
 @pytest.mark.parametrize(
     "line,expected",
     [
-        ("COMPLETED|0:0", ("COMPLETED", "0:0")),
-        ("FAILED|2:0", ("FAILED", "2:0")),
-        ("CANCELLED by 1807600296|0:0", ("CANCELLED by 1807600296", "0:0")),
+        ("COMPLETED|0:0|90", ("COMPLETED", "0:0", "90")),
+        ("FAILED|2:0|5", ("FAILED", "2:0", "5")),
+        (
+            "CANCELLED by 1807600296|0:0|3723",
+            ("CANCELLED by 1807600296", "0:0", "3723"),
+        ),
     ],
 )
 def test_parse_sacct_line(line, expected):
@@ -109,7 +112,11 @@ def test_parse_sacct_line(line, expected):
     ],
 )
 def test_map_state(slurm_state, exit_string, expected_state, expected_exit):
-    assert _map_state(slurm_state, exit_string) == (expected_state, expected_exit)
+    assert _map_state(slurm_state, exit_string, 60.0) == (
+        expected_state,
+        expected_exit,
+        60.0 if expected_state != JobState.RUNNING else None,
+    )
 
 
 def test_map_state_unknown_raises():
