@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "psycopg[binary]>=3.2",
     "pydantic>=2.13.5",
+    "pydantic-ai-slim[openrouter]>=2.45.0",
     "uvicorn>=0.52.4",
 ]
 
