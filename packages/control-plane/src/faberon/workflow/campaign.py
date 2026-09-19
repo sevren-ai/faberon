@@ -5,14 +5,14 @@ commit or resets to the parent. Stop conditions are checked at the top of
 the loop in precedence order; the signal name for cancel is ``cancel``.
 """
 
-from collections.abc import Callable
 from pathlib import Path
 
 from dbos import DBOS
 
 from ..executor import JobInfo
 from ..schema.events import Actor, Event, EventType, StopReason
-from .models import CampaignSetup, ExperimentSetup
+from .models import CampaignSetup, ExperimentSetup, Proposal
+from .proposer import ExperimentProposer
 from .runtime import Runtime
 from .tree import CommitResult, commit_file, reset_hard
 
@@ -32,23 +32,23 @@ class CampaignRunner:
         self,
         runtime: Runtime,
         repo_path: str,
-        edit_fn: Callable[[str], str],
+        proposer: ExperimentProposer,
         target_file: str = "train.py",
         gpus: int = 1,
     ) -> None:
         self.runtime = runtime
         self.config_name = runtime.config_name
         self.repo = Path(repo_path)
-        self.edit_fn = edit_fn
+        self.proposer = proposer
         self.target_file = target_file
         self.gpus = gpus
 
     # -- steps (checkpointed; replayed without re-execution) --
 
     @DBOS.step()
-    def propose_step(self, current: str) -> str:
-        """Apply the constructor-injected proposer to the current content."""
-        return self.edit_fn(current)
+    def propose_step(self, setup: CampaignSetup, current: str) -> Proposal:
+        """Ask the proposer for one replacement."""
+        return self.proposer.propose(setup.campaign_id, setup.plan, current)
 
     @DBOS.step()
     def commit_step(self, message: str) -> CommitResult:
@@ -118,10 +118,15 @@ class CampaignRunner:
 
             experiments_done += 1
             current = self.read_target_step()
-            proposed = self.propose_step(current)
-            self.write_target_step(proposed)
+            proposal = self.propose_step(setup, current)
+            self.write_target_step(proposal.content)
             result = self.commit_step(f"experiment {experiments_done}")
-            self._record_proposal(setup, experiments_done, result)
+            self._record_proposal(
+                setup,
+                experiments_done,
+                result,
+                proposal.rationale,
+            )
 
             setup_one = ExperimentSetup(
                 campaign_id=setup.campaign_id,
@@ -150,14 +155,18 @@ class CampaignRunner:
         return DBOS.recv(topic="cancel", timeout_seconds=0.0) is not None
 
     def _record_proposal(
-        self, setup: CampaignSetup, index: int, result: CommitResult
+        self,
+        setup: CampaignSetup,
+        index: int,
+        result: CommitResult,
+        rationale: str,
     ) -> None:
         self.record_event(
             Event(
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_PROPOSED,
-                justification=f"experiment {index} proposed",
+                justification=rationale,
                 payload={
                     "sha": result.sha,
                     "parent_sha": result.parent_sha,
