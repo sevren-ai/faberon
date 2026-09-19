@@ -10,15 +10,8 @@ from pydantic_ai.models.test import TestModel
 from faberon.schema.events import Actor, Event, EventType
 from faberon.workflow import AgentProposer, Proposal
 
+from .._fakes import FakeEvents
 from ..conftest import make_plan
-
-
-class FakeEvents:
-    def __init__(self, events: list[Event] | None = None) -> None:
-        self.events = events or []
-
-    def campaign_events(self, campaign_id: uuid.UUID) -> list[Event]:
-        return [event for event in self.events if event.campaign_id == campaign_id]
 
 
 def test_proposer():

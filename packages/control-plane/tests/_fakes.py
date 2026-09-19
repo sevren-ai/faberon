@@ -1,4 +1,4 @@
-"""Shared test fakes implementing the executor protocol."""
+"""Shared test fakes."""
 
 import json
 import os
@@ -6,10 +6,21 @@ import tempfile
 from uuid import UUID
 
 from faberon.executor import JobInfo, JobState, SubmitRequest
+from faberon.schema.events import Event
 from faberon.schema.plan import ResearchPlan
 from faberon.workflow.models import Proposal
 
 _STATE_FILE = "executor_state.json"
+
+
+class FakeEvents:
+    """In-memory campaign event reader."""
+
+    def __init__(self, events: list[Event] | None = None) -> None:
+        self.events = events or []
+
+    def campaign_events(self, campaign_id: UUID) -> list[Event]:
+        return [event for event in self.events if event.campaign_id == campaign_id]
 
 
 class FakeProposer:
