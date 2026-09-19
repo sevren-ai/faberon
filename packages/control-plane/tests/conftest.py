@@ -7,6 +7,8 @@ from pathlib import Path
 import psycopg
 import pytest
 
+from faberon.schema.plan import ResearchPlan
+
 
 def _postgres_is_reachable(url: str) -> bool:
     try:
@@ -32,6 +34,9 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
             pytest.skip(
                 "set FABERON_SLURM_ACCOUNT to the Slurm account to bill jobs to"
             )
+    if "llm" in item.keywords:
+        if not os.environ.get("FABERON_MODEL"):
+            pytest.skip("set FABERON_MODEL (and the provider key) to run LLM tests")
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -60,3 +65,20 @@ def make_repo(tmp_path: Path, baseline: str = "baseline") -> Path:
 def repo(tmp_path: Path) -> Path:
     """A git repo at ``tmp_path/repo`` with one baseline commit of train.py."""
     return make_repo(tmp_path)
+
+
+def make_plan(**overrides) -> ResearchPlan:
+    """A valid research plan; tests override the fields they care about."""
+    data = {
+        "goal": "Beat val_bpb baseline.",
+        "metric_name": "val_bpb",
+        "metric_command": "cat metric.txt",
+        "baseline": 1.23,
+        "budget_gpu_hours": 100.0,
+        "max_experiments": 3,
+        "max_concurrency": 1,
+        "walltime": 10,
+        "stop_conditions": ["n/a"],
+    }
+    data.update(overrides)
+    return ResearchPlan.model_validate(data)

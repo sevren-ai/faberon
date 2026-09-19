@@ -21,14 +21,8 @@ from ..executor import Executor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
 from ..schema.events import Actor, Event, EventType
-from ..workflow import CampaignRunner, CampaignSetup, Runtime
+from ..workflow import AgentProposer, CampaignRunner, CampaignSetup, Runtime
 from .models import CampaignCreate, CampaignCreated, CampaignStatus, CancelCampaign
-
-
-def _placeholder_edit(content: str) -> str:
-    """Proposer placeholder: append a marker line so each commit is non-empty."""
-    return content + "\n# proposed by Faberon\n"
-
 
 _HEALTHZ_PATH = "/healthz"
 RequestResponseEndpoint = Callable[[StarletteRequest], Awaitable[Response]]
@@ -60,11 +54,10 @@ def create_app(
     auth_token: str | None = None,
     repo_path: str = ".",
 ) -> FastAPI:
-    """Build the Faberon HTTP app. Requires ``FABERON_DATABASE_URL``.
+    """Build the Faberon HTTP app.
+    Requires ``FABERON_DATABASE_URL`` and ``FABERON_MODEL``.
 
-    Configures the process-global DBOS singleton (destroying any prior
-    instance). One DBOS per process: do not call concurrently or alongside
-    other DBOS users in the same process.
+    Configures the process-global DBOS singleton.
     """
     db_url = os.environ.get("FABERON_DATABASE_URL")
     if not db_url:
@@ -84,7 +77,11 @@ def create_app(
         assert db_url is not None
         ledger = Ledger(db_url)
         runtime = Runtime(executor, ledger, config_name=config_name)
-        runner = CampaignRunner(runtime, repo_path=repo_path, edit_fn=_placeholder_edit)
+        runner = CampaignRunner(
+            runtime,
+            repo_path=repo_path,
+            proposer=AgentProposer.from_env(ledger),
+        )
         DBOS.register_instance(runtime)
         DBOS.register_instance(runner)
         DBOS.launch()
@@ -124,8 +121,8 @@ def create_app(
 def create_app_slurm() -> FastAPI:
     """Uvicorn entrypoint: Slurm executor from the environment.
 
-    Requires ``FABERON_DATABASE_URL``, ``FABERON_SLURM_ACCOUNT``, and
-    ``FABERON_API_TOKEN``.
+    Requires ``FABERON_DATABASE_URL``, ``FABERON_SLURM_ACCOUNT``,
+    ``FABERON_API_TOKEN``, and ``FABERON_MODEL``.
     Optional ``FABERON_SLURM_OUTPUT`` sets the Slurm ``--output`` path.
     Optional ``FABERON_SLURM_GPUS`` sets the GPU count per job (default 1).
     Optional ``FABERON_SLURM_MAX_TIME`` sets a walltime cap (minutes)..

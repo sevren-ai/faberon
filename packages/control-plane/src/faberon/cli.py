@@ -15,7 +15,8 @@ def main() -> None:
 
     Reads host and port from ``FABERON_HOST`` and ``FABERON_PORT`` if set.
     Requires the same env vars as ``create_app_slurm``:
-    ``FABERON_DATABASE_URL``, ``FABERON_SLURM_ACCOUNT``, ``FABERON_API_TOKEN``.
+    ``FABERON_DATABASE_URL``, ``FABERON_SLURM_ACCOUNT``, ``FABERON_API_TOKEN``,
+    and ``FABERON_MODEL``.
     """
     host = os.environ.get("FABERON_HOST", _DEFAULT_HOST)
     port = int(os.environ.get("FABERON_PORT", str(_DEFAULT_PORT)))

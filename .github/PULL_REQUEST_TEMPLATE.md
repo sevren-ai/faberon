@@ -6,21 +6,26 @@
 
 <!-- If an agent helped with the implementation, disclose that here. State which parts it authored and which parts you wrote or reviewed. -->
 
-## Slurm integration tests
+## Integration tests
 
 <!--
-Every PR must run the on-cluster Slurm integration suite and paste the output below. 
+Every PR must run the on-cluster integration suite (Slurm jobs plus the configured LLM) and paste the output below.
 
 Run on the login node:
 
-    FABERON_SLURM_ACCOUNT=<account> bash scripts/slurm-test.sh
+    bash scripts/prod-test.sh
 
 Paste the full output, including the summary line, for example:
 
 ```
-    collected 31 items / 27 deselected / 4 selected
-    tests/test_executor/test_slurm_integration.py ....                                                                                                                                               [100%]
-    4 passed, 27 deselected in 12.84s
+collected 72 items / 65 deselected / 7 selected
+
+tests/test_executor/test_slurm_integration.py ..... [ 71%]
+tests/test_workflow/test_experiment_on_slurm.py .  [ 85%]
+tests/test_workflow/test_proposer_llm.py .  [100%]
+
+7 passed, 65 deselected in 39.36s 
+Integration tests passed.
 ```
 
 If you do not have cluster access, state that explicitly here.

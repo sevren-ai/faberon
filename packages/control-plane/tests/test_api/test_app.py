@@ -18,10 +18,20 @@ from faberon.api import create_app
 from faberon.executor import JobState
 from faberon.ledger import Ledger
 from faberon.schema.events import EventType
+from faberon.workflow import AgentProposer
 
-from .._fakes import FakeExecutor
+from .._fakes import FakeExecutor, FakeProposer
+from ..conftest import make_plan
 
 pytestmark = pytest.mark.postgres
+
+
+@pytest.fixture(autouse=True)
+def _fake_proposer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Replace the LLM proposer with a deterministic one for API tests."""
+    monkeypatch.setattr(
+        AgentProposer, "from_env", classmethod(lambda cls, events: FakeProposer())
+    )
 
 
 @dataclass
@@ -49,7 +59,11 @@ def api(tmp_path, repo) -> Iterator[ApiFixture]:
     executor = FakeExecutor(JobState.COMPLETED, exit_code=0)
 
     config_name = f"api-test-{uuid.uuid4().hex}"
-    app = create_app(executor=executor, config_name=config_name, repo_path=str(repo))
+    app = create_app(
+        executor=executor,
+        config_name=config_name,
+        repo_path=str(repo),
+    )
     _reset_databases()
     with TestClient(app) as client:
         yield ApiFixture(
@@ -61,19 +75,12 @@ def api(tmp_path, repo) -> Iterator[ApiFixture]:
 
 
 def _create_body(metric_path: str, campaign_id: str) -> dict:
+    plan = make_plan(
+        metric_command=f"cat {metric_path}", budget_gpu_hours=1.0, max_experiments=6
+    )
     return {
         "campaign_id": campaign_id,
-        "plan": {
-            "goal": "Beat baseline val_bpb.",
-            "metric_name": "val_bpb",
-            "metric_command": f"cat {metric_path}",
-            "baseline": 1.23,
-            "budget_gpu_hours": 1.0,
-            "max_experiments": 6,
-            "max_concurrency": 1,
-            "walltime": 10,
-            "stop_conditions": ["budget exhausted"],
-        },
+        "plan": plan.model_dump(mode="json"),
         "command": ["true"],
         "poll_interval_seconds": 0.05,
     }

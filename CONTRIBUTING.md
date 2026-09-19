@@ -23,7 +23,7 @@ How to use them:
 
 - Work on feature branches. Keep PRs small and self-contained.
 - Agents must not commit, push, or open PRs. A human reviews the changes, commits, pushes, and opens the PR.
-- Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Agents must not draft the description, not even in chat. Follow the PR template in `.github/PULL_REQUEST_TEMPLATE.md` (summary, AI disclaimer, and the on-cluster Slurm integration test output).
+- Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Agents must not draft the description, not even in chat. Follow the PR template in `.github/PULL_REQUEST_TEMPLATE.md` (summary, AI disclaimer, and the on-cluster integration test output).
 - `main` stays green. CI runs `ruff`, `ty`, and the test suite (`.github/workflows/lint.yml`, `.github/workflows/test.yml`) on every PR and on `main`; a red run blocks the merge.
 - A release is cut by merging to `main` and tagging `vX.Y.Z`.
 
@@ -57,6 +57,16 @@ FABERON_SLURM_ACCOUNT=<account> bash scripts/slurm-test.sh
 ```
 
 `FABERON_SLURM_ACCOUNT` is the Slurm account jobs are billed to; the cluster requires it. The script sets `FABERON_SLURM_INTEGRATION=1` to opt in and runs `pytest -m slurm`. These verify actual behaviour on the cluster.
+
+### LLM tests
+
+`tests/test_workflow/test_proposer_llm.py` runs the proposer against the real model configured in `FABERON_MODEL`. It is skipped by default. To run it:
+
+```bash
+FABERON_MODEL=openrouter:<provider>/<model> OPENROUTER_API_KEY=<key> bash scripts/llm-test.sh
+```
+
+Use `scripts/prod-test.sh` to run the Slurm and LLM integration tests together; it needs both sets of env vars.
 
 ## Formatting and linting
 

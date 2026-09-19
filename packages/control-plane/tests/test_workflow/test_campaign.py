@@ -9,26 +9,12 @@ from dbos import DBOS, DBOSConfig
 
 from faberon.ledger import Ledger
 from faberon.schema.events import EventType, StopReason
-from faberon.schema.plan import ResearchPlan
 from faberon.workflow import CampaignRunner, CampaignSetup, Runtime
 
-from .._fakes import FakeExecutor
+from .._fakes import FakeExecutor, FakeProposer
+from ..conftest import make_plan
 
 pytestmark = pytest.mark.postgres
-
-_DEFAULT_EXPERIMENTS = 3
-
-_PLAN = {
-    "goal": "Beat val_bpb baseline.",
-    "metric_name": "val_bpb",
-    "metric_command": "cat metric.txt",
-    "baseline": 1.23,
-    "budget_gpu_hours": 100.0,
-    "max_experiments": _DEFAULT_EXPERIMENTS,
-    "max_concurrency": 1,
-    "walltime": 10,
-    "stop_conditions": ["n/a"],
-}
 
 
 @pytest.fixture
@@ -64,12 +50,13 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     runner = CampaignRunner(
         runtime,
         repo_path=str(repo),
-        edit_fn=lambda content: content + "# edit\n",
+        proposer=FakeProposer(),
         target_file="train.py",
     )
+    plan = make_plan()
     setup = CampaignSetup(
         campaign_id=uuid.uuid4(),
-        plan=ResearchPlan.model_validate(_PLAN),
+        plan=plan,
         command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
@@ -84,9 +71,11 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     events = list(ledger.tail())
     ledger.close()
     types = [e.type for e in events]
-    assert types.count(EventType.EXPERIMENT_PROPOSED) == _DEFAULT_EXPERIMENTS
-    assert types.count(EventType.EXPERIMENT_JUDGED) == _DEFAULT_EXPERIMENTS
+    assert types.count(EventType.EXPERIMENT_PROPOSED) == plan.max_experiments
+    assert types.count(EventType.EXPERIMENT_JUDGED) == plan.max_experiments
     assert types.count(EventType.CAMPAIGN_ENDED) == 1
+    proposed = next(e for e in events if e.type == EventType.EXPERIMENT_PROPOSED)
+    assert proposed.justification == "test proposal 1"
     ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
     assert ended.payload["stop_reason"] == "max_experiments"
 
@@ -101,16 +90,12 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
     runner = CampaignRunner(
         runtime,
         repo_path=str(repo),
-        edit_fn=lambda content: content + "# edit\n",
+        proposer=FakeProposer(),
         target_file="train.py",
     )
-    # TODO: copy instead of mutate
-    new_plan = _PLAN
-    new_plan["budget_gpu_hours"] = 7.0
-    new_plan["max_experiments"] = 10.0
     setup = CampaignSetup(
         campaign_id=uuid.uuid4(),
-        plan=ResearchPlan.model_validate(new_plan),
+        plan=make_plan(budget_gpu_hours=7.0, max_experiments=10),
         command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
@@ -141,13 +126,13 @@ def test_campaign_cancel_before_first_boundary(dbos, repo):
     runner = CampaignRunner(
         runtime,
         repo_path=str(repo),
-        edit_fn=lambda content: content,
+        proposer=FakeProposer(),
         target_file="train.py",
     )
     campaign_id = uuid.uuid4()
     setup = CampaignSetup(
         campaign_id=campaign_id,
-        plan=ResearchPlan.model_validate(_PLAN),
+        plan=make_plan(),
         command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),

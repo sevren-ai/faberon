@@ -85,6 +85,23 @@ export FABERON_API_TOKEN=<random_token>
 
 `FABERON_API_TOKEN` is mandatory for the Slurm entrypoint.
 
+Then, set the model's parameters, either using OpenRouter:
+
+```bash
+export FABERON_MODEL=openrouter:<provider>/<model>
+export OPENROUTER_API_KEY=<key>
+```
+
+Or a local server with an OpenAI-compatible API:
+
+```bash
+export FABERON_MODEL=openai:<model>
+export OPENAI_BASE_URL=http://localhost:<port>/v1
+export OPENAI_API_KEY=local
+```
+
+The OpenAI client requires a key value. A local server may ignore it.
+
 Optional deployment-side knobs:
 
 - `FABERON_SLURM_GPUS`: GPU count per job (default 1).

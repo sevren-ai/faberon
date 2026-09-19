@@ -17,7 +17,7 @@ A version is a milestone release, not the whole roadmap. Each phase becomes its 
 
 Questions that affect near-term work. Broader deferred ideas belong in [future.md](future.md).
 
-- Multi-file repo edits: v0.2.0 edits one file (`train.py`); the real proposer should edit many files. Lands with the Pydantic AI agent: `edit_fn` becomes a callable that mutates the working tree, `propose_step` resets to head first so recovery stays deterministic. Commit scoping settles at that design review: plan-listed paths vs. agent-decided commit tool vs. `add -A` with an ignore-file convention for run outputs.
+- Multi-file repo edits: v0.2.0 keeps the proposer limited to replacing `train.py`. General repo editing lands with the scale work in v0.4.0, alongside worktrees. That design review settles commit scoping: plan-listed paths vs. an agent-decided commit tool vs. `add -A` with an ignore-file convention for run outputs.
 - Compute-node to login-node HTTP egress (gates the epilog webhook).
 - Cluster specifics: partition, GPU type, and QoS are not currently set by the executor. Explicit `--partition` and QoS belong with the scale work (v0.4.0); `--time` walltime is pulled forward to v0.2.0.
 - Constraint-aware judgment: today judgment scores one metric movement with a confidence measure. Constraint-driven search (e.g. edge models that must fit a size or memory budget) needs a hard gate distinct from the scored objective: keep only if the metric moves AND the run satisfies a budget. Settles where the constraint lives (plan schema field vs. judgment step) and whether it is a per-run gate or a campaign-level rule.
