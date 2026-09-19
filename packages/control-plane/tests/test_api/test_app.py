@@ -76,9 +76,8 @@ def api(tmp_path, repo) -> Iterator[ApiFixture]:
 
 def _create_body(metric_path: str, campaign_id: str) -> dict:
     plan = make_plan(
-        metric_command=f"cat {metric_path}",
-        budget_gpu_hours=1.0,
-        max_experiments=6)
+        metric_command=f"cat {metric_path}", budget_gpu_hours=1.0, max_experiments=6
+    )
     return {
         "campaign_id": campaign_id,
         "plan": plan.model_dump(mode="json"),
