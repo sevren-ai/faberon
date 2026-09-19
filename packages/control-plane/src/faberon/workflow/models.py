@@ -8,6 +8,13 @@ from ..executor import JobInfo
 from ..schema.plan import ResearchPlan
 
 
+class Proposal(BaseModel):
+    """Validated replacement content and its research rationale."""
+
+    content: str = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+
+
 class ExperimentResult(BaseModel):
     """Outcome of one experiment: judgment, metric, and the final job info."""
 
