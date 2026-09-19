@@ -18,10 +18,14 @@ Run on the login node:
 Paste the full output, including the summary line, for example:
 
 ```
-collected 32 items / 27 deselected / 5 selected
-tests/test_executor/test_slurm_integration.py ....                                                                                                                                               [ 80%]
-tests/test_workflow/test_proposer_llm.py .                                                                                                                                                       [100%]
-5 passed, 27 deselected in 12.84s
+collected 72 items / 65 deselected / 7 selected
+
+tests/test_executor/test_slurm_integration.py ..... [ 71%]
+tests/test_workflow/test_experiment_on_slurm.py .  [ 85%]
+tests/test_workflow/test_proposer_llm.py .  [100%]
+
+7 passed, 65 deselected in 39.36s 
+Integration tests passed.
 ```
 
 If you do not have cluster access, state that explicitly here.
