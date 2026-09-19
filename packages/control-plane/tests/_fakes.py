@@ -3,10 +3,32 @@
 import json
 import os
 import tempfile
+from uuid import UUID
 
 from faberon.executor import JobInfo, JobState, SubmitRequest
+from faberon.schema.plan import ResearchPlan
+from faberon.workflow.models import Proposal
 
 _STATE_FILE = "executor_state.json"
+
+
+class FakeProposer:
+    """Deterministic proposer for campaign and API tests."""
+
+    def __init__(self) -> None:
+        self.proposal_count = 0
+
+    def propose(
+        self,
+        campaign_id: UUID,
+        plan: ResearchPlan,
+        current_content: str,
+    ) -> Proposal:
+        self.proposal_count += 1
+        return Proposal(
+            content=current_content + f"# experiment {self.proposal_count}\n",
+            rationale=f"test proposal {self.proposal_count}",
+        )
 
 
 class FakeExecutor:

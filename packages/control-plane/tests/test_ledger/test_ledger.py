@@ -9,6 +9,8 @@ import pytest
 from faberon.ledger import Ledger
 from faberon.schema.events import Actor, Event, EventType
 
+from ..conftest import make_plan
+
 pytestmark = pytest.mark.postgres
 
 
@@ -65,20 +67,8 @@ def test_append_preserves_fields(ledger):
 
 
 def test_create_campaign_idempotent(ledger):
-    from faberon.schema.plan import ResearchPlan
-
     camp_id = uuid.uuid4()
-    plan = ResearchPlan(
-        goal="g",
-        metric_name="val_bpb",
-        metric_command="cat x",
-        baseline=1.0,
-        budget_gpu_hours=1.0,
-        max_experiments=6,
-        max_concurrency=1,
-        walltime=10,
-        stop_conditions=["s"],
-    )
+    plan = make_plan()
     assert ledger.create_campaign(camp_id, str(camp_id), plan) is True
     assert ledger.create_campaign(camp_id, str(camp_id), plan) is False
     events = list(ledger.tail())
