@@ -42,10 +42,12 @@ class ProposalContext:
 class AgentProposer:
     """Runs the experiment proposer against the configured model."""
 
-    _prompt = ("Propose one focused ML experiment. Read the target file and the "
-               "campaign history before deciding. Return the complete replacement "
-               "file and a concise rationale. The replacement must differ from the "
-               "current file.")
+    _prompt = (
+        "Propose one focused ML experiment. Read the target file and the "
+        "campaign history before deciding. Return the complete replacement "
+        "file and a concise rationale. The replacement must differ from the "
+        "current file."
+    )
 
     def __init__(self, events: CampaignEventReader, model: Model) -> None:
         self._events = events
