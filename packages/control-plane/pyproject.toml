@@ -39,6 +39,7 @@ select = ["E", "F", "I", "UP"]
 markers = [
     "postgres: requires a real Postgres; set FABERON_DATABASE_URL",
     "slurm: requires a real Slurm cluster; opt in with FABERON_SLURM_INTEGRATION=1",
+    "llm: requires a real model; set FABERON_MODEL and the provider key",
 ]
 filterwarnings = [
     # Starlette TestClient still imports anyio.abc.BlockingPortal; fixed upstream later.

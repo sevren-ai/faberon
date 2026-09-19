@@ -34,6 +34,9 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
             pytest.skip(
                 "set FABERON_SLURM_ACCOUNT to the Slurm account to bill jobs to"
             )
+    if "llm" in item.keywords:
+        if not os.environ.get("FABERON_MODEL"):
+            pytest.skip("set FABERON_MODEL (and the provider key) to run LLM tests")
 
 
 def _git(repo: Path, *args: str) -> str:
