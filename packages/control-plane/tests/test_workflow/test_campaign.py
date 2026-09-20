@@ -116,6 +116,46 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
     assert ended.payload["experiments_done"] == 4
 
 
+def test_campaign_metric_command_renders_job_id(dbos, repo, tmp_path):
+    # The metric file is named after the executor's job id: only a rendered
+    # {job_id} placeholder finds it.
+    (tmp_path / "metric-fake-1.txt").write_text("val_bpb: 1.10\n")
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(
+        runtime,
+        repo_path=str(repo),
+        proposer=FakeProposer(),
+        target_file="train.py",
+    )
+    setup = CampaignSetup(
+        campaign_id=uuid.uuid4(),
+        plan=make_plan(
+            metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
+            max_experiments=1,
+        ),
+        command=["true"],
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        target_file="train.py",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
+    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    events = list(ledger.tail())
+    ledger.close()
+    judged = next(e for e in events if e.type == EventType.EXPERIMENT_JUDGED)
+    assert judged.payload["judgment"] == "keep"
+    assert judged.payload["metric_value"] == 1.10
+
+
 def test_campaign_cancel_before_first_boundary(dbos, repo):
     runtime = Runtime(
         FakeExecutor(),

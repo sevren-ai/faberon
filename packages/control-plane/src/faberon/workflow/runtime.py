@@ -89,7 +89,7 @@ class Runtime:
         metric_value: float | None = None
         if info.state == JobState.COMPLETED and info.exit_code == 0:
             metric_value = self.parse_metric_step(
-                setup.metric_command, setup.metric_name
+                setup.metric_command.replace("{job_id}", job_id), setup.metric_name
             )
 
         judgment, reason = self.judge_step(metric_value, setup.baseline, info)
