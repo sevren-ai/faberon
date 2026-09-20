@@ -134,18 +134,17 @@ Postgres (no-sudo install) is ready.
   data:     $data
   env file: $env_file
 
-To start it:
+To start it (from the Faberon repo root):
 
-    source $env_file
-    pg_ctl -D "\$FABERON_PGDATA" -l "$log_dir/pg.log" start
+    bash scripts/start-postgres.sh
 
-Once (with Postgres running, from the Faberon repo root):
+Once (with Postgres running):
 
     bash scripts/create-faberon-db.sh
 
 To stop it:
 
-    pg_ctl -D "\$FABERON_PGDATA" stop
+    bash scripts/stop-postgres.sh
 
 Note: PGDATA lives on the same filesystem as \$HOME. On login nodes that is
 often a network FS (e.g. Weka). Fine for Faberon's small ledger; do not put

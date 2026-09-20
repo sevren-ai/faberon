@@ -56,8 +56,7 @@ bash scripts/install-postgres-no-sudo.sh     # binaries + initdb + env file
 To start it (each session, from the repo root):
 
 ```bash
-source ~/.config/faberon/postgres.env
-pg_ctl -D "$FABERON_PGDATA" -l "$FABERON_PGDATA/../log/pg.log" start
+bash scripts/start-postgres.sh
 ```
 
 Once (with Postgres running):
@@ -69,7 +68,7 @@ bash scripts/create-faberon-db.sh            # creates the Faberon database
 To stop it:
 
 ```bash
-pg_ctl -D "$FABERON_PGDATA" stop
+bash scripts/stop-postgres.sh
 ```
 
 PGDATA sits next to the binaries on your home filesystem. On many clusters that is a network FS (for example Weka); that is fine for Faberon's small ledger and DBOS state.
