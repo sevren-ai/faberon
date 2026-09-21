@@ -132,12 +132,18 @@ class Ledger:
         ).fetchone()
         if row is None:
             return None
-        return Campaign(
-            campaign_id=row[0],
-            workflow_id=row[1],
-            plan=ResearchPlan.model_validate(row[2]),
-            created_at=row[3],
+        return _row_to_campaign(row)
+
+    def list_campaigns(self) -> list[Campaign]:
+        """Return all campaigns, oldest first."""
+        rows = self._conn.execute(
+            """
+            SELECT campaign_id, workflow_id, plan, created_at
+            FROM campaigns
+            ORDER BY created_at
+            """
         )
+        return [_row_to_campaign(row) for row in rows]
 
     def append_with_session(self, session: Session, event: Event) -> int:
         """Append an event through a caller-supplied SQLAlchemy session.
@@ -191,6 +197,15 @@ class Ledger:
             (str(campaign_id),),
         )
         return [_row_to_event(row) for row in rows]
+
+
+def _row_to_campaign(row: tuple) -> Campaign:
+    return Campaign(
+        campaign_id=row[0],
+        workflow_id=row[1],
+        plan=ResearchPlan.model_validate(row[2]),
+        created_at=row[3],
+    )
 
 
 def _row_to_event(row: tuple) -> Event:

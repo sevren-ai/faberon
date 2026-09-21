@@ -87,6 +87,16 @@ def test_get_campaign(ledger):
     assert campaign.plan == plan
 
 
+def test_list_campaigns(ledger):
+    assert ledger.list_campaigns() == []
+    camp_a = uuid.uuid4()
+    camp_b = uuid.uuid4()
+    ledger.create_campaign(camp_a, str(camp_a), make_plan())
+    ledger.create_campaign(camp_b, str(camp_b), make_plan())
+    campaigns = ledger.list_campaigns()
+    assert [c.campaign_id for c in campaigns] == [camp_a, camp_b]
+
+
 def test_create_campaign_idempotent(ledger):
     camp_id = uuid.uuid4()
     plan = make_plan()

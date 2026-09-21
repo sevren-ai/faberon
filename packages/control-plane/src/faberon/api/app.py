@@ -180,6 +180,11 @@ def _register_routes(app: FastAPI) -> None:
             workflow_id=handle.workflow_id,
         )
 
+    @app.get("/v0/campaigns")
+    def list_campaigns() -> list[Campaign]:
+        ledger: Ledger = app.state.ledger
+        return ledger.list_campaigns()
+
     @app.post("/v0/campaigns/{campaign_id}/cancel", status_code=202)
     def cancel_campaign(campaign_id: UUID, body: CancelCampaign) -> dict[str, str]:
         ledger: Ledger = app.state.ledger

@@ -123,6 +123,22 @@ def test_get_campaign(api: ApiFixture):
     assert "created_at" in campaign
 
 
+def test_list_campaigns(api: ApiFixture):
+    assert api.client.get("/v0/campaigns").json() == []
+    ids = [str(uuid.uuid4()) for _ in range(2)]
+    for cid in ids:
+        response = api.client.post(
+            "/v0/campaigns", json=_create_body(api.metric_path, cid)
+        )
+        assert response.status_code == 201
+        DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    response = api.client.get("/v0/campaigns")
+    assert response.status_code == 200
+    campaigns = response.json()
+    assert [c["campaign_id"] for c in campaigns] == ids
+
+
 def test_get_unknown_campaign(api: ApiFixture):
     unknown = "00000000-0000-0000-0000-000000000099"
     assert api.client.get(f"/v0/campaigns/{unknown}").status_code == 404
