@@ -131,6 +131,7 @@ All `/v0/*` routes require `Authorization: Bearer $FABERON_API_TOKEN`.
 
 - `GET /healthz`: liveness check (no auth required)
 - `POST /v0/campaigns`: accept a plan + command, append `campaign.created`, start the campaign workflow
+- `GET /v0/campaigns`: list all campaign records, oldest first
 - `POST /v0/campaigns/{id}/cancel`: append `cancel.requested`, signal the workflow to stop at its next decision boundary
 - `GET /v0/campaigns/{id}`: the campaign record (plan, workflow ID, creation time)
 - `GET /v0/campaigns/{id}/events?after=0`: SSE ledger tail for that campaign
