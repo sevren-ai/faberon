@@ -6,7 +6,8 @@ from pathlib import Path
 
 import psycopg
 import pytest
-from psycopg.conninfo import conninfo_to_dict, make_conninfo
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 
 from faberon.schema.plan import ResearchPlan
 
@@ -19,11 +20,10 @@ def _test_db_url() -> str:
     if not base:
         return ""
     try:
-        parts = conninfo_to_dict(base)
-    except psycopg.ProgrammingError:
+        url = make_url(base)
+    except ArgumentError:
         return ""
-    parts["dbname"] = TEST_DB_NAME
-    return make_conninfo(**{k: str(v) for k, v in parts.items() if v is not None})
+    return url.set(database=TEST_DB_NAME).render_as_string(hide_password=False)
 
 
 def pytest_configure() -> None:
