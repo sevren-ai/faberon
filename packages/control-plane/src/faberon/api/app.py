@@ -10,7 +10,7 @@ from uuid import UUID
 from dbos import DBOS, DBOSConfig, SetWorkflowID
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware import Middleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response
@@ -246,4 +246,14 @@ def _register_routes(app: FastAPI) -> None:
                 "Connection": "keep-alive",
                 "X-Accel-Buffering": "no",
             },
+        )
+
+    @app.get("/v0/events.jsonl")
+    def read_events_jsonl(after: int = Query(default=0, ge=0)) -> PlainTextResponse:
+        """Bounded snapshot of the ledger, one JSON event per line."""
+        ledger: Ledger = app.state.ledger
+        lines = [event.model_dump_json() for event in ledger.tail(after=after)]
+        return PlainTextResponse(
+            "".join(f"{line}\n" for line in lines),
+            media_type="application/x-ndjson",
         )

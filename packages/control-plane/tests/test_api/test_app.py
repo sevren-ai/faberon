@@ -1,5 +1,6 @@
 """HTTP API tests. Require Postgres (``postgres`` marker)."""
 
+import json
 import os
 import socket
 import threading
@@ -112,6 +113,28 @@ def test_create_campaign(api: ApiFixture):
 def test_get_unknown_campaign(api: ApiFixture):
     response = api.client.get("/v0/campaigns/00000000-0000-0000-0000-000000000099")
     assert response.status_code == 404
+
+
+def test_events_jsonl(api: ApiFixture):
+    camp_id = str(uuid.uuid4())
+    response = api.client.post(
+        "/v0/campaigns", json=_create_body(api.metric_path, camp_id)
+    )
+    assert response.status_code == 201
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    response = api.client.get("/v0/events.jsonl")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/x-ndjson")
+    events = [json.loads(line) for line in response.text.splitlines()]
+    assert events[0]["type"] == EventType.CAMPAIGN_CREATED
+    assert EventType.EXPERIMENT_JUDGED in {e["type"] for e in events}
+
+    # `after` skips earlier events.
+    response = api.client.get("/v0/events.jsonl", params={"after": 1})
+    events = [json.loads(line) for line in response.text.splitlines()]
+    assert all(e["seq"] > 1 for e in events)
+    assert EventType.CAMPAIGN_CREATED not in {e["type"] for e in events}
 
 
 def test_healthz(api: ApiFixture):
