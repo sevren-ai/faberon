@@ -45,8 +45,10 @@ This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, m
 
 ### Ledger tests
 
-The ledger tests need a local Postgres and `FABERON_DATABASE_URL` exported in your shell (see `## Prerequisites` and the `## Setup` section of `README.md`). They skip themselves when `FABERON_DATABASE_URL` is unset or when the postgres isn't running, 
+The ledger tests need a local Postgres and `FABERON_DATABASE_URL` exported in your shell (see `## Prerequisites` and the `## Setup` section of `README.md`). They skip themselves when `FABERON_DATABASE_URL` is unset or when the postgres isn't running,
 so a plain `scripts/test.sh` run doesn't need a database.
+
+The test suite runs against the `faberon_test` database, not the actual (production) database named in `FABERON_DATABASE_URL`. The tests truncate tables and reset the DBOS system database, so this separation keeps production data safe. `scripts/create-faberon-db.sh` creates both databases.
 
 ### On-cluster Slurm tests
 

@@ -6,8 +6,31 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from faberon.schema.plan import ResearchPlan
+
+TEST_DB_NAME = "faberon_test"
+
+
+def _test_db_url() -> str:
+    """FABERON_DATABASE_URL with the database part swapped for the test database."""
+    base = os.environ.get("FABERON_DATABASE_URL", "")
+    if not base:
+        return ""
+    try:
+        parts = conninfo_to_dict(base)
+    except psycopg.ProgrammingError:
+        return ""
+    parts["dbname"] = TEST_DB_NAME
+    return make_conninfo(**parts)
+
+
+def pytest_configure() -> None:
+    """Redirect FABERON_DATABASE_URL to the test database for the whole run."""
+    url = _test_db_url()
+    if url:
+        os.environ["FABERON_DATABASE_URL"] = url
 
 
 def _postgres_is_reachable(url: str) -> bool:
@@ -26,7 +49,10 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         if not url:
             pytest.skip("set FABERON_DATABASE_URL to a Postgres instance")
         if not _postgres_is_reachable(url):
-            pytest.skip(f"Postgres is not running at {url}.")
+            pytest.skip(
+                f"no {TEST_DB_NAME} database at {url}:"
+                " run scripts/create-faberon-db.sh"
+            )
     if "slurm" in item.keywords:
         if not os.environ.get("FABERON_SLURM_INTEGRATION"):
             pytest.skip("set FABERON_SLURM_INTEGRATION=1 to run on-cluster Slurm tests")

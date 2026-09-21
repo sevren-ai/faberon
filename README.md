@@ -15,7 +15,7 @@ The console (Pi extension, TypeScript) joins as a sibling package in upcoming wo
 The control plane stores its ledger in Postgres. Setup is two layers:
 
 1. **Install a Postgres server** (once per machine).
-2. **Create the `faberon` database** with `scripts/create-faberon-db.sh` (once per server, with Postgres running).
+2. **Create the databases** with `scripts/create-faberon-db.sh` (once per server, with Postgres running). This creates `faberon` for the control plane and `faberon_test` for the test suite.
 
 How you do step 1 depends on the machine. Run the `scripts/` commands from the Faberon repo root.
 
@@ -62,7 +62,7 @@ bash scripts/start-postgres.sh
 Once (with Postgres running):
 
 ```bash
-bash scripts/create-faberon-db.sh            # creates the Faberon database
+bash scripts/create-faberon-db.sh            # creates the faberon and faberon_test databases
 ```
 
 To stop it:

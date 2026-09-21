@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Create the Faberon database inside an already-running Postgres.
+# Create the Faberon databases inside an already-running Postgres: the main
+# database for the control plane and a test database for the test suite.
 # Postgres itself must already be installed and started (see README).
 
 set -euo pipefail
 
-db="faberon"
+main_db="faberon"
+dbs=("$main_db" "${main_db}_test")
 
 # Source the no-sudo Postgres env if present (puts psql on PATH, sets PGPORT).
 if [ -f ~/.config/faberon/postgres.env ]; then
@@ -18,23 +20,25 @@ if ! command -v psql >/dev/null 2>&1; then
     exit 1
 fi
 
-echo ">> createdb $db"
-if psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1; then
-    echo "database '$db' already exists"
-else
-    createdb "$db"
-    echo "created database '$db'"
-fi
+for db in "${dbs[@]}"; do
+    echo ">> createdb $db"
+    if psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1; then
+        echo "database '$db' already exists"
+    else
+        createdb "$db"
+        echo "created database '$db'"
+    fi
+done
 
 if [ -z "${FABERON_DATABASE_URL:-}" ]; then
     if [ -n "${PGPORT:-}" ]; then
-        url="postgres://localhost:${PGPORT}/$db"
+        url="postgres://localhost:${PGPORT}/$main_db"
     else
-        url="postgres:///$db"
+        url="postgres:///$main_db"
     fi
     cat <<EOF
 
-Database ready. Export the connection URL for Faberon:
+Databases ready. Export the connection URL for Faberon:
 
     export FABERON_DATABASE_URL=$url
 EOF
