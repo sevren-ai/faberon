@@ -23,7 +23,7 @@ def _test_db_url() -> str:
     except psycopg.ProgrammingError:
         return ""
     parts["dbname"] = TEST_DB_NAME
-    return make_conninfo(**parts)
+    return make_conninfo(**{k: str(v) for k, v in parts.items() if v is not None})
 
 
 def pytest_configure() -> None:
@@ -50,8 +50,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
             pytest.skip("set FABERON_DATABASE_URL to a Postgres instance")
         if not _postgres_is_reachable(url):
             pytest.skip(
-                f"no {TEST_DB_NAME} database at {url}:"
-                " run scripts/create-faberon-db.sh"
+                f"no {TEST_DB_NAME} database at {url}: run scripts/create-faberon-db.sh"
             )
     if "slurm" in item.keywords:
         if not os.environ.get("FABERON_SLURM_INTEGRATION"):
