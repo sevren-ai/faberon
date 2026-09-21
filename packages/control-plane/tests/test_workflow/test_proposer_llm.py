@@ -14,7 +14,31 @@ from ..conftest import make_plan
 
 pytestmark = pytest.mark.llm
 
-_BASELINE = "LEARNING_RATE = 1e-3\n\n\ndef train():\n    ...\n"
+# A production-shaped target file.
+_BASELINE = '''\
+"""Autoresearch pretraining script. Single-GPU, single-file."""
+
+import math
+
+LEARNING_RATE = 1e-3
+WARMUP_STEPS = 100
+TOTAL_STEPS = 5000
+MIN_LR_FRACTION = 0.1
+
+
+def lr_at(step):
+    """Linear warmup, then cosine decay to MIN_LR_FRACTION * LEARNING_RATE."""
+    if step < WARMUP_STEPS:
+        return LEARNING_RATE * (step + 1) / WARMUP_STEPS
+    progress = min(1.0, (step - WARMUP_STEPS) / max(1, TOTAL_STEPS - WARMUP_STEPS))
+    cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+    return LEARNING_RATE * (MIN_LR_FRACTION + (1.0 - MIN_LR_FRACTION) * cosine)
+
+
+def train():
+    # Use lr_at(step) as the optimizer learning rate at each training step.
+    ...
+'''
 
 
 def test_proposer_with_llm():
