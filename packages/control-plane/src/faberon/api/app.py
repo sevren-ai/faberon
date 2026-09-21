@@ -20,9 +20,10 @@ from .. import __version__
 from ..executor import Executor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
+from ..schema.campaign import Campaign
 from ..schema.events import Actor, Event, EventType
 from ..workflow import AgentProposer, CampaignRunner, CampaignSetup, Runtime
-from .models import CampaignCreate, CampaignCreated, CampaignStatus, CancelCampaign
+from .models import CampaignCreate, CampaignCreated, CancelCampaign
 
 _HEALTHZ_PATH = "/healthz"
 RequestResponseEndpoint = Callable[[StarletteRequest], Awaitable[Response]]
@@ -182,9 +183,9 @@ def _register_routes(app: FastAPI) -> None:
     @app.post("/v0/campaigns/{campaign_id}/cancel", status_code=202)
     def cancel_campaign(campaign_id: UUID, body: CancelCampaign) -> dict[str, str]:
         ledger: Ledger = app.state.ledger
-        events = ledger.campaign_events(campaign_id)
-        if not events:
+        if ledger.get_campaign(campaign_id) is None:
             raise HTTPException(status_code=404, detail="campaign not found")
+        events = ledger.campaign_events(campaign_id)
         if any(e.type == EventType.CAMPAIGN_ENDED for e in events):
             raise HTTPException(status_code=409, detail="campaign already ended")
         ledger.append(
@@ -199,20 +200,23 @@ def _register_routes(app: FastAPI) -> None:
         DBOS.send(str(campaign_id), "cancel", "cancel")
         return {"campaign_id": str(campaign_id), "status": "cancel requested"}
 
-    @app.get("/v0/campaigns/{campaign_id}", response_model=CampaignStatus)
-    def get_campaign(campaign_id: UUID) -> CampaignStatus:
+    @app.get("/v0/campaigns/{campaign_id}")
+    def get_campaign(campaign_id: UUID) -> Campaign:
         ledger: Ledger = app.state.ledger
-        events = ledger.campaign_events(campaign_id)
-        if not events:
+        campaign = ledger.get_campaign(campaign_id)
+        if campaign is None:
             raise HTTPException(status_code=404, detail="campaign not found")
-        return CampaignStatus(campaign_id=campaign_id, events=events)
+        return campaign
 
-    @app.get("/v0/events")
+    @app.get("/v0/campaigns/{campaign_id}/events")
     async def stream_events(
         request: Request,
+        campaign_id: UUID,
         after: int = Query(default=0, ge=0),
     ) -> StreamingResponse:
         ledger: Ledger = request.app.state.ledger
+        if ledger.get_campaign(campaign_id) is None:
+            raise HTTPException(status_code=404, detail="campaign not found")
         sse_pool: ThreadPoolExecutor = request.app.state.sse_pool
         stop_sse: asyncio.Event = request.app.state.stop_sse
         loop = asyncio.get_running_loop()
@@ -224,7 +228,8 @@ def _register_routes(app: FastAPI) -> None:
                     break
                 # Sync psycopg call; keep it off the event loop/DBOS executor
                 batch = await loop.run_in_executor(
-                    sse_pool, lambda: list(ledger.tail(after=cursor))
+                    sse_pool,
+                    lambda: list(ledger.tail(campaign_id, after=cursor)),
                 )
                 if stop_sse.is_set():
                     break
@@ -248,11 +253,18 @@ def _register_routes(app: FastAPI) -> None:
             },
         )
 
-    @app.get("/v0/events.jsonl")
-    def read_events_jsonl(after: int = Query(default=0, ge=0)) -> PlainTextResponse:
-        """Bounded snapshot of the ledger, one JSON event per line."""
+    @app.get("/v0/campaigns/{campaign_id}/events.jsonl")
+    def read_events_jsonl(
+        campaign_id: UUID,
+        after: int = Query(default=0, ge=0),
+    ) -> PlainTextResponse:
+        """Bounded snapshot of one campaign's events, one JSON event per line."""
         ledger: Ledger = app.state.ledger
-        lines = [event.model_dump_json() for event in ledger.tail(after=after)]
+        if ledger.get_campaign(campaign_id) is None:
+            raise HTTPException(status_code=404, detail="campaign not found")
+        lines = [
+            event.model_dump_json() for event in ledger.tail(campaign_id, after=after)
+        ]
         return PlainTextResponse(
             "".join(f"{line}\n" for line in lines),
             media_type="application/x-ndjson",

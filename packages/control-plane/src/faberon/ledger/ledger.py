@@ -22,6 +22,7 @@ from psycopg.types.json import Jsonb
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from ..schema.campaign import Campaign
 from ..schema.events import Actor, Event, EventType
 from ..schema.plan import ResearchPlan
 
@@ -119,6 +120,25 @@ class Ledger:
             )
             return True
 
+    def get_campaign(self, campaign_id: UUID) -> Campaign | None:
+        """Return the campaign row, or None if it does not exist."""
+        row = self._conn.execute(
+            """
+            SELECT campaign_id, workflow_id, plan, created_at
+            FROM campaigns
+            WHERE campaign_id = %s
+            """,
+            (str(campaign_id),),
+        ).fetchone()
+        if row is None:
+            return None
+        return Campaign(
+            campaign_id=row[0],
+            workflow_id=row[1],
+            plan=ResearchPlan.model_validate(row[2]),
+            created_at=row[3],
+        )
+
     def append_with_session(self, session: Session, event: Event) -> int:
         """Append an event through a caller-supplied SQLAlchemy session.
         Returns the assigned seq.
@@ -145,16 +165,16 @@ class Ledger:
         ).scalar_one()
         return int(row)
 
-    def tail(self, after: int = 0) -> Iterator[Event]:
-        """Yield events with seq > after, in order. after=0 starts from the first."""
+    def tail(self, campaign_id: UUID, after: int = 0) -> Iterator[Event]:
+        """Yield one campaign's events with seq > after, in seq order."""
         rows = self._conn.execute(
             """
             SELECT seq, ts, campaign_id, actor, type, justification, payload
             FROM events
-            WHERE seq > %s
+            WHERE campaign_id = %s AND seq > %s
             ORDER BY seq
             """,
-            (after,),
+            (str(campaign_id), after),
         )
         for row in rows:
             yield _row_to_event(row)

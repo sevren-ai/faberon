@@ -127,7 +127,11 @@ uv tool install packages/control-plane
 faberon
 ```
 
+All `/v0/*` routes require `Authorization: Bearer $FABERON_API_TOKEN`.
+
 - `GET /healthz`: liveness check (no auth required)
-- `POST /v0/campaigns`: accept a plan + command, append `campaign.created`, start `run_experiment`
-- `GET /v0/campaigns/{id}`: ledger events for that campaign
-- `GET /v0/events?after=0`: SSE ledger tail
+- `POST /v0/campaigns`: accept a plan + command, append `campaign.created`, start the campaign workflow
+- `POST /v0/campaigns/{id}/cancel`: append `cancel.requested`, signal the workflow to stop at its next decision boundary
+- `GET /v0/campaigns/{id}`: the campaign record (plan, workflow ID, creation time)
+- `GET /v0/campaigns/{id}/events?after=0`: SSE ledger tail for that campaign
+- `GET /v0/campaigns/{id}/events.jsonl?after=0`: bounded snapshot, one JSON event per line

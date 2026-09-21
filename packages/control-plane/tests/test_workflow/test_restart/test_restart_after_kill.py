@@ -17,6 +17,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
@@ -103,7 +104,7 @@ def test_restart_after_kill(tmp_path):
 
     # Exactly once: one submitted (implicit), one completed, one judged.
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    events = list(ledger.tail())
+    events = list(ledger.tail(UUID(campaign_id)))
     ledger.close()
     types = [e.type for e in events]
     assert types.count(EventType.EXPERIMENT_COMPLETED) == 1

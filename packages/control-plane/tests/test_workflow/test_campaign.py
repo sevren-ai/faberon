@@ -68,7 +68,7 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
 
     assert stop_reason == StopReason.MAX_EXPERIMENTS.value
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    events = list(ledger.tail())
+    events = list(ledger.tail(setup.campaign_id))
     ledger.close()
     types = [e.type for e in events]
     assert types.count(EventType.EXPERIMENT_PROPOSED) == plan.max_experiments
@@ -107,7 +107,7 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
 
     assert stop_reason == StopReason.BUDGET_EXHAUSTED.value
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    events = list(ledger.tail())
+    events = list(ledger.tail(setup.campaign_id))
     ledger.close()
     ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
     assert ended.payload["stop_reason"] == "budget_exhausted"
@@ -149,7 +149,7 @@ def test_campaign_metric_command_renders_job_id(dbos, repo, tmp_path):
 
     assert stop_reason == StopReason.MAX_EXPERIMENTS.value
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    events = list(ledger.tail())
+    events = list(ledger.tail(setup.campaign_id))
     ledger.close()
     judged = next(e for e in events if e.type == EventType.EXPERIMENT_JUDGED)
     assert judged.payload["judgment"] == "keep"
@@ -191,7 +191,7 @@ def test_campaign_cancel_before_first_boundary(dbos, repo):
 
     assert stop_reason == StopReason.CANCELLED.value
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    events = [e for e in ledger.tail() if e.campaign_id == campaign_id]
+    events = list(ledger.tail(campaign_id))
     ledger.close()
     assert list(dict.fromkeys(e.type for e in events)) == [EventType.CAMPAIGN_ENDED]
     ended = events[0]

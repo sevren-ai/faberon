@@ -43,27 +43,48 @@ def test_append_assigns_seq(ledger):
 
 
 def test_tail_orders_by_seq(ledger):
-    first = ledger.append(_event())
-    second = ledger.append(_event())
-    events = list(ledger.tail())
+    camp_id = uuid.uuid4()
+    first = ledger.append(_event(campaign_id=camp_id))
+    second = ledger.append(_event(campaign_id=camp_id))
+    events = list(ledger.tail(camp_id))
     assert [e.seq for e in events] == [first.seq, second.seq]
 
 
 def test_tail_after_cursor(ledger):
-    first = ledger.append(_event())
-    ledger.append(_event())
+    camp_id = uuid.uuid4()
+    first = ledger.append(_event(campaign_id=camp_id))
+    ledger.append(_event(campaign_id=camp_id))
     assert first.seq is not None
-    rest = list(ledger.tail(after=first.seq))
+    rest = list(ledger.tail(camp_id, after=first.seq))
     assert [e.seq for e in rest] == [2]
+
+
+def test_tail_scopes_to_campaign(ledger):
+    camp_id = uuid.uuid4()
+    ledger.append(_event(campaign_id=camp_id))
+    ledger.append(_event())
+    assert [e.campaign_id for e in ledger.tail(camp_id)] == [camp_id]
 
 
 def test_append_preserves_fields(ledger):
     event = _event(justification="plan accepted", payload={"k": "v"})
     stored = ledger.append(event)
-    again = next(ledger.tail())
+    again = next(ledger.tail(stored.campaign_id))
     assert again == stored
     assert again.justification == "plan accepted"
     assert again.payload == {"k": "v"}
+
+
+def test_get_campaign(ledger):
+    camp_id = uuid.uuid4()
+    assert ledger.get_campaign(camp_id) is None
+    plan = make_plan()
+    ledger.create_campaign(camp_id, str(camp_id), plan)
+    campaign = ledger.get_campaign(camp_id)
+    assert campaign is not None
+    assert campaign.campaign_id == camp_id
+    assert campaign.workflow_id == str(camp_id)
+    assert campaign.plan == plan
 
 
 def test_create_campaign_idempotent(ledger):
@@ -71,7 +92,7 @@ def test_create_campaign_idempotent(ledger):
     plan = make_plan()
     assert ledger.create_campaign(camp_id, str(camp_id), plan) is True
     assert ledger.create_campaign(camp_id, str(camp_id), plan) is False
-    events = list(ledger.tail())
+    events = list(ledger.tail(camp_id))
     assert len(events) == 1
     assert events[0].type == EventType.CAMPAIGN_CREATED
 

@@ -61,9 +61,10 @@ def test_experiment_on_slurm(dbos, tmp_path):
     DBOS.register_instance(runtime)
     DBOS.launch()
 
+    campaign_id = uuid.UUID("00000000-0342-0342-0342-000000000000")
     judgment = runtime.run_experiment(
         ExperimentSetup(
-            campaign_id=uuid.UUID("00000000-0342-0342-0342-000000000000"),
+            campaign_id=campaign_id,
             command=command,
             submission_key=f"slurm-{uuid.uuid4().hex}",
             metric_command=f"cat {metric_file}",
@@ -75,7 +76,7 @@ def test_experiment_on_slurm(dbos, tmp_path):
     )
     assert judgment.judgment == "keep"
 
-    events = list(ledger.tail())
+    events = list(ledger.tail(campaign_id))
     ledger.close()
     types = [e.type for e in events]
     assert types == [EventType.EXPERIMENT_COMPLETED, EventType.EXPERIMENT_JUDGED]
