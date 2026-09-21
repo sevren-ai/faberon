@@ -1,5 +1,6 @@
 """HTTP API tests. Require Postgres (``postgres`` marker)."""
 
+import json
 import os
 import socket
 import threading
@@ -101,17 +102,76 @@ def test_create_campaign(api: ApiFixture):
     assert stop_reason == "max_experiments"
     assert api.executor.submit_count == 6
 
-    status = api.client.get(f"/v0/campaigns/{body['campaign_id']}")
-    assert status.status_code == 200
-    types = [e["type"] for e in status.json()["events"]]
+    response = api.client.get(f"/v0/campaigns/{body['campaign_id']}/events.jsonl")
+    types = [json.loads(line)["type"] for line in response.text.splitlines()]
     assert types[0] == EventType.CAMPAIGN_CREATED
     assert EventType.EXPERIMENT_COMPLETED in types
     assert EventType.EXPERIMENT_JUDGED in types
 
 
+def test_get_campaign(api: ApiFixture):
+    body = _create_body(api.metric_path, str(uuid.uuid4()))
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 201
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    response = api.client.get(f"/v0/campaigns/{body['campaign_id']}")
+    assert response.status_code == 200
+    campaign = response.json()
+    assert campaign["campaign_id"] == body["campaign_id"]
+    assert campaign["plan"]["goal"] == body["plan"]["goal"]
+    assert "created_at" in campaign
+
+
+def test_list_campaigns(api: ApiFixture):
+    assert api.client.get("/v0/campaigns").json() == []
+    ids = [str(uuid.uuid4()) for _ in range(2)]
+    for cid in ids:
+        response = api.client.post(
+            "/v0/campaigns", json=_create_body(api.metric_path, cid)
+        )
+        assert response.status_code == 201
+        DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    response = api.client.get("/v0/campaigns")
+    assert response.status_code == 200
+    campaigns = response.json()
+    assert [c["campaign_id"] for c in campaigns] == ids
+
+
 def test_get_unknown_campaign(api: ApiFixture):
-    response = api.client.get("/v0/campaigns/00000000-0000-0000-0000-000000000099")
-    assert response.status_code == 404
+    unknown = "00000000-0000-0000-0000-000000000099"
+    assert api.client.get(f"/v0/campaigns/{unknown}").status_code == 404
+    assert api.client.get(f"/v0/campaigns/{unknown}/events").status_code == 404
+    assert api.client.get(f"/v0/campaigns/{unknown}/events.jsonl").status_code == 404
+
+
+def test_events_jsonl(api: ApiFixture):
+    camp_id = str(uuid.uuid4())
+    other_id = str(uuid.uuid4())
+    for cid in (camp_id, other_id):
+        response = api.client.post(
+            "/v0/campaigns", json=_create_body(api.metric_path, cid)
+        )
+        assert response.status_code == 201
+        DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    response = api.client.get(f"/v0/campaigns/{camp_id}/events.jsonl")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/x-ndjson")
+    events = [json.loads(line) for line in response.text.splitlines()]
+    assert events[0]["type"] == EventType.CAMPAIGN_CREATED
+    assert EventType.EXPERIMENT_JUDGED in {e["type"] for e in events}
+    # The path scopes the read: no events from the other campaign.
+    assert all(e["campaign_id"] == camp_id for e in events)
+
+    # `after` skips earlier events.
+    response = api.client.get(
+        f"/v0/campaigns/{camp_id}/events.jsonl", params={"after": 1}
+    )
+    events = [json.loads(line) for line in response.text.splitlines()]
+    assert all(e["seq"] > 1 for e in events)
+    assert EventType.CAMPAIGN_CREATED not in {e["type"] for e in events}
 
 
 def test_healthz(api: ApiFixture):
@@ -162,8 +222,8 @@ def test_create_campaign_idempotent(api: ApiFixture):
     assert second.json()["workflow_id"] == first.json()["workflow_id"]
     assert api.executor.submit_count == 6
 
-    status = api.client.get(f"/v0/campaigns/{camp_id}")
-    types = [e["type"] for e in status.json()["events"]]
+    status = api.client.get(f"/v0/campaigns/{camp_id}/events.jsonl")
+    types = [json.loads(line)["type"] for line in status.text.splitlines()]
     assert types.count(EventType.CAMPAIGN_CREATED) == 1
 
 
@@ -241,11 +301,15 @@ def test_events_stream_resume(live_server: LiveServer):
         assert handle.get_result() == "max_experiments"
 
         # Full replay from the start.
-        events = _read_sse_until(client, "/v0/events", "experiment.judged")
+        events = _read_sse_until(
+            client, f"/v0/campaigns/{campaign_id}/events", "experiment.judged"
+        )
         assert any("campaign.created" in e for e in events)
         assert any(campaign_id in e for e in events)
 
         # Reconnect after seq 1: skips campaign.created, streams experiment.judged
-        replayed = _read_sse_until(client, "/v0/events?after=1", "experiment.judged")
+        replayed = _read_sse_until(
+            client, f"/v0/campaigns/{campaign_id}/events?after=1", "experiment.judged"
+        )
         assert not any("campaign.created" in e for e in replayed)
         assert any(campaign_id in e for e in replayed)

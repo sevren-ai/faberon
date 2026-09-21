@@ -1,5 +1,6 @@
 """Pydantic AI proposer for single-file experiments."""
 
+import ast
 import os
 from dataclasses import dataclass
 from typing import Protocol
@@ -69,11 +70,15 @@ class AgentProposer:
             return ctx.deps.events.campaign_events(ctx.deps.campaign_id)
 
         @self._agent.output_validator
-        def validate_changed_content(
+        def validate_content(
             ctx: RunContext[ProposalContext], proposal: Proposal
         ) -> Proposal:
             if proposal.content == ctx.deps.current_content:
                 raise ModelRetry("The replacement must change the target file.")
+            try:
+                ast.parse(proposal.content)
+            except SyntaxError as e:
+                raise ModelRetry(f"The replacement is not valid Python: {e}") from e
             return proposal
 
     @classmethod

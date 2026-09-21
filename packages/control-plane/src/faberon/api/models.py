@@ -4,7 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..schema.events import Event
 from ..schema.plan import ResearchPlan
 
 
@@ -28,10 +27,3 @@ class CampaignCreated(BaseModel):
 
     campaign_id: UUID
     workflow_id: str
-
-
-class CampaignStatus(BaseModel):
-    """Minimal campaign view: ID plus ledger events for that campaign."""
-
-    campaign_id: UUID
-    events: list[Event]

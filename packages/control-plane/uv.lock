@@ -91,20 +91,20 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dbos", specifier = ">=2.31.0" },
-    { name = "fastapi", specifier = ">=0.141.1" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
-    { name = "pydantic", specifier = ">=2.13.5" },
-    { name = "pydantic-ai-slim", extras = ["openrouter"], specifier = ">=2.45.0" },
-    { name = "uvicorn", specifier = ">=0.52.4" },
+    { name = "dbos", specifier = ">=2.31.0,<3" },
+    { name = "fastapi", specifier = ">=0.141.1,<1" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.5,<4" },
+    { name = "pydantic", specifier = ">=2.13.5,<3" },
+    { name = "pydantic-ai-slim", extras = ["openrouter"], specifier = ">=2.45.0,<3" },
+    { name = "uvicorn", specifier = ">=0.52.4,<1" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx2", specifier = ">=2.12.0" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "ruff", specifier = ">=0.13" },
-    { name = "ty", specifier = ">=0.0.78" },
+    { name = "httpx2", specifier = ">=2.12.0,<3" },
+    { name = "pytest", specifier = ">=9.1.1,<10" },
+    { name = "ruff", specifier = ">=0.16.5,<0.17" },
+    { name = "ty", specifier = ">=0.0.78,<0.0.79" },
 ]
 
 [[package]]

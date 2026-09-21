@@ -15,7 +15,7 @@ The console (Pi extension, TypeScript) joins as a sibling package in upcoming wo
 The control plane stores its ledger in Postgres. Setup is two layers:
 
 1. **Install a Postgres server** (once per machine).
-2. **Create the `faberon` database** with `scripts/create-faberon-db.sh` (once per server, with Postgres running).
+2. **Create the databases** with `scripts/create-faberon-db.sh` (once per server, with Postgres running). This creates `faberon` for the control plane and `faberon_test` for the test suite.
 
 How you do step 1 depends on the machine. Run the `scripts/` commands from the Faberon repo root.
 
@@ -56,20 +56,19 @@ bash scripts/install-postgres-no-sudo.sh     # binaries + initdb + env file
 To start it (each session, from the repo root):
 
 ```bash
-source ~/.config/faberon/postgres.env
-pg_ctl -D "$FABERON_PGDATA" -l "$FABERON_PGDATA/../log/pg.log" start
+bash scripts/start-postgres.sh
 ```
 
 Once (with Postgres running):
 
 ```bash
-bash scripts/create-faberon-db.sh            # creates the Faberon database
+bash scripts/create-faberon-db.sh            # creates the faberon and faberon_test databases
 ```
 
 To stop it:
 
 ```bash
-pg_ctl -D "$FABERON_PGDATA" stop
+bash scripts/stop-postgres.sh
 ```
 
 PGDATA sits next to the binaries on your home filesystem. On many clusters that is a network FS (for example Weka); that is fine for Faberon's small ledger and DBOS state.
@@ -128,7 +127,12 @@ uv tool install packages/control-plane
 faberon
 ```
 
+All `/v0/*` routes require `Authorization: Bearer $FABERON_API_TOKEN`.
+
 - `GET /healthz`: liveness check (no auth required)
-- `POST /v0/campaigns`: accept a plan + command, append `campaign.created`, start `run_experiment`
-- `GET /v0/campaigns/{id}`: ledger events for that campaign
-- `GET /v0/events?after=0`: SSE ledger tail
+- `POST /v0/campaigns`: accept a plan + command, append `campaign.created`, start the campaign workflow
+- `GET /v0/campaigns`: list all campaign records, oldest first
+- `POST /v0/campaigns/{id}/cancel`: append `cancel.requested`, signal the workflow to stop at its next decision boundary
+- `GET /v0/campaigns/{id}`: the campaign record (plan, workflow ID, creation time)
+- `GET /v0/campaigns/{id}/events?after=0`: SSE ledger tail for that campaign
+- `GET /v0/campaigns/{id}/events.jsonl?after=0`: bounded snapshot, one JSON event per line

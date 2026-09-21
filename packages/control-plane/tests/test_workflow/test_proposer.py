@@ -97,6 +97,24 @@ def test_proposer_rejects_unchanged():
         )
 
 
+def test_proposer_rejects_unparseable():
+    # A model that emits broken Python (e.g. newlines collapsed by the
+    # structured-output path) gets a retry instead of corrupting train.py.
+    model = TestModel(
+        custom_output_args={
+            "content": "def train( nope\n",
+            "rationale": "Broken Python.",
+        }
+    )
+
+    with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
+        AgentProposer(FakeEvents(), model).propose(
+            uuid.uuid4(),
+            make_plan(),
+            "print('baseline')\n",
+        )
+
+
 def test_proposer_requires_model(monkeypatch):
     monkeypatch.delenv("FABERON_MODEL", raising=False)
 

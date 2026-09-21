@@ -65,7 +65,17 @@ Design rule: **one brain**. The console and the drafter propose; the brain dispo
 
 "v0" is the contract version, independent of release versions: v0 means unstable while we learn, v1 is the first stability promise. Routes are prefixed `/v0/` from day one so a future `/v1` can coexist with it.
 
-`POST /campaigns` · `POST /campaigns/{id}/ideas` · `POST /campaigns/{id}/amendments` · `POST /approvals/{id}` · `GET /campaigns` · `GET /campaigns/{id}` · `GET /campaigns/{id}/runs` · `GET /runs/{id}` · `GET /events` (SSE ledger tail).
+* `POST /campaigns`
+* `POST /campaigns/{id}/cancel`
+* `POST /campaigns/{id}/ideas`
+* `POST /campaigns/{id}/amendments`
+* `POST /approvals/{id}`
+* `GET /campaigns`
+* `GET /campaigns/{id}`
+* `GET /campaigns/{id}/events` (SSE ledger tail)
+* `GET /campaigns/{id}/events.jsonl` (bounded snapshot)
+* `GET /campaigns/{id}/runs`
+* `GET /runs/{id}`
 
 Contracts are **skeleton-first**: shapes live as Pydantic models in one quarantined module from day one and are frozen into versioned artifacts (JSON Schema / OpenAPI goldens) after the first release. This contract keeps console and brain independently replaceable.
 

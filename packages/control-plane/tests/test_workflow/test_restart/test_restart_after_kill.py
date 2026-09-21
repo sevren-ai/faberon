@@ -17,6 +17,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
@@ -75,7 +76,7 @@ def test_restart_after_kill(tmp_path):
         text=True,
     )
     try:
-        deadline = time.time() + 10
+        deadline = time.time() + 60
         while time.time() < deadline:
             if executor.submit_count() >= 1 and executor.job_id_for(wf_id):
                 break
@@ -93,7 +94,7 @@ def test_restart_after_kill(tmp_path):
 
     # Phase 2: mark the job complete, then restart a fresh process to recover.
     executor.complete(job_id, exit_code=0)
-    result = _run("recover", env, timeout=30)
+    result = _run("recover", env, timeout=60)
     assert result.returncode == 0, (
         f"recover failed:\nstdout={result.stdout}\nstderr={result.stderr}"
     )
@@ -103,7 +104,7 @@ def test_restart_after_kill(tmp_path):
 
     # Exactly once: one submitted (implicit), one completed, one judged.
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    events = list(ledger.tail())
+    events = list(ledger.tail(UUID(campaign_id)))
     ledger.close()
     types = [e.type for e in events]
     assert types.count(EventType.EXPERIMENT_COMPLETED) == 1

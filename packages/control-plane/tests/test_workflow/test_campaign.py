@@ -68,7 +68,7 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
 
     assert stop_reason == StopReason.MAX_EXPERIMENTS.value
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    events = list(ledger.tail())
+    events = list(ledger.tail(setup.campaign_id))
     ledger.close()
     types = [e.type for e in events]
     assert types.count(EventType.EXPERIMENT_PROPOSED) == plan.max_experiments
@@ -107,13 +107,53 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
 
     assert stop_reason == StopReason.BUDGET_EXHAUSTED.value
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    events = list(ledger.tail())
+    events = list(ledger.tail(setup.campaign_id))
     ledger.close()
     ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
     assert ended.payload["stop_reason"] == "budget_exhausted"
     # Each job burns 2 GPU-hours (7200 s x 1 GPU). After experiment 4 the
     # total is 8 >= budget 7, so the loop ends the campaign before the 5th.
     assert ended.payload["experiments_done"] == 4
+
+
+def test_campaign_metric_command_renders_job_id(dbos, repo, tmp_path):
+    # The metric file is named after the executor's job id: only a rendered
+    # {job_id} placeholder finds it.
+    (tmp_path / "metric-fake-1.txt").write_text("val_bpb: 1.10\n")
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(
+        runtime,
+        repo_path=str(repo),
+        proposer=FakeProposer(),
+        target_file="train.py",
+    )
+    setup = CampaignSetup(
+        campaign_id=uuid.uuid4(),
+        plan=make_plan(
+            metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
+            max_experiments=1,
+        ),
+        command=["true"],
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        target_file="train.py",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
+    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    events = list(ledger.tail(setup.campaign_id))
+    ledger.close()
+    judged = next(e for e in events if e.type == EventType.EXPERIMENT_JUDGED)
+    assert judged.payload["judgment"] == "keep"
+    assert judged.payload["metric_value"] == 1.10
 
 
 def test_campaign_cancel_before_first_boundary(dbos, repo):
@@ -151,7 +191,7 @@ def test_campaign_cancel_before_first_boundary(dbos, repo):
 
     assert stop_reason == StopReason.CANCELLED.value
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    events = [e for e in ledger.tail() if e.campaign_id == campaign_id]
+    events = list(ledger.tail(campaign_id))
     ledger.close()
     assert list(dict.fromkeys(e.type for e in events)) == [EventType.CAMPAIGN_ENDED]
     ended = events[0]
