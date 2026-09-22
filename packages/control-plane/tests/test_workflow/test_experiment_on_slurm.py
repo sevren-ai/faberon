@@ -72,6 +72,8 @@ def test_experiment_on_slurm(dbos, tmp_path):
             baseline=1.23,
             poll_interval_seconds=5.0,
             walltime=10,
+            index=1,
+            sha="0" * 40,
         )
     )
     assert judgment.judgment == "keep"

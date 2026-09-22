@@ -137,6 +137,8 @@ class CampaignRunner:
                 baseline=best_metric if best_metric is not None else plan.baseline,
                 poll_interval_seconds=setup.poll_interval_seconds,
                 walltime=plan.walltime,
+                index=experiments_done,
+                sha=result.sha,
             )
             outcome = self.runtime.run_experiment(setup_one)
 

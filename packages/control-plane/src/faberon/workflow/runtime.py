@@ -104,6 +104,8 @@ class Runtime:
                 justification=f"job {job_id} {info.state.value} exit={exit_code_str}",
                 payload={
                     "job_id": job_id,
+                    "index": setup.index,
+                    "sha": setup.sha,
                     "state": info.state.value,
                     "exit_code": info.exit_code,
                     "elapsed_seconds": info.elapsed_seconds,
@@ -121,6 +123,8 @@ class Runtime:
                 ),
                 payload={
                     "job_id": job_id,
+                    "index": setup.index,
+                    "sha": setup.sha,
                     "metric_value": metric_value,
                     "baseline": setup.baseline,
                     "judgment": judgment,
