@@ -2,13 +2,13 @@
 
 **Status:** living document. Features planned for the near future, plus open questions that affect that work. Updated whenever plans or decisions change, by humans or by agents (see `AGENTS.md`). Stable architecture lives in [design.md](design.md). Speculative ideas and deferred options live in [future.md](future.md). This doc is not a history: git records what shipped and why.
 
-**Current focus:** v0.2.0 (autonomy). Scope and progress: [v0.2.0.md](v0.2.0.md).
+**Current focus:** v0.3.0 (console). Scope and progress: [v0.3.0.md](v0.3.0.md).
 
 ## Phases
 
 A version is a milestone release, not the whole roadmap. Each phase becomes its own version with its own design doc when its design review happens.
 
-- **v0.3.0: console.** Pi extension on the login node: drafter intake, `inject_idea`, `runs_status`, `approve`, live SSE widget (runs, budget burn, pending approvals). Add an `experiment.proposing` event: the proposer's LLM call takes minutes and the ledger is silent meanwhile, which reads like a hang when watching the raw stream. Add a `faberon` CLI for shell operations (list campaigns, show a campaign, tail its events, cancel): today that is raw `curl` with a bearer header and full URLs. The CLI reads the token and base URL from the environment; the bare `faberon` command becomes `faberon serve`. Chassis: Typer, same type-annotation style as the FastAPI/Pydantic stack.
+- **v0.3.0: console.** Pi extension on the login node: drafter intake, `inject_idea`, live SSE status (runs, budget burn). Adds an `experiment.proposing` event so the proposer's LLM wait does not read like a hang, and a `faberon` CLI for shell operations. Human-injected ideas are advisory-only for now.
 - **v0.4.0: scale.** Concurrency-limited queue for ablations (git worktrees arrive here, one linked working tree per job on its own commit, shared venv and data); real budget enforcement if not already covered by the gate work; epilog webhook once egress is verified; restart drills as routine.
 - **v0.5.0: research quality.** Judgment quality (robust confidence measure, eval-suite non-regression backpressure, constraint-aware gates); living notes file; plan stop-conditions honored end-to-end (LLM-parsed, not stand-in). The ledger records parent and new sha so the lineage tree is reconstructable.
 
