@@ -23,7 +23,9 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: faberon
+          # The test suite redirects FABERON_DATABASE_URL to faberon_test (see
+          # tests/conftest.py), so that is the only database CI needs.
+          POSTGRES_DB: faberon_test
         ports:
           - 5432:5432
         options: >-
