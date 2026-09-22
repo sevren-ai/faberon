@@ -76,6 +76,17 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     assert types.count(EventType.CAMPAIGN_ENDED) == 1
     proposed = next(e for e in events if e.type == EventType.EXPERIMENT_PROPOSED)
     assert proposed.justification == "test proposal 1"
+    # completed/judged carry the same index and sha as their proposal.
+    proposed_by_index = {
+        e.payload["index"]: e.payload["sha"]
+        for e in events
+        if e.type == EventType.EXPERIMENT_PROPOSED
+    }
+    judged = [e for e in events if e.type == EventType.EXPERIMENT_JUDGED]
+    assert [e.payload["index"] for e in judged] == sorted(proposed_by_index)
+    assert all(
+        e.payload["sha"] == proposed_by_index[e.payload["index"]] for e in judged
+    )
     ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
     assert ended.payload["stop_reason"] == "max_experiments"
 
@@ -154,6 +165,7 @@ def test_campaign_metric_command_renders_job_id(dbos, repo, tmp_path):
     judged = next(e for e in events if e.type == EventType.EXPERIMENT_JUDGED)
     assert judged.payload["judgment"] == "keep"
     assert judged.payload["metric_value"] == 1.10
+    assert judged.payload["index"] == 1
 
 
 def test_campaign_cancel_before_first_boundary(dbos, repo):

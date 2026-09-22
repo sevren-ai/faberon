@@ -60,6 +60,8 @@ def _experiment_setup() -> ExperimentSetup:
         baseline=1.23,
         poll_interval_seconds=0.05,
         walltime=10,
+        index=1,
+        sha="0" * 40,
     )
 
 

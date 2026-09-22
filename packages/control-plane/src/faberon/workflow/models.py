@@ -34,6 +34,8 @@ class ExperimentSetup(BaseModel):
     baseline: float
     poll_interval_seconds: float = Field(gt=0)
     walltime: int = Field(gt=0)  # in minutes
+    index: int = Field(ge=1)
+    sha: str = Field(min_length=1)
 
 
 class CampaignSetup(BaseModel):
