@@ -70,7 +70,7 @@ wheels = [
 
 [[package]]
 name = "faberon"
-version = "0.3.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "dbos" },

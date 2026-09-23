@@ -17,7 +17,7 @@ How to use them:
 - Update docs in the same commit/PR that changes a decision: `roadmap.md` for plan changes, `design.md` only when the stable architecture genuinely changes.
 - Speculative ideas belong in `docs/design/future.md`, not in the roadmap or in code comments.
 - The current WIP release doc stays editable until it ships. Never edit a `vX.Y.Z.md` after that version has shipped.
-- When starting work toward a new release, bump the version at the start of the feature branch (`packages/control-plane/pyproject.toml` and `faberon.__version__`), so every artifact knows what it is working toward. Do not wait until merge time.
+- Bump the version (`packages/control-plane/pyproject.toml` and `faberon.__version__`) right before a release is cut.
 
 ## Git and pull requests
 
