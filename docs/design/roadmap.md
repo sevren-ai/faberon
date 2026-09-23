@@ -2,7 +2,9 @@
 
 **Status:** living document. Features planned for the near future, plus open questions that affect that work. Updated whenever plans or decisions change, by humans or by agents (see `AGENTS.md`). Stable architecture lives in [design.md](design.md). Speculative ideas and deferred options live in [future.md](future.md). This doc is not a history: git records what shipped and why.
 
-**Current focus:** v0.3.0 (console). Scope and progress: [v0.3.0.md](v0.3.0.md).
+**Current focus:** 
+* v0.2.1 (robustness): [v0.2.1.md](v0.2.1.md). 
+* v0.3.0 (console): [v0.3.0.md](v0.3.0.md).
 
 ## Phases
 
