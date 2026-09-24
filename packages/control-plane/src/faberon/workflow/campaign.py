@@ -117,7 +117,8 @@ class CampaignRunner:
             current = self.read_target_step(repo, setup.target_file)
             proposal = self.propose_step(setup, current)
             self.write_target_step(repo, setup.target_file, proposal.content)
-            commit_msg = f"experiment {experiments_done}"
+            summary = proposal.rationale.splitlines()[0].strip()[:60].rstrip()
+            commit_msg = f"exp {experiments_done}: {summary}"
             result = self.commit_step(repo, setup.target_file, commit_msg)
             self._record_proposal(
                 setup,
