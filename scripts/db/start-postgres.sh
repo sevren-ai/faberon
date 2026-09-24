@@ -7,7 +7,7 @@ set -euo pipefail
 env_file="${XDG_CONFIG_HOME:-$HOME/.config}/faberon/postgres.env"
 if [ ! -f "$env_file" ]; then
     echo "error: $env_file not found" >&2
-    echo "this script only manages a personal Postgres installed by scripts/install-postgres-no-sudo.sh" >&2
+    echo "this script only manages a personal Postgres installed by scripts/db/install-postgres-no-sudo.sh" >&2
     echo "if you installed Postgres with your system package manager (dnf/apt), it is already running as a system service" >&2
     exit 1
 fi

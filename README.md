@@ -15,7 +15,7 @@ The console (Pi extension, TypeScript) joins as a sibling package in upcoming wo
 The control plane stores its ledger in Postgres. Setup is two layers:
 
 1. **Install a Postgres server** (once per machine).
-2. **Create the databases** with `scripts/create-faberon-db.sh` (once per server, with Postgres running). This creates `faberon` for the control plane and `faberon_test` for the test suite.
+2. **Create the databases** with `scripts/db/create-faberon-db.sh` (once per server, with Postgres running). This creates `faberon` for the control plane and `faberon_test` for the test suite.
 
 How you do step 1 depends on the machine. Run the `scripts/` commands from the Faberon repo root.
 
@@ -28,7 +28,7 @@ sudo dnf install postgresql-server postgresql-contrib
 sudo postgresql-setup --initdb          # creates the data dir with peer auth
 sudo systemctl enable --now postgresql  # start it, and on boot
 sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-bash scripts/create-faberon-db.sh
+bash scripts/db/create-faberon-db.sh
 export FABERON_DATABASE_URL=postgres:///faberon
 ```
 
@@ -37,13 +37,13 @@ On Ubuntu:
 ```bash
 sudo apt install postgresql postgresql-contrib   # package inits the cluster and starts the service
 sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-bash scripts/create-faberon-db.sh
+bash scripts/db/create-faberon-db.sh
 export FABERON_DATABASE_URL=postgres:///faberon
 ```
 
 `postgres:///faberon` connects over the local unix socket using peer auth (you are authenticated as your OS user, no password, no network). Data persists on disk under the Postgres data directory.
 
-The system package runs Postgres as a background service that starts on boot, so there is nothing to start or stop by hand. Do not use `scripts/start-postgres.sh` or `scripts/stop-postgres.sh` here; those are for the no-sudo install below.
+The system package runs Postgres as a background service that starts on boot, so there is nothing to start or stop by hand. Do not use `scripts/db/start-postgres.sh` or `scripts/db/stop-postgres.sh` here; those are for the no-sudo install below.
 
 ### Login node (no sudo)
 
@@ -52,27 +52,27 @@ Login nodes typically have no working sudo. Install a personal Postgres instead 
 Once:
 
 ```bash
-bash scripts/install-postgres-no-sudo.sh     # binaries + initdb + env file
+bash scripts/db/install-postgres-no-sudo.sh  # binaries + initdb + env file
 ```
 
-The installer writes an env file to `~/.config/faberon/postgres.env` (or `$XDG_CONFIG_HOME/faberon/postgres.env`). It records the install paths and connection settings. `scripts/start-postgres.sh` and `scripts/stop-postgres.sh` source this file.
+The installer writes an env file to `~/.config/faberon/postgres.env` (or `$XDG_CONFIG_HOME/faberon/postgres.env`). It records the install paths and connection settings. `scripts/db/start-postgres.sh` and `scripts/db/stop-postgres.sh` source this file.
 
 To start the postgres (each session, from the repo root):
 
 ```bash
-bash scripts/start-postgres.sh
+bash scripts/db/start-postgres.sh
 ```
 
 Once (with Postgres running):
 
 ```bash
-bash scripts/create-faberon-db.sh            # creates the faberon and faberon_test databases
+bash scripts/db/create-faberon-db.sh         # creates the faberon and faberon_test databases
 ```
 
 To stop it:
 
 ```bash
-bash scripts/stop-postgres.sh
+bash scripts/db/stop-postgres.sh
 ```
 
 PGDATA sits next to the binaries on your home filesystem. On many clusters that is a network FS (for example Weka); that is fine for Faberon's small ledger and DBOS state.

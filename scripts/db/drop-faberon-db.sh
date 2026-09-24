@@ -41,4 +41,4 @@ for db in "${dbs[@]}"; do
     fi
 done
 
-echo "Done. Recreate them with scripts/create-faberon-db.sh"
+echo "Done. Recreate them with scripts/db/create-faberon-db.sh"

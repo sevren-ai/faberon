@@ -32,7 +32,7 @@ How to use them:
 From the repo root:
 
 ```bash
-bash scripts/test.sh
+bash scripts/test/test.sh
 ```
 
 This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, mirroring `.github/workflows/test.yml`.
@@ -46,16 +46,16 @@ This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, m
 ### Ledger tests
 
 The ledger tests need a local Postgres and `FABERON_DATABASE_URL` exported in your shell (see `## Prerequisites` and the `## Setup` section of `README.md`). They skip themselves when `FABERON_DATABASE_URL` is unset or when the postgres isn't running,
-so a plain `scripts/test.sh` run doesn't need a database.
+so a plain `scripts/test/test.sh` run doesn't need a database.
 
-The test suite runs against the `faberon_test` database, not the actual (production) database named in `FABERON_DATABASE_URL`. The tests truncate tables and reset the DBOS system database, so this separation keeps production data safe. `scripts/create-faberon-db.sh` creates both databases.
+The test suite runs against the `faberon_test` database, not the actual (production) database named in `FABERON_DATABASE_URL`. The tests truncate tables and reset the DBOS system database, so this separation keeps production data safe. `scripts/db/create-faberon-db.sh` creates both databases.
 
 ### On-cluster Slurm tests
 
 Tests that submit real jobs to Slurm live in `tests/test_executor/test_slurm_integration.py`. They are skipped by default so a plain `pytest` run never submits jobs, in CI or on a login node. To run them on a login node that has `sbatch` on `PATH`:
 
 ```bash
-FABERON_SLURM_ACCOUNT=<account> bash scripts/slurm-test.sh
+FABERON_SLURM_ACCOUNT=<account> bash scripts/test/slurm-test.sh
 ```
 
 `FABERON_SLURM_ACCOUNT` is the Slurm account jobs are billed to; the cluster requires it. The script sets `FABERON_SLURM_INTEGRATION=1` to opt in and runs `pytest -m slurm`. These verify actual behaviour on the cluster.
@@ -65,10 +65,10 @@ FABERON_SLURM_ACCOUNT=<account> bash scripts/slurm-test.sh
 `tests/test_workflow/test_proposer_llm.py` runs the proposer against the real model configured in `FABERON_MODEL`. It is skipped by default. To run it:
 
 ```bash
-FABERON_MODEL=openrouter:<provider>/<model> OPENROUTER_API_KEY=<key> bash scripts/llm-test.sh
+FABERON_MODEL=openrouter:<provider>/<model> OPENROUTER_API_KEY=<key> bash scripts/test/llm-test.sh
 ```
 
-Use `scripts/prod-test.sh` to run the Slurm and LLM integration tests together; it needs both sets of env vars.
+Use `scripts/test/prod-test.sh` to run the Slurm and LLM integration tests together; it needs both sets of env vars.
 
 ## Formatting and linting
 
