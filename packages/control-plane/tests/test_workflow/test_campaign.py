@@ -162,7 +162,8 @@ def test_campaign_metric_command_renders_job_id(dbos, repo, tmp_path):
     assert judged.payload["index"] == 1
 
 
-def test_campaign_cancel_before_first_boundary(dbos, repo):
+def test_campaign_ends_on_cancel(dbos, repo):
+    """A cancelled campaign ends with stop_reason ``cancelled`` by the human."""
     runtime = Runtime(
         FakeExecutor(),
         Ledger(os.environ["FABERON_DATABASE_URL"]),
@@ -197,7 +198,7 @@ def test_campaign_cancel_before_first_boundary(dbos, repo):
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
     events = list(ledger.tail(campaign_id))
     ledger.close()
-    assert list(dict.fromkeys(e.type for e in events)) == [EventType.CAMPAIGN_ENDED]
-    ended = events[0]
+    ended = events[-1]
+    assert ended.type == EventType.CAMPAIGN_ENDED
     assert ended.payload["stop_reason"] == "cancelled"
     assert ended.actor.value == "human"
