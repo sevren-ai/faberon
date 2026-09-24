@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run all integration tests against real infrastructure: Slurm jobs and the
-# configured LLM. Combines slurm-test.sh and llm-test.sh in one pytest run.
+# configured LLM. Combines slurm.sh and llm.sh in one pytest run.
 #
 # Required env:
 #   FABERON_SLURM_ACCOUNT Slurm account to bill jobs to.
@@ -21,7 +21,7 @@ fi
 
 # Resolve the repo root from the script location so it works from any cwd.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/.." && pwd)"
+repo_root="$(cd "$script_dir/../.." && pwd)"
 pkg="$repo_root/packages/control-plane"
 
 cd "$pkg"
