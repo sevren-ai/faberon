@@ -43,6 +43,8 @@ export FABERON_DATABASE_URL=postgres:///faberon
 
 `postgres:///faberon` connects over the local unix socket using peer auth (you are authenticated as your OS user, no password, no network). Data persists on disk under the Postgres data directory.
 
+The system package runs Postgres as a background service that starts on boot, so there is nothing to start or stop by hand. Do not use `scripts/start-postgres.sh` or `scripts/stop-postgres.sh` here; those are for the no-sudo install below.
+
 ### Login node (no sudo)
 
 Login nodes typically have no working sudo. Install a personal Postgres instead of the system package.
@@ -53,7 +55,9 @@ Once:
 bash scripts/install-postgres-no-sudo.sh     # binaries + initdb + env file
 ```
 
-To start it (each session, from the repo root):
+The installer writes an env file to `~/.config/faberon/postgres.env` (or `$XDG_CONFIG_HOME/faberon/postgres.env`). It records the install paths and connection settings. `scripts/start-postgres.sh` and `scripts/stop-postgres.sh` source this file.
+
+To start the postgres (each session, from the repo root):
 
 ```bash
 bash scripts/start-postgres.sh
