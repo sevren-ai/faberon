@@ -1,5 +1,6 @@
 """Tests for the Pydantic AI experiment proposer."""
 
+import time
 import uuid
 
 import pytest
@@ -9,6 +10,7 @@ from pydantic_ai.models.test import TestModel
 
 from faberon.schema.events import Actor, Event, EventType
 from faberon.workflow import AgentProposer, Proposal
+from faberon.workflow.proposer import _run_with_timeout
 
 from .._fakes import FakeEvents
 from ..conftest import make_plan
@@ -120,3 +122,25 @@ def test_proposer_requires_model(monkeypatch):
 
     with pytest.raises(RuntimeError, match="FABERON_MODEL is not set"):
         AgentProposer.from_env(FakeEvents())
+
+
+def test_run_with_timeout_returns():
+    proposal = Proposal(content="print('x')\n", rationale="r")
+    assert _run_with_timeout(5.0, lambda: proposal) == proposal
+
+
+def test_run_with_timeout_raises():
+    def hang() -> Proposal:
+        time.sleep(60)
+        raise AssertionError("a timed-out call must not return")
+
+    with pytest.raises(TimeoutError, match="exceeded"):
+        _run_with_timeout(0.1, hang)
+
+
+def test_run_with_timeout_reraises():
+    def boom() -> Proposal:
+        raise ValueError("model broke")
+
+    with pytest.raises(ValueError, match="model broke"):
+        _run_with_timeout(5.0, boom)

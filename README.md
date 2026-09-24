@@ -110,6 +110,7 @@ Optional deployment-side knobs:
 - `FABERON_SLURM_GPUS`: GPU count per job (default 1).
 - `FABERON_SLURM_MAX_TIME`: walltime cap in minutes. Each job's walltime comes from its campaign plan; this cap can only lower it, never raise it. Set it to protect the cluster from runaway jobs.
 - `FABERON_SLURM_OUTPUT`: Slurm `--output` path for job stdout/stderr.
+- `FABERON_PROPOSER_TIMEOUT`: bound in seconds on one proposer LLM call. On expiry the call fails. Defaults to 600 if not set.
 
 You can generate a random token with:
 
