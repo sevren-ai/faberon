@@ -39,4 +39,4 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run pytest
+      - run: uv run pytest -rs

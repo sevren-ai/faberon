@@ -26,6 +26,6 @@ echo ">> uv sync --locked"
 uv sync --locked
 
 echo ">> pytest -m llm"
-uv run pytest -m llm
+uv run pytest -rs -m llm
 
 echo "LLM integration tests passed."
