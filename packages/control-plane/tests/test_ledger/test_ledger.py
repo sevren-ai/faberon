@@ -108,6 +108,29 @@ def test_create_campaign_idempotent(ledger):
     assert events[0].type == EventType.CAMPAIGN_CREATED
 
 
+def test_active_campaign_on_repo(ledger):
+    repo = "/repo/a"
+    assert ledger.active_campaign_on_repo(repo) is None
+
+    active_id = uuid.uuid4()
+    ledger.create_campaign(active_id, str(active_id), make_plan(), repo)
+    # A different repo is not affected.
+    assert ledger.active_campaign_on_repo("/repo/other") is None
+    active = ledger.active_campaign_on_repo(repo)
+    assert active is not None
+    assert active.campaign_id == active_id
+
+    # Once the campaign ends, the repo is free again.
+    ledger.append(
+        _event(
+            campaign_id=active_id,
+            type=EventType.CAMPAIGN_ENDED,
+            payload={"stop_reason": "max_experiments"},
+        )
+    )
+    assert ledger.active_campaign_on_repo(repo) is None
+
+
 def test_campaign_events(ledger):
     camp_a = uuid.uuid4()
     camp_b = uuid.uuid4()

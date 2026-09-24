@@ -160,6 +160,19 @@ def _register_routes(app: FastAPI) -> None:
         campaign_id = body.campaign_id
         workflow_id = str(campaign_id)
 
+        existing = ledger.get_campaign(campaign_id)
+        if existing is None:
+            # One active campaign per repo: a second one would interleave
+            # commits on the same checkout.
+            active = ledger.active_campaign_on_repo(body.repo_path)
+            if active is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"repo already has an active campaign: {active.campaign_id}"
+                    ),
+                )
+
         setup = CampaignSetup(
             campaign_id=campaign_id,
             plan=body.plan,

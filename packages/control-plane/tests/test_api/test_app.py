@@ -228,6 +228,65 @@ def test_create_campaign_idempotent(api: ApiFixture):
     assert types.count(EventType.CAMPAIGN_CREATED) == 1
 
 
+def test_second_campaign_rejected(tmp_path, repo):
+    """While one campaign is active on a repo, a second one is rejected."""
+    DBOS.destroy()
+
+    metric = tmp_path / "metric.txt"
+    metric.write_text("val_bpb: 1.10\n")
+    executor = FakeExecutor(JobState.RUNNING)
+    app = create_app(
+        executor=executor,
+        config_name=f"api-test-{uuid.uuid4().hex}",
+    )
+    _reset_databases()
+    with TestClient(app) as client:
+        first = client.post(
+            "/v0/campaigns",
+            json=_create_body(str(metric), str(uuid.uuid4()), str(repo)),
+        )
+        assert first.status_code == 201
+
+        conflict = client.post(
+            "/v0/campaigns",
+            json=_create_body(str(metric), str(uuid.uuid4()), str(repo)),
+        )
+        assert conflict.status_code == 409
+        assert first.json()["campaign_id"] in conflict.json()["detail"]
+
+        # A different repo path is unaffected.
+        other = tmp_path / "other-repo"
+        accepted = client.post(
+            "/v0/campaigns",
+            json=_create_body(str(metric), str(uuid.uuid4()), str(other)),
+        )
+        assert accepted.status_code == 201
+    DBOS.destroy()
+
+
+def test_no_conflict_with_ended_campaigns(api: ApiFixture):
+    """Once the campaign on a repo ends, a new one on the same repo is accepted."""
+    first = api.client.post(
+        "/v0/campaigns",
+        json=_create_body(api.metric_path, str(uuid.uuid4()), api.repo_path),
+    )
+    assert first.status_code == 201
+
+    # End the first event
+    DBOS.retrieve_workflow(first.json()["workflow_id"]).get_result()
+    first_id = first.json()["campaign_id"]
+    events = api.client.get(f"/v0/campaigns/{first_id}/events.jsonl")
+    types = [json.loads(line)["type"] for line in events.text.splitlines()]
+    assert EventType.CAMPAIGN_ENDED in types
+
+    # Submit the second: should be no issue
+    second = api.client.post(
+        "/v0/campaigns",
+        json=_create_body(api.metric_path, str(uuid.uuid4()), api.repo_path),
+    )
+    assert second.status_code == 201
+
+
 @dataclass
 class LiveServer:
     base_url: str

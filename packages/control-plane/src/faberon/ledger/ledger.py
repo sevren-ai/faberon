@@ -153,6 +153,32 @@ class Ledger:
         )
         return [_row_to_campaign(row) for row in rows]
 
+    def active_campaign_on_repo(self, repo_path: str) -> Campaign | None:
+        """Return the active campaign on ``repo_path``, or None.
+
+        A campaign is active while it has no ``campaign.ended`` event. Two
+        active campaigns on one repo would interleave commits, so the create
+        route rejects the second one.
+        """
+        row = self._conn.execute(
+            """
+            SELECT campaign_id, workflow_id, plan, repo_path, created_at
+            FROM campaigns c
+            WHERE c.repo_path = %s
+              AND NOT EXISTS (
+                  SELECT 1 FROM events e
+                  WHERE e.campaign_id = c.campaign_id
+                    AND e.type = %s
+              )
+            ORDER BY created_at
+            LIMIT 1
+            """,
+            (repo_path, EventType.CAMPAIGN_ENDED.value),
+        ).fetchone()
+        if row is None:
+            return None
+        return _row_to_campaign(row)
+
     def append_with_session(self, session: Session, event: Event) -> int:
         """Append an event through a caller-supplied SQLAlchemy session.
         Returns the assigned seq.
