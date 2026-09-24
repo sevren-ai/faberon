@@ -23,6 +23,6 @@ echo ">> uv sync --locked"
 uv sync --locked
 
 echo ">> pytest -m slurm"
-FABERON_SLURM_INTEGRATION=1 uv run pytest -m slurm
+FABERON_SLURM_INTEGRATION=1 uv run pytest -rs -m slurm
 
 echo "Slurm integration tests passed."

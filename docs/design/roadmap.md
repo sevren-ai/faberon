@@ -18,6 +18,7 @@ A version is a milestone release, not the whole roadmap. Each phase becomes its 
 
 Questions that affect near-term work. Broader deferred ideas belong in [future.md](future.md).
 
+- Database schema versioning: today the schema is created idempotently (`CREATE TABLE IF NOT EXISTS`) and never migrated, so upgrading between versions requires recreating the database and losing its data. Once Faberon has users who cannot do that, adopt a real mechanism: a `schema_version` table, ordered migration steps, a startup check that refuses to run against an unexpected version, and a migration test that upgrades an old schema and asserts the new code works against it. The open question is timing: which release is the first one that must not break an existing database.
 - Multi-file repo edits: v0.2.0 keeps the proposer limited to replacing `train.py`. General repo editing lands with the scale work in v0.4.0, alongside worktrees. That design review settles commit scoping: plan-listed paths vs. an agent-decided commit tool vs. `add -A` with an ignore-file convention for run outputs.
 - Compute-node to login-node HTTP egress (gates the epilog webhook).
 - Cluster specifics: partition, GPU type, and QoS are not currently set by the executor. Explicit `--partition` and QoS belong with the scale work (v0.4.0); `--time` walltime is pulled forward to v0.2.0.

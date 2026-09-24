@@ -14,4 +14,5 @@ class Campaign(BaseModel):
     campaign_id: UUID
     workflow_id: str
     plan: ResearchPlan
+    repo_path: str
     created_at: datetime

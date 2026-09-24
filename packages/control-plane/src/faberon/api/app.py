@@ -53,7 +53,6 @@ def create_app(
     *,
     config_name: str = "default",
     auth_token: str | None = None,
-    repo_path: str = ".",
 ) -> FastAPI:
     """Build the Faberon HTTP app.
     Requires ``FABERON_DATABASE_URL`` and ``FABERON_MODEL``.
@@ -80,7 +79,6 @@ def create_app(
         runtime = Runtime(executor, ledger, config_name=config_name)
         runner = CampaignRunner(
             runtime,
-            repo_path=repo_path,
             proposer=AgentProposer.from_env(ledger),
         )
         DBOS.register_instance(runtime)
@@ -162,19 +160,32 @@ def _register_routes(app: FastAPI) -> None:
         campaign_id = body.campaign_id
         workflow_id = str(campaign_id)
 
+        existing = ledger.get_campaign(campaign_id)
+        if existing is None:
+            # One active campaign per repo: a second one would interleave
+            # commits on the same checkout.
+            active = ledger.active_campaign_on_repo(body.repo_path)
+            if active is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"repo already has an active campaign: {active.campaign_id}"
+                    ),
+                )
+
         setup = CampaignSetup(
             campaign_id=campaign_id,
             plan=body.plan,
             command=body.command,
+            repo_path=body.repo_path,
             poll_interval_seconds=body.poll_interval_seconds,
-            repo_path=".",
         )
         # Idempotent: DBOS dedupes on workflow id, the ledger dedupes on
         # the campaigns row. A retry with the same campaign_id returns the
         # existing campaign instead of creating a new one.
         with SetWorkflowID(workflow_id):
             handle = DBOS.start_workflow(runner.run_campaign, setup)
-        ledger.create_campaign(campaign_id, workflow_id, body.plan)
+        ledger.create_campaign(campaign_id, workflow_id, body.plan, body.repo_path)
         return CampaignCreated(
             campaign_id=campaign_id,
             workflow_id=handle.workflow_id,

@@ -79,20 +79,21 @@ def test_get_campaign(ledger):
     camp_id = uuid.uuid4()
     assert ledger.get_campaign(camp_id) is None
     plan = make_plan()
-    ledger.create_campaign(camp_id, str(camp_id), plan)
+    ledger.create_campaign(camp_id, str(camp_id), plan, "/repo/a")
     campaign = ledger.get_campaign(camp_id)
     assert campaign is not None
     assert campaign.campaign_id == camp_id
     assert campaign.workflow_id == str(camp_id)
     assert campaign.plan == plan
+    assert campaign.repo_path == "/repo/a"
 
 
 def test_list_campaigns(ledger):
     assert ledger.list_campaigns() == []
     camp_a = uuid.uuid4()
     camp_b = uuid.uuid4()
-    ledger.create_campaign(camp_a, str(camp_a), make_plan())
-    ledger.create_campaign(camp_b, str(camp_b), make_plan())
+    ledger.create_campaign(camp_a, str(camp_a), make_plan(), "/repo/a")
+    ledger.create_campaign(camp_b, str(camp_b), make_plan(), "/repo/b")
     campaigns = ledger.list_campaigns()
     assert [c.campaign_id for c in campaigns] == [camp_a, camp_b]
 
@@ -100,11 +101,34 @@ def test_list_campaigns(ledger):
 def test_create_campaign_idempotent(ledger):
     camp_id = uuid.uuid4()
     plan = make_plan()
-    assert ledger.create_campaign(camp_id, str(camp_id), plan) is True
-    assert ledger.create_campaign(camp_id, str(camp_id), plan) is False
+    assert ledger.create_campaign(camp_id, str(camp_id), plan, "/repo/a") is True
+    assert ledger.create_campaign(camp_id, str(camp_id), plan, "/repo/a") is False
     events = list(ledger.tail(camp_id))
     assert len(events) == 1
     assert events[0].type == EventType.CAMPAIGN_CREATED
+
+
+def test_active_campaign_on_repo(ledger):
+    repo = "/repo/a"
+    assert ledger.active_campaign_on_repo(repo) is None
+
+    active_id = uuid.uuid4()
+    ledger.create_campaign(active_id, str(active_id), make_plan(), repo)
+    # A different repo is not affected.
+    assert ledger.active_campaign_on_repo("/repo/other") is None
+    active = ledger.active_campaign_on_repo(repo)
+    assert active is not None
+    assert active.campaign_id == active_id
+
+    # Once the campaign ends, the repo is free again.
+    ledger.append(
+        _event(
+            campaign_id=active_id,
+            type=EventType.CAMPAIGN_ENDED,
+            payload={"stop_reason": "max_experiments"},
+        )
+    )
+    assert ledger.active_campaign_on_repo(repo) is None
 
 
 def test_campaign_events(ledger):

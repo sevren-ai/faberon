@@ -17,6 +17,6 @@ echo ">> uv sync --locked"
 uv sync --locked
 
 echo ">> pytest"
-uv run pytest
+uv run pytest -rs
 
 echo "Tests passed."
