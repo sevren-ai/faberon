@@ -78,7 +78,7 @@ def api(tmp_path, repo) -> Iterator[ApiFixture]:
 
 def _create_body(metric_path: str, campaign_id: str, repo_path: str) -> dict:
     plan = make_plan(
-        metric_command=f"cat {metric_path}", budget_gpu_hours=1.0, max_experiments=6
+        metric_command=f"cat {metric_path}", budget_gpu_hours=1.0, max_experiments=3
     )
     return {
         "campaign_id": campaign_id,
@@ -102,7 +102,7 @@ def test_create_campaign(api: ApiFixture):
     handle = DBOS.retrieve_workflow(body["workflow_id"])
     stop_reason = handle.get_result()
     assert stop_reason == "max_experiments"
-    assert api.executor.submit_count == 6
+    assert api.executor.submit_count == 3
 
     response = api.client.get(f"/v0/campaigns/{body['campaign_id']}/events.jsonl")
     types = [json.loads(line)["type"] for line in response.text.splitlines()]
@@ -221,7 +221,7 @@ def test_create_campaign_idempotent(api: ApiFixture):
     assert second.status_code == 201
     assert second.json()["campaign_id"] == first.json()["campaign_id"]
     assert second.json()["workflow_id"] == first.json()["workflow_id"]
-    assert api.executor.submit_count == 6
+    assert api.executor.submit_count == 3
 
     status = api.client.get(f"/v0/campaigns/{camp_id}/events.jsonl")
     types = [json.loads(line)["type"] for line in status.text.splitlines()]
