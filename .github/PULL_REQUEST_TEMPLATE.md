@@ -13,7 +13,7 @@ Every PR must run the on-cluster integration suite (Slurm jobs plus the configur
 
 Run on the login node:
 
-    bash scripts/test/prod-test.sh
+    bash scripts/test/prod.sh
 
 Paste the full output, including the summary line, for example:
 

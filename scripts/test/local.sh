@@ -2,7 +2,7 @@
 # Run the test suite CI runs, locally. Exits non-zero on failure.
 # Mirrors .github/workflows/test.yml.
 #
-# Usage: bash scripts/test/test.sh
+# Usage: bash scripts/test/local.sh
 
 set -euo pipefail
 
