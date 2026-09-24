@@ -49,9 +49,7 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     DBOS.register_instance(runtime)
     runner = CampaignRunner(
         runtime,
-        repo_path=str(repo),
         proposer=FakeProposer(),
-        target_file="train.py",
     )
     plan = make_plan()
     setup = CampaignSetup(
@@ -100,9 +98,7 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
     DBOS.register_instance(runtime)
     runner = CampaignRunner(
         runtime,
-        repo_path=str(repo),
         proposer=FakeProposer(),
-        target_file="train.py",
     )
     setup = CampaignSetup(
         campaign_id=uuid.uuid4(),
@@ -139,9 +135,7 @@ def test_campaign_metric_command_renders_job_id(dbos, repo, tmp_path):
     DBOS.register_instance(runtime)
     runner = CampaignRunner(
         runtime,
-        repo_path=str(repo),
         proposer=FakeProposer(),
-        target_file="train.py",
     )
     setup = CampaignSetup(
         campaign_id=uuid.uuid4(),
@@ -177,9 +171,7 @@ def test_campaign_cancel_before_first_boundary(dbos, repo):
     DBOS.register_instance(runtime)
     runner = CampaignRunner(
         runtime,
-        repo_path=str(repo),
         proposer=FakeProposer(),
-        target_file="train.py",
     )
     campaign_id = uuid.uuid4()
     setup = CampaignSetup(

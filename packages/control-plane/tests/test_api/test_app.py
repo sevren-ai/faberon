@@ -40,6 +40,7 @@ class ApiFixture:
     client: TestClient
     executor: FakeExecutor
     metric_path: str
+    repo_path: str
 
 
 def _reset_databases() -> None:
@@ -63,7 +64,6 @@ def api(tmp_path, repo) -> Iterator[ApiFixture]:
     app = create_app(
         executor=executor,
         config_name=config_name,
-        repo_path=str(repo),
     )
     _reset_databases()
     with TestClient(app) as client:
@@ -71,11 +71,12 @@ def api(tmp_path, repo) -> Iterator[ApiFixture]:
             client=client,
             executor=executor,
             metric_path=str(metric),
+            repo_path=str(repo),
         )
     DBOS.destroy()
 
 
-def _create_body(metric_path: str, campaign_id: str) -> dict:
+def _create_body(metric_path: str, campaign_id: str, repo_path: str) -> dict:
     plan = make_plan(
         metric_command=f"cat {metric_path}", budget_gpu_hours=1.0, max_experiments=6
     )
@@ -83,6 +84,7 @@ def _create_body(metric_path: str, campaign_id: str) -> dict:
         "campaign_id": campaign_id,
         "plan": plan.model_dump(mode="json"),
         "command": ["true"],
+        "repo_path": repo_path,
         "poll_interval_seconds": 0.05,
     }
 
@@ -90,7 +92,7 @@ def _create_body(metric_path: str, campaign_id: str) -> dict:
 def test_create_campaign(api: ApiFixture):
     camp_id = str(uuid.uuid4())
     response = api.client.post(
-        "/v0/campaigns", json=_create_body(api.metric_path, camp_id)
+        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
     )
     assert response.status_code == 201
     body = response.json()
@@ -110,7 +112,7 @@ def test_create_campaign(api: ApiFixture):
 
 
 def test_get_campaign(api: ApiFixture):
-    body = _create_body(api.metric_path, str(uuid.uuid4()))
+    body = _create_body(api.metric_path, str(uuid.uuid4()), api.repo_path)
     response = api.client.post("/v0/campaigns", json=body)
     assert response.status_code == 201
     DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
@@ -128,7 +130,7 @@ def test_list_campaigns(api: ApiFixture):
     ids = [str(uuid.uuid4()) for _ in range(2)]
     for cid in ids:
         response = api.client.post(
-            "/v0/campaigns", json=_create_body(api.metric_path, cid)
+            "/v0/campaigns", json=_create_body(api.metric_path, cid, api.repo_path)
         )
         assert response.status_code == 201
         DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
@@ -151,7 +153,7 @@ def test_events_jsonl(api: ApiFixture):
     other_id = str(uuid.uuid4())
     for cid in (camp_id, other_id):
         response = api.client.post(
-            "/v0/campaigns", json=_create_body(api.metric_path, cid)
+            "/v0/campaigns", json=_create_body(api.metric_path, cid, api.repo_path)
         )
         assert response.status_code == 201
         DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
@@ -190,11 +192,10 @@ def test_auth(tmp_path, repo):
         executor=executor,
         config_name=f"api-test-{uuid.uuid4().hex}",
         auth_token="my-secret-token",
-        repo_path=str(repo),
     )
     _reset_databases()
     headers = {"Authorization": "Bearer my-secret-token"}
-    body = _create_body(str(metric), str(uuid.uuid4()))
+    body = _create_body(str(metric), str(uuid.uuid4()), str(repo))
     with TestClient(app) as client:
         # healthz is always open
         assert client.get("/healthz").status_code == 200
@@ -210,7 +211,7 @@ def test_auth(tmp_path, repo):
 
 def test_create_campaign_idempotent(api: ApiFixture):
     camp_id = str(uuid.uuid4())
-    body = _create_body(api.metric_path, camp_id)
+    body = _create_body(api.metric_path, camp_id, api.repo_path)
     first = api.client.post("/v0/campaigns", json=body)
     assert first.status_code == 201
     DBOS.retrieve_workflow(first.json()["workflow_id"]).get_result()
@@ -232,6 +233,7 @@ class LiveServer:
     base_url: str
     executor: FakeExecutor
     metric_path: str
+    repo_path: str
 
 
 @pytest.fixture
@@ -246,7 +248,6 @@ def live_server(tmp_path, repo) -> Iterator[LiveServer]:
     app = create_app(
         executor=executor,
         config_name=f"api-test-{uuid.uuid4().hex}",
-        repo_path=str(repo),
     )
     _reset_databases()
 
@@ -268,6 +269,7 @@ def live_server(tmp_path, repo) -> Iterator[LiveServer]:
         base_url=f"http://127.0.0.1:{port}",
         executor=executor,
         metric_path=str(metric),
+        repo_path=str(repo),
     )
 
     server.should_exit = True
@@ -292,7 +294,8 @@ def test_events_stream_resume(live_server: LiveServer):
     camp_id = str(uuid.uuid4())
     with httpx2.Client(base_url=live_server.base_url, timeout=timeout) as client:
         response = client.post(
-            "/v0/campaigns", json=_create_body(live_server.metric_path, camp_id)
+            "/v0/campaigns",
+            json=_create_body(live_server.metric_path, camp_id, live_server.repo_path),
         )
         assert response.status_code == 201
         campaign_id = response.json()["campaign_id"]

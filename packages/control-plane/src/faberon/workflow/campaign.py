@@ -31,16 +31,12 @@ class CampaignRunner:
     def __init__(
         self,
         runtime: Runtime,
-        repo_path: str,
         proposer: ExperimentProposer,
-        target_file: str = "train.py",
         gpus: int = 1,
     ) -> None:
         self.runtime = runtime
         self.config_name = runtime.config_name
-        self.repo = Path(repo_path)
         self.proposer = proposer
-        self.target_file = target_file
         self.gpus = gpus
 
     # -- steps (checkpointed; replayed without re-execution) --
@@ -51,24 +47,24 @@ class CampaignRunner:
         return self.proposer.propose(setup.campaign_id, setup.plan, current)
 
     @DBOS.step()
-    def commit_step(self, message: str) -> CommitResult:
+    def commit_step(self, repo: Path, target_file: str, message: str) -> CommitResult:
         """Commit the proposed edit to the target repo."""
-        return commit_file(self.repo, self.target_file, message)
+        return commit_file(repo, target_file, message)
 
     @DBOS.step()
-    def discard_step(self, parent_sha: str) -> None:
+    def discard_step(self, repo: Path, parent_sha: str) -> None:
         """Revert the working tree to the parent commit."""
-        reset_hard(self.repo, parent_sha)
+        reset_hard(repo, parent_sha)
 
     @DBOS.step()
-    def read_target_step(self) -> str:
+    def read_target_step(self, repo: Path, target_file: str) -> str:
         """Read the current target file content."""
-        return (self.repo / self.target_file).read_text()
+        return (repo / target_file).read_text()
 
     @DBOS.step()
-    def write_target_step(self, content: str) -> None:
+    def write_target_step(self, repo: Path, target_file: str, content: str) -> None:
         """Write the proposed content to the target file."""
-        (self.repo / self.target_file).write_text(content)
+        (repo / target_file).write_text(content)
 
     @DBOS.transaction()
     def record_event(self, event: Event) -> None:
@@ -84,6 +80,7 @@ class CampaignRunner:
         Returns the stop reason.
         """
         plan = setup.plan
+        repo = Path(setup.repo_path)
         experiments_done = 0
         gpu_hours_burned = 0.0
         best_metric: float | None = None
@@ -117,10 +114,11 @@ class CampaignRunner:
                 return StopReason.MAX_EXPERIMENTS.value
 
             experiments_done += 1
-            current = self.read_target_step()
+            current = self.read_target_step(repo, setup.target_file)
             proposal = self.propose_step(setup, current)
-            self.write_target_step(proposal.content)
-            result = self.commit_step(f"experiment {experiments_done}")
+            self.write_target_step(repo, setup.target_file, proposal.content)
+            commit_msg = f"experiment {experiments_done}"
+            result = self.commit_step(repo, setup.target_file, commit_msg)
             self._record_proposal(
                 setup,
                 experiments_done,
@@ -147,7 +145,7 @@ class CampaignRunner:
             if outcome.judgment == "keep":
                 best_metric = outcome.metric_value
             else:
-                self.discard_step(result.parent_sha)
+                self.discard_step(repo, result.parent_sha)
 
     # -- helpers --
 
