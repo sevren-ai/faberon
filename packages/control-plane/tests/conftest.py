@@ -50,7 +50,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
             pytest.skip("set FABERON_DATABASE_URL to a Postgres instance")
         if not _postgres_is_reachable(url):
             pytest.skip(
-                f"no {TEST_DB_NAME} database at {url}: run scripts/db/create-faberon-db.sh"
+                f"no {TEST_DB_NAME} DB at {url}: run scripts/db/create-faberon-db.sh"
             )
     if "slurm" in item.keywords:
         if not os.environ.get("FABERON_SLURM_INTEGRATION"):
