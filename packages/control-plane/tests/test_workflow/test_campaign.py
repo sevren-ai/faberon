@@ -1,6 +1,7 @@
 """Campaign workflow tests: loop, hard caps, budget, cancel."""
 
 import os
+import subprocess
 import uuid
 from collections.abc import Iterator
 
@@ -9,7 +10,9 @@ from dbos import DBOS, DBOSConfig
 
 from faberon.ledger import Ledger
 from faberon.schema.events import EventType, StopReason
+from faberon.schema.plan import ResearchPlan
 from faberon.workflow import CampaignRunner, CampaignSetup, Runtime
+from faberon.workflow.models import Proposal
 
 from .._fakes import FakeExecutor, FakeProposer
 from ..conftest import make_plan
@@ -87,6 +90,100 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     )
     ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
     assert ended.payload["stop_reason"] == "max_experiments"
+
+
+def test_campaign_commit_msg(dbos, repo, tmp_path):
+    """Experiment commits are titled ``exp N: <first rationale line>``."""
+    # One metric file per job id, each better than the last, so both
+    # experiments keep and their commits stay on the branch.
+    (tmp_path / "metric-fake-1.txt").write_text("val_bpb: 1.10\n")
+    (tmp_path / "metric-fake-2.txt").write_text("val_bpb: 1.00\n")
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(
+        runtime,
+        proposer=FakeProposer(),
+    )
+    setup = CampaignSetup(
+        campaign_id=uuid.uuid4(),
+        plan=make_plan(
+            metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
+            max_experiments=2,
+        ),
+        command=["true"],
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        target_file="train.py",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
+    log = subprocess.run(
+        ["git", "log", "--format=%s"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    # Newest first; both experiments keep, so nothing is reset away.
+    assert log[0] == "exp 2: test proposal 2"
+    assert log[1] == "exp 1: test proposal 1"
+
+
+def test_campaign_commit_msg_truncates(dbos, repo, tmp_path):
+    """A verbose first rationale line is truncated to a bounded title."""
+
+    class VerboseProposer(FakeProposer):
+        def propose(
+            self,
+            campaign_id: uuid.UUID,
+            plan: ResearchPlan,
+            current_content: str,
+        ) -> Proposal:
+            proposal = super().propose(campaign_id, plan, current_content)
+            proposal.rationale = "x" * 120
+            return proposal
+
+    # Keep the experiment so its commit stays on the branch.
+    metric_file = tmp_path / "metric.txt"
+    metric_file.write_text("val_bpb: 1.10\n")
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(runtime, proposer=VerboseProposer())
+    setup = CampaignSetup(
+        campaign_id=uuid.uuid4(),
+        plan=make_plan(
+            metric_command=f"cat {metric_file}",
+            max_experiments=1,
+        ),
+        command=["true"],
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        target_file="train.py",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
+    title = subprocess.run(
+        ["git", "log", "-1", "--format=%s"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert title == f"exp 1: {'x' * 60}"
 
 
 def test_campaign_stops_on_budget(dbos, repo, tmp_path):
