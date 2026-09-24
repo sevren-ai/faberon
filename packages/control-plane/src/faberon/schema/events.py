@@ -20,6 +20,7 @@ class EventType(StrEnum):
     CAMPAIGN_ENDED = "campaign.ended"
     CANCEL_REQUESTED = "campaign.cancel_requested"
     EXPERIMENT_PROPOSED = "experiment.proposed"
+    EXPERIMENT_PROPOSE_FAILED = "experiment.propose_failed"
     EXPERIMENT_SUBMITTED = "experiment.submitted"
     EXPERIMENT_COMPLETED = "experiment.completed"
     EXPERIMENT_JUDGED = "experiment.judged"

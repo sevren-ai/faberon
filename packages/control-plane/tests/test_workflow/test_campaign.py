@@ -7,6 +7,7 @@ from collections.abc import Iterator
 
 import pytest
 from dbos import DBOS, DBOSConfig
+from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, UserError
 
 from faberon.ledger import Ledger
 from faberon.schema.events import EventType, StopReason
@@ -184,6 +185,105 @@ def test_campaign_commit_msg_truncates(dbos, repo, tmp_path):
         text=True,
     ).stdout.strip()
     assert title == f"exp 1: {'x' * 60}"
+
+
+def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
+    """A failed propose step is recorded and skipped, not fatal and not counted."""
+    (tmp_path / "metric-fake-1.txt").write_text("val_bpb: 1.10\n")
+    (tmp_path / "metric-fake-2.txt").write_text("val_bpb: 1.00\n")
+
+    class FlakyProposer(FakeProposer):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        def propose(
+            self,
+            campaign_id: uuid.UUID,
+            plan: ResearchPlan,
+            current_content: str,
+        ) -> Proposal:
+            self.calls += 1
+            if self.calls == 1:
+                raise TimeoutError("proposer call exceeded 600 seconds")
+            if self.calls == 3:
+                raise UnexpectedModelBehavior("maximum output retries")
+            if self.calls == 4:
+                raise ModelHTTPError(503, "test-model", body="overloaded")
+            return super().propose(campaign_id, plan, current_content)
+
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    proposer = FlakyProposer()
+    runner = CampaignRunner(runtime, proposer=proposer)
+    setup = CampaignSetup(
+        campaign_id=uuid.uuid4(),
+        plan=make_plan(
+            metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
+            max_experiments=2,
+        ),
+        command=["true"],
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        target_file="train.py",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
+    # Three failures were skipped, 2 experiments were run succesfully
+    assert proposer.calls == 5
+    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    events = list(ledger.tail(setup.campaign_id))
+    ledger.close()
+    failed = [e for e in events if e.type == EventType.EXPERIMENT_PROPOSE_FAILED]
+    assert [e.payload["error"] for e in failed] == [
+        "TimeoutError",
+        "UnexpectedModelBehavior",
+        "ModelHTTPError",
+    ]
+    proposed = [e for e in events if e.type == EventType.EXPERIMENT_PROPOSED]
+    assert [e.payload["index"] for e in proposed] == [1, 2]
+    ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
+    assert ended.payload["experiments_done"] == 2
+
+
+def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
+    """A UserError is not a recoverable model turn: it kills the campaign."""
+
+    class BrokenProposer(FakeProposer):
+        def propose(
+            self,
+            campaign_id: uuid.UUID,
+            plan: ResearchPlan,
+            current_content: str,
+        ) -> Proposal:
+            raise UserError("bad model string")
+
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(runtime, proposer=BrokenProposer())
+    setup = CampaignSetup(
+        campaign_id=uuid.uuid4(),
+        plan=make_plan(max_experiments=1),
+        command=["true"],
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        target_file="train.py",
+    )
+    DBOS.launch()
+
+    with pytest.raises(UserError):
+        runner.run_campaign(setup)
 
 
 def test_campaign_stops_on_budget(dbos, repo, tmp_path):

@@ -8,6 +8,7 @@ the loop in precedence order; the signal name for cancel is ``cancel``.
 from pathlib import Path
 
 from dbos import DBOS
+from pydantic_ai.exceptions import AgentRunError
 
 from ..executor import JobInfo
 from ..schema.events import Actor, Event, EventType, StopReason
@@ -113,9 +114,15 @@ class CampaignRunner:
                 )
                 return StopReason.MAX_EXPERIMENTS.value
 
-            experiments_done += 1
             current = self.read_target_step(repo, setup.target_file)
-            proposal = self.propose_step(setup, current)
+            try:
+                proposal = self.propose_step(setup, current)
+            except (TimeoutError, AgentRunError) as e:
+                # AgentRunError covers recoverable model-side failures.
+                # Record a failed proposal, then loop back.
+                self._record_propose_failure(setup, e)
+                continue
+            experiments_done += 1
             self.write_target_step(repo, setup.target_file, proposal.content)
             summary = proposal.rationale.splitlines()[0].strip()[:60].rstrip()
             commit_msg = f"exp {experiments_done}: {summary}"
@@ -155,6 +162,18 @@ class CampaignRunner:
         # a time-out would return None
         return DBOS.recv(topic="cancel", timeout_seconds=0.0) is not None
 
+    def _record_propose_failure(self, setup: CampaignSetup, error: Exception) -> None:
+        """Record a failed propose event"""
+        self.record_event(
+            Event(
+                campaign_id=setup.campaign_id,
+                actor=Actor.AGENT,
+                type=EventType.EXPERIMENT_PROPOSE_FAILED,
+                justification=f"propose step failed: {error}",
+                payload={"error": type(error).__name__},
+            )
+        )
+
     def _record_proposal(
         self,
         setup: CampaignSetup,
@@ -162,6 +181,7 @@ class CampaignRunner:
         result: CommitResult,
         rationale: str,
     ) -> None:
+        """Record a proper experiment proposal"""
         self.record_event(
             Event(
                 campaign_id=setup.campaign_id,
