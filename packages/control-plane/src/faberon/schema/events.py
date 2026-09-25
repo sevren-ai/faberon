@@ -18,6 +18,7 @@ class EventType(StrEnum):
 
     CAMPAIGN_CREATED = "campaign.created"
     CAMPAIGN_ENDED = "campaign.ended"
+    CAMPAIGN_CRASHED = "campaign.crashed"
     CANCEL_REQUESTED = "campaign.cancel_requested"
     EXPERIMENT_PROPOSED = "experiment.proposed"
     EXPERIMENT_PROPOSE_FAILED = "experiment.propose_failed"
@@ -32,6 +33,7 @@ class StopReason(StrEnum):
     CANCELLED = "cancelled"
     BUDGET_EXHAUSTED = "budget_exhausted"
     MAX_EXPERIMENTS = "max_experiments"
+    ERROR = "error"
 
 
 class Event(BaseModel):

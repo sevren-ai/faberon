@@ -17,6 +17,9 @@ from .proposer import ExperimentProposer
 from .runtime import Runtime
 from .tree import CommitResult, commit_file, reset_hard
 
+# Consecutive propose-step failures that end the campaign
+MAX_PROP_FAILS = 5
+
 
 def _gpu_hours(info: JobInfo, gpus: int) -> float:
     """GPU-hours burned by one terminal job"""
@@ -82,78 +85,72 @@ class CampaignRunner:
         """
         plan = setup.plan
         repo = Path(setup.repo_path)
-        experiments_done = 0
-        gpu_hours_burned = 0.0
+        exp_done = 0
+        gpu_h = 0.0
         best_metric: float | None = None
+        prop_fails = 0
 
-        while True:
-            # One check site, in precedence order: cancel, budget, cap.
-            if self._cancel_received():
-                self._end(
-                    setup,
-                    StopReason.CANCELLED,
-                    experiments_done,
-                    gpu_hours_burned,
-                    actor=Actor.HUMAN,
+        try:
+            while True:
+                # One check site, in precedence order: cancel, budget, cap.
+                if self._cancel_received():
+                    reason = StopReason.CANCELLED
+                    self._end(setup, reason, exp_done, gpu_h, actor=Actor.HUMAN)
+                    return reason.value
+                if gpu_h >= plan.budget_gpu_hours and exp_done > 0:
+                    self._end(setup, StopReason.BUDGET_EXHAUSTED, exp_done, gpu_h)
+                    return StopReason.BUDGET_EXHAUSTED.value
+                if exp_done >= plan.max_experiments:
+                    self._end(setup, StopReason.MAX_EXPERIMENTS, exp_done, gpu_h)
+                    return StopReason.MAX_EXPERIMENTS.value
+
+                current = self.read_target_step(repo, setup.target_file)
+                try:
+                    proposal = self.propose_step(setup, current)
+                except (TimeoutError, AgentRunError) as e:
+                    # AgentRunError covers recoverable model-side failures.
+                    # Record a failed proposal, then loop back.
+                    # Stop looping after max consecutive propose failures.
+                    self._record_propose_failure(setup, e)
+                    prop_fails += 1
+                    if prop_fails >= MAX_PROP_FAILS:
+                        self._end(setup, StopReason.ERROR, exp_done, gpu_h)
+                        return StopReason.ERROR.value
+                    continue
+                # From here on, we know the propose step succeeded
+                prop_fails = 0
+                exp_done += 1
+                self.write_target_step(repo, setup.target_file, proposal.content)
+                summary = proposal.rationale.splitlines()[0].strip()[:60].rstrip()
+                commit_msg = f"exp {exp_done}: {summary}"
+                result = self.commit_step(repo, setup.target_file, commit_msg)
+                self._record_proposal(setup, exp_done, result, proposal.rationale)
+
+                exp = ExperimentSetup(
+                    campaign_id=setup.campaign_id,
+                    command=setup.command,
+                    submission_key=f"{setup.campaign_id}:{exp_done}",
+                    metric_command=plan.metric_command,
+                    metric_name=plan.metric_name,
+                    baseline=best_metric if best_metric is not None else plan.baseline,
+                    poll_interval_seconds=setup.poll_interval_seconds,
+                    walltime=plan.walltime,
+                    index=exp_done,
+                    sha=result.sha,
                 )
-                return StopReason.CANCELLED.value
-            if gpu_hours_burned >= plan.budget_gpu_hours and experiments_done > 0:
-                self._end(
-                    setup,
-                    StopReason.BUDGET_EXHAUSTED,
-                    experiments_done,
-                    gpu_hours_burned,
-                )
-                return StopReason.BUDGET_EXHAUSTED.value
-            if experiments_done >= plan.max_experiments:
-                self._end(
-                    setup,
-                    StopReason.MAX_EXPERIMENTS,
-                    experiments_done,
-                    gpu_hours_burned,
-                )
-                return StopReason.MAX_EXPERIMENTS.value
+                outcome = self.runtime.run_experiment(exp)
 
-            current = self.read_target_step(repo, setup.target_file)
-            try:
-                proposal = self.propose_step(setup, current)
-            except (TimeoutError, AgentRunError) as e:
-                # AgentRunError covers recoverable model-side failures.
-                # Record a failed proposal, then loop back.
-                self._record_propose_failure(setup, e)
-                continue
-            experiments_done += 1
-            self.write_target_step(repo, setup.target_file, proposal.content)
-            summary = proposal.rationale.splitlines()[0].strip()[:60].rstrip()
-            commit_msg = f"exp {experiments_done}: {summary}"
-            result = self.commit_step(repo, setup.target_file, commit_msg)
-            self._record_proposal(
-                setup,
-                experiments_done,
-                result,
-                proposal.rationale,
-            )
-
-            setup_one = ExperimentSetup(
-                campaign_id=setup.campaign_id,
-                command=setup.command,
-                submission_key=f"{setup.campaign_id}:{experiments_done}",
-                metric_command=plan.metric_command,
-                metric_name=plan.metric_name,
-                baseline=best_metric if best_metric is not None else plan.baseline,
-                poll_interval_seconds=setup.poll_interval_seconds,
-                walltime=plan.walltime,
-                index=experiments_done,
-                sha=result.sha,
-            )
-            outcome = self.runtime.run_experiment(setup_one)
-
-            if outcome.job_info.state.is_terminal:
-                gpu_hours_burned += _gpu_hours(outcome.job_info, self.gpus)
-            if outcome.judgment == "keep":
-                best_metric = outcome.metric_value
-            else:
-                self.discard_step(repo, result.parent_sha)
+                if outcome.job_info.state.is_terminal:
+                    gpu_h += _gpu_hours(outcome.job_info, self.gpus)
+                if outcome.judgment == "keep":
+                    best_metric = outcome.metric_value
+                else:
+                    self.discard_step(repo, result.parent_sha)
+        except Exception as e:
+            # Record the crash, then let the workflow fail so DBOS marks it ERROR
+            self._record_crash(setup, e)
+            self._end(setup, StopReason.ERROR, exp_done, gpu_h)
+            raise
 
     # -- helpers --
 
@@ -170,6 +167,18 @@ class CampaignRunner:
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_PROPOSE_FAILED,
                 justification=f"propose step failed: {error}",
+                payload={"error": type(error).__name__},
+            )
+        )
+
+    def _record_crash(self, setup: CampaignSetup, error: Exception) -> None:
+        """Record an unhandled loop exception that ends the campaign."""
+        self.record_event(
+            Event(
+                campaign_id=setup.campaign_id,
+                actor=Actor.AGENT,
+                type=EventType.CAMPAIGN_CRASHED,
+                justification=f"campaign crashed: {type(error).__name__}: {error}",
                 payload={"error": type(error).__name__},
             )
         )
@@ -200,8 +209,8 @@ class CampaignRunner:
         self,
         setup: CampaignSetup,
         reason: StopReason,
-        experiments_done: int,
-        gpu_hours_burned: float,
+        exp_done: int,
+        gpu_h: float,
         actor: Actor = Actor.AGENT,
     ) -> None:
         """Record the campaign-end event."""
@@ -213,8 +222,8 @@ class CampaignRunner:
                 justification=f"campaign ended: {reason.value}",
                 payload={
                     "stop_reason": reason,
-                    "experiments_done": experiments_done,
-                    "gpu_hours_burned": gpu_hours_burned,
+                    "experiments_done": exp_done,
+                    "gpu_hours_burned": gpu_h,
                 },
             )
         )
