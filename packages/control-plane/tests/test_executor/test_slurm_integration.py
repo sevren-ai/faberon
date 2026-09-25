@@ -13,6 +13,7 @@ is parsed correctly.
 """
 
 import os
+import subprocess
 import time
 import uuid
 
@@ -37,6 +38,19 @@ def executor(tmp_path) -> SlurmExecutor:
     )
 
 
+def _raw_slurm_state(job_id: str) -> str:
+    """Best-effort diagnostic: what squeue/sacct report for the job right now."""
+    squeue = subprocess.run(
+        ["squeue", "-h", "-j", job_id, "-o", "%T"], capture_output=True, text=True
+    ).stdout.strip()
+    sacct = subprocess.run(
+        ["sacct", "-X", "-j", job_id, "-P", "-o", "State,ExitCode,ElapsedRaw", "-n"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    return f"squeue={squeue!r} sacct={sacct!r}"
+
+
 def _wait_for_terminal(executor: SlurmExecutor, job_id: str) -> JobState:
     """Poll until the job reaches a terminal state, or time out."""
     deadline = time.monotonic() + _POLL_DEADLINE_S
@@ -45,7 +59,10 @@ def _wait_for_terminal(executor: SlurmExecutor, job_id: str) -> JobState:
         if info.state in (JobState.COMPLETED, JobState.FAILED, JobState.CANCELLED):
             return info.state
         time.sleep(_POLL_INTERVAL_S)
-    raise AssertionError(f"job {job_id} did not finish within {_POLL_DEADLINE_S}s")
+    raise AssertionError(
+        f"job {job_id} did not finish within {_POLL_DEADLINE_S}s; "
+        f"{_raw_slurm_state(job_id)}"
+    )
 
 
 def _request(command: list[str], key: str) -> SubmitRequest:
