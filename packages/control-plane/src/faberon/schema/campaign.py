@@ -16,6 +16,11 @@ class CampaignStatus(StrEnum):
     ENDED = "ended"
     DIED = "died"
 
+    @property
+    def is_active(self) -> bool:
+        """Only an active campaign still owns its repo and blocks a new one."""
+        return self is CampaignStatus.ACTIVE
+
 
 class Campaign(BaseModel):
     """A campaign row: the anchor record for one research loop."""

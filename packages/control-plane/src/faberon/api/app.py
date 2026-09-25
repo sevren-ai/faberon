@@ -20,9 +20,15 @@ from .. import __version__
 from ..executor import Executor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
-from ..schema.campaign import Campaign
+from ..schema.campaign import CampaignInfo
 from ..schema.events import Actor, Event, EventType
-from ..workflow import AgentProposer, CampaignRunner, CampaignSetup, Runtime
+from ..workflow import (
+    AgentProposer,
+    CampaignRunner,
+    CampaignSetup,
+    Runtime,
+    get_campaign_info,
+)
 from .models import CampaignCreate, CampaignCreated, CancelCampaign
 
 _HEALTHZ_PATH = "/healthz"
@@ -164,14 +170,14 @@ def _register_routes(app: FastAPI) -> None:
         if existing is None:
             # One active campaign per repo: a second one would interleave
             # commits on the same checkout.
-            active = ledger.active_campaign_on_repo(body.repo_path)
-            if active is not None:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        f"repo already has an active campaign: {active.campaign_id}"
-                    ),
-                )
+            for other in ledger.campaigns_on_repo(body.repo_path):
+                if get_campaign_info(ledger, other).status.is_active:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"repo already has an active campaign: {other.campaign_id}"
+                        ),
+                    )
 
         setup = CampaignSetup(
             campaign_id=campaign_id,
