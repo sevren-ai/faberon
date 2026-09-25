@@ -119,7 +119,10 @@ def test_get_campaign(api: ApiFixture):
 
     response = api.client.get(f"/v0/campaigns/{body['campaign_id']}")
     assert response.status_code == 200
-    campaign = response.json()
+    info = response.json()
+    assert info["status"] == "ended"
+    assert info["stop_reason"] == "max_experiments"
+    campaign = info["campaign"]
     assert campaign["campaign_id"] == body["campaign_id"]
     assert campaign["plan"]["goal"] == body["plan"]["goal"]
     assert "created_at" in campaign
@@ -138,7 +141,8 @@ def test_list_campaigns(api: ApiFixture):
     response = api.client.get("/v0/campaigns")
     assert response.status_code == 200
     campaigns = response.json()
-    assert [c["campaign_id"] for c in campaigns] == ids
+    assert [c["campaign"]["campaign_id"] for c in campaigns] == ids
+    assert {c["status"] for c in campaigns} == {"ended"}
 
 
 def test_get_unknown_campaign(api: ApiFixture):
@@ -246,6 +250,11 @@ def test_second_campaign_rejected(tmp_path, repo):
             json=_create_body(str(metric), str(uuid.uuid4()), str(repo)),
         )
         assert first.status_code == 201
+
+        # The running campaign reads active.
+        info = client.get(f"/v0/campaigns/{first.json()['campaign_id']}").json()
+        assert info["status"] == "active"
+        assert info["stop_reason"] is None
 
         conflict = client.post(
             "/v0/campaigns",
