@@ -301,7 +301,7 @@ def test_campaign_ends_max_propose_failure(dbos, repo, tmp_path):
 
 
 def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
-    """A UserError is not a recoverable model turn: it kills the campaign."""
+    """A UserError kills the campaign and records a terminal 'error' event."""
 
     class BrokenProposer(FakeProposer):
         def propose(
@@ -319,8 +319,9 @@ def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
     )
     DBOS.register_instance(runtime)
     runner = CampaignRunner(runtime, proposer=BrokenProposer())
+    campaign_id = uuid.uuid4()
     setup = CampaignSetup(
-        campaign_id=uuid.uuid4(),
+        campaign_id=campaign_id,
         plan=make_plan(max_experiments=1),
         command=["true"],
         poll_interval_seconds=0.05,
@@ -331,6 +332,15 @@ def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
 
     with pytest.raises(UserError):
         runner.run_campaign(setup)
+
+    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    events = list(ledger.tail(campaign_id))
+    ledger.close()
+    crashed = next(e for e in events if e.type == EventType.CAMPAIGN_CRASHED)
+    assert crashed.payload["error"] == "UserError"
+    assert "bad model string" in crashed.justification
+    ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
+    assert ended.payload["stop_reason"] == "error"
 
 
 def test_campaign_stops_on_budget(dbos, repo, tmp_path):
