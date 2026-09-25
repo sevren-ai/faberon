@@ -192,9 +192,9 @@ def _register_routes(app: FastAPI) -> None:
         )
 
     @app.get("/v0/campaigns")
-    def list_campaigns() -> list[Campaign]:
+    def list_campaigns() -> list[CampaignInfo]:
         ledger: Ledger = app.state.ledger
-        return ledger.list_campaigns()
+        return [get_campaign_info(ledger, c) for c in ledger.list_campaigns()]
 
     @app.post("/v0/campaigns/{campaign_id}/cancel", status_code=202)
     def cancel_campaign(campaign_id: UUID, body: CancelCampaign) -> dict[str, str]:
@@ -217,12 +217,12 @@ def _register_routes(app: FastAPI) -> None:
         return {"campaign_id": str(campaign_id), "status": "cancel requested"}
 
     @app.get("/v0/campaigns/{campaign_id}")
-    def get_campaign(campaign_id: UUID) -> Campaign:
+    def get_campaign(campaign_id: UUID) -> CampaignInfo:
         ledger: Ledger = app.state.ledger
         campaign = ledger.get_campaign(campaign_id)
         if campaign is None:
             raise HTTPException(status_code=404, detail="campaign not found")
-        return campaign
+        return get_campaign_info(ledger, campaign)
 
     @app.get("/v0/campaigns/{campaign_id}/events")
     async def stream_events(
