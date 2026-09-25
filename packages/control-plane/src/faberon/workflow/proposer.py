@@ -1,17 +1,24 @@
 """Pydantic AI proposer for single-file experiments."""
 
 import ast
+import contextvars
 import os
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models import Model, infer_model
+from pydantic_ai.settings import ModelSettings
 
 from ..schema.events import Event
 from ..schema.plan import ResearchPlan
 from .models import Proposal
+
+# Default proposer timeout (seconds). Overridable with FABERON_PROPOSER_TIMEOUT
+DEFAULT_TIMEOUT = 600.0
 
 
 class CampaignEventReader(Protocol):
@@ -51,9 +58,16 @@ class AgentProposer:
         "commit message. The replacement must differ from the current file."
     )
 
-    def __init__(self, events: CampaignEventReader, model: Model) -> None:
+    def __init__(
+        self,
+        events: CampaignEventReader,
+        model: Model,
+        *,
+        timeout: float = DEFAULT_TIMEOUT,
+    ) -> None:
         self._events = events
         self._model = model
+        self._timeout = timeout
         self._agent: Agent[ProposalContext, Proposal] = Agent(
             deps_type=ProposalContext,
             output_type=Proposal,
@@ -88,7 +102,8 @@ class AgentProposer:
         name = os.environ.get("FABERON_MODEL", "").strip()
         if not name:
             raise RuntimeError("FABERON_MODEL is not set")
-        return cls(events, infer_model(name))
+        timeout = float(os.environ.get("FABERON_PROPOSER_TIMEOUT", DEFAULT_TIMEOUT))
+        return cls(events, infer_model(name), timeout=timeout)
 
     def propose(
         self,
@@ -96,7 +111,10 @@ class AgentProposer:
         plan: ResearchPlan,
         current_content: str,
     ) -> Proposal:
-        """Propose one replacement using the plan and current campaign state."""
+        """Propose one replacement using the plan and current campaign state.
+
+        Raises ``TimeoutError`` after ``timeout`` seconds.
+        """
         prompt = (
             f"Goal: {plan.goal}\n"
             f"Metric: {plan.metric_name} (lower is better)\n"
@@ -105,13 +123,51 @@ class AgentProposer:
             f"{current_content}\n"
             "</target_file>"
         )
-        result = self._agent.run_sync(
-            prompt,
-            model=self._model,
-            deps=ProposalContext(
-                events=self._events,
-                campaign_id=campaign_id,
-                current_content=current_content,
+        # Two layers of timeout.
+        # 1. Via the model client's HTTP request (some providers ignore it)
+        # 2. _run_with_timeout raises TimeoutError on expiry
+        # A timed-out call keeps running on the daemon thread until its HTTP layer gives
+        # up, but never blocks the caller or process shutdown.
+        return _run_with_timeout(
+            self._timeout,
+            lambda: (
+                self._agent.run_sync(
+                    prompt,
+                    model=self._model,
+                    model_settings=ModelSettings(timeout=self._timeout),
+                    deps=ProposalContext(
+                        events=self._events,
+                        campaign_id=campaign_id,
+                        current_content=current_content,
+                    ),
+                ).output
             ),
         )
-        return result.output
+
+
+def _run_with_timeout(timeout: float, call: Callable[[], Proposal]) -> Proposal:
+    """Run the call on a daemon thread, returning its result within the bound.
+
+    Raises ``TimeoutError`` on expiry. Re-raises any exception the call
+    raised. The thread is a daemon, so a call that outlives the timeout does
+    not block process shutdown.
+    """
+    result: list[Proposal] = []
+    error: list[BaseException] = []
+    # Propagate context to the worker thread
+    ctx = contextvars.copy_context()
+
+    def target() -> None:
+        try:
+            result.append(ctx.run(call))
+        except BaseException as e:  # propagate to the joining thread
+            error.append(e)
+
+    thread = threading.Thread(target=target, daemon=True)
+    thread.start()
+    thread.join(timeout)
+    if thread.is_alive():
+        raise TimeoutError(f"proposer call exceeded {timeout} seconds")
+    if error:
+        raise error[0]
+    return result[0]
