@@ -13,6 +13,7 @@ from faberon.ledger import Ledger
 from faberon.schema.events import EventType, StopReason
 from faberon.schema.plan import ResearchPlan
 from faberon.workflow import CampaignRunner, CampaignSetup, Runtime
+from faberon.workflow.campaign import MAX_PROP_FAILS
 from faberon.workflow.models import Proposal
 
 from .._fakes import FakeExecutor, FakeProposer
@@ -251,6 +252,52 @@ def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
     assert [e.payload["index"] for e in proposed] == [1, 2]
     ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
     assert ended.payload["experiments_done"] == 2
+
+
+def test_campaign_ends_max_propose_failure(dbos, repo, tmp_path):
+    """A proposer that fails on every call ends the campaign with 'error'."""
+
+    class AlwaysFailProposer(FakeProposer):
+        def propose(
+            self,
+            campaign_id: uuid.UUID,
+            plan: ResearchPlan,
+            current_content: str,
+        ) -> Proposal:
+            raise TimeoutError("proposer call exceeded 600 seconds")
+
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(runtime, proposer=AlwaysFailProposer())
+    campaign_id = uuid.uuid4()
+    setup = CampaignSetup(
+        campaign_id=campaign_id,
+        plan=make_plan(),
+        command=["true"],
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        target_file="train.py",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.ERROR.value
+    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    events = list(ledger.tail(campaign_id))
+    ledger.close()
+    ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
+    assert ended.payload["stop_reason"] == "error"
+    assert ended.payload["experiments_done"] == 0
+    failed = [e for e in events if e.type == EventType.EXPERIMENT_PROPOSE_FAILED]
+    assert len(failed) == MAX_PROP_FAILS
+    # No experiment ever ran: no proposals, no submissions.
+    assert not [e for e in events if e.type == EventType.EXPERIMENT_PROPOSED]
+    assert not [e for e in events if e.type == EventType.EXPERIMENT_SUBMITTED]
 
 
 def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
