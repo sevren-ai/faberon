@@ -34,6 +34,10 @@ from .models import CampaignCreate, CampaignCreated, CancelCampaign
 _HEALTHZ_PATH = "/healthz"
 RequestResponseEndpoint = Callable[[StarletteRequest], Awaitable[Response]]
 
+# How long uvicorn waits before cancelling open connections at shutdown, such
+# as an SSE stream. This would otherwise deadlock.
+GRACEFUL_SHUTDOWN_TIMEOUT = 5
+
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):
     """Reject requests missing the expected bearer token."""
