@@ -20,9 +20,15 @@ from .. import __version__
 from ..executor import Executor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
-from ..schema.campaign import Campaign
+from ..schema.campaign import CampaignInfo
 from ..schema.events import Actor, Event, EventType
-from ..workflow import AgentProposer, CampaignRunner, CampaignSetup, Runtime
+from ..workflow import (
+    AgentProposer,
+    CampaignRunner,
+    CampaignSetup,
+    Runtime,
+    get_campaign_info,
+)
 from .models import CampaignCreate, CampaignCreated, CancelCampaign
 
 _HEALTHZ_PATH = "/healthz"
@@ -164,14 +170,14 @@ def _register_routes(app: FastAPI) -> None:
         if existing is None:
             # One active campaign per repo: a second one would interleave
             # commits on the same checkout.
-            active = ledger.active_campaign_on_repo(body.repo_path)
-            if active is not None:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        f"repo already has an active campaign: {active.campaign_id}"
-                    ),
-                )
+            for other in ledger.campaigns_on_repo(body.repo_path):
+                if get_campaign_info(ledger, other).status.is_active:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"repo already has an active campaign: {other.campaign_id}"
+                        ),
+                    )
 
         setup = CampaignSetup(
             campaign_id=campaign_id,
@@ -192,9 +198,9 @@ def _register_routes(app: FastAPI) -> None:
         )
 
     @app.get("/v0/campaigns")
-    def list_campaigns() -> list[Campaign]:
+    def list_campaigns() -> list[CampaignInfo]:
         ledger: Ledger = app.state.ledger
-        return ledger.list_campaigns()
+        return [get_campaign_info(ledger, c) for c in ledger.list_campaigns()]
 
     @app.post("/v0/campaigns/{campaign_id}/cancel", status_code=202)
     def cancel_campaign(campaign_id: UUID, body: CancelCampaign) -> dict[str, str]:
@@ -217,12 +223,12 @@ def _register_routes(app: FastAPI) -> None:
         return {"campaign_id": str(campaign_id), "status": "cancel requested"}
 
     @app.get("/v0/campaigns/{campaign_id}")
-    def get_campaign(campaign_id: UUID) -> Campaign:
+    def get_campaign(campaign_id: UUID) -> CampaignInfo:
         ledger: Ledger = app.state.ledger
         campaign = ledger.get_campaign(campaign_id)
         if campaign is None:
             raise HTTPException(status_code=404, detail="campaign not found")
-        return campaign
+        return get_campaign_info(ledger, campaign)
 
     @app.get("/v0/campaigns/{campaign_id}/events")
     async def stream_events(
