@@ -302,6 +302,9 @@ class LiveServer:
     executor: FakeExecutor
     metric_path: str
     repo_path: str
+    server: uvicorn.Server
+    thread: threading.Thread
+    shutdown_timeout: int
 
 
 @pytest.fixture
@@ -323,7 +326,15 @@ def live_server(tmp_path, repo) -> Iterator[LiveServer]:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
 
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    # A short graceful-shutdown window keeps the test fast
+    shutdown_timeout = 2
+    config = uvicorn.Config(
+        app,
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
+        timeout_graceful_shutdown=shutdown_timeout,
+    )
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -338,6 +349,9 @@ def live_server(tmp_path, repo) -> Iterator[LiveServer]:
         executor=executor,
         metric_path=str(metric),
         repo_path=str(repo),
+        server=server,
+        thread=thread,
+        shutdown_timeout=shutdown_timeout,
     )
 
     server.should_exit = True
@@ -384,3 +398,25 @@ def test_events_stream_resume(live_server: LiveServer):
         )
         assert not any("campaign.created" in e for e in replayed)
         assert any(campaign_id in e for e in replayed)
+
+
+def test_shutdown_with_sse_stream(live_server: LiveServer):
+    """The server stops on should_exit even with an SSE stream held open"""
+    camp_id = str(uuid.uuid4())
+    with httpx2.Client(base_url=live_server.base_url, timeout=10.0) as client:
+        response = client.post(
+            "/v0/campaigns",
+            json=_create_body(live_server.metric_path, camp_id, live_server.repo_path),
+        )
+        assert response.status_code == 201
+        campaign_id = response.json()["campaign_id"]
+        DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+        # Open a stream and keep it open across the shutdown. The server stops
+        # after the graceful-shutdown window plus a small teardown margin.
+        with client.stream("GET", f"/v0/campaigns/{campaign_id}/events"):
+            live_server.server.should_exit = True
+            live_server.thread.join(timeout=live_server.shutdown_timeout + 5)
+            assert not live_server.thread.is_alive(), (
+                "server did not stop with an SSE stream attached"
+            )
