@@ -41,6 +41,9 @@ class FakeProposer:
             rationale=f"test proposal {self.proposal_count}",
         )
 
+    def close(self) -> None:
+        """No-op stand-in for ``AgentProposer.close``"""
+
 
 class FakeExecutor:
     """In-memory executor: fixed status on first poll, counts submissions."""
