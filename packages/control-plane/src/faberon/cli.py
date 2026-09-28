@@ -4,7 +4,7 @@ import os
 
 import uvicorn
 
-from .api.app import create_app_slurm
+from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_slurm
 
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8000
@@ -20,4 +20,10 @@ def main() -> None:
     """
     host = os.environ.get("FABERON_HOST", _DEFAULT_HOST)
     port = int(os.environ.get("FABERON_PORT", str(_DEFAULT_PORT)))
-    uvicorn.run(create_app_slurm, host=host, port=port, factory=True)
+    uvicorn.run(
+        create_app_slurm,
+        host=host,
+        port=port,
+        factory=True,
+        timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_TIMEOUT,
+    )
