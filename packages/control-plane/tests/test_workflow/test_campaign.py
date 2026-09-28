@@ -78,7 +78,8 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     assert types.count(EventType.EXPERIMENT_JUDGED) == plan.max_experiments
     assert types.count(EventType.CAMPAIGN_ENDED) == 1
     proposed = next(e for e in events if e.type == EventType.EXPERIMENT_PROPOSED)
-    assert proposed.justification == "test proposal 1"
+    assert proposed.justification == "rationale for test proposal 1"
+    assert proposed.payload["title"] == "test proposal 1"
     # completed/judged carry the same index and sha as their proposal.
     proposed_by_index = {
         e.payload["index"]: e.payload["sha"]
@@ -95,7 +96,7 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
 
 
 def test_campaign_commit_msg(dbos, repo, tmp_path):
-    """Experiment commits are titled ``exp N: <first rationale line>``."""
+    """Experiment commits are titled ``exp N: <proposal title>``."""
     # One metric file per job id, each better than the last, so both
     # experiments keep and their commits stay on the branch.
     (tmp_path / "metric-fake-1.txt").write_text("val_bpb: 1.10\n")
@@ -138,54 +139,10 @@ def test_campaign_commit_msg(dbos, repo, tmp_path):
     assert log[1] == "exp 1: test proposal 1"
 
 
-def test_campaign_commit_msg_truncates(dbos, repo, tmp_path):
-    """A verbose first rationale line is truncated to a bounded title."""
-
-    class VerboseProposer(FakeProposer):
-        def propose(
-            self,
-            campaign_id: uuid.UUID,
-            plan: ResearchPlan,
-            current_content: str,
-        ) -> Proposal:
-            proposal = super().propose(campaign_id, plan, current_content)
-            proposal.rationale = "x" * 120
-            return proposal
-
-    # Keep the experiment so its commit stays on the branch.
-    metric_file = tmp_path / "metric.txt"
-    metric_file.write_text("val_bpb: 1.10\n")
-    runtime = Runtime(
-        FakeExecutor(),
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
-        config_name=f"campaign-{uuid.uuid4().hex}",
-    )
-    DBOS.register_instance(runtime)
-    runner = CampaignRunner(runtime, proposer=VerboseProposer())
-    setup = CampaignSetup(
-        campaign_id=uuid.uuid4(),
-        plan=make_plan(
-            metric_command=f"cat {metric_file}",
-            max_experiments=1,
-        ),
-        command=["true"],
-        poll_interval_seconds=0.05,
-        repo_path=str(repo),
-        target_file="train.py",
-    )
-    DBOS.launch()
-
-    stop_reason = runner.run_campaign(setup)
-
-    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
-    title = subprocess.run(
-        ["git", "log", "-1", "--format=%s"],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    assert title == f"exp 1: {'x' * 60}"
+def test_proposal_title_max_length():
+    """A title over 55 characters is rejected at the model boundary."""
+    with pytest.raises(ValidationError):
+        Proposal(content="print('x')\n", title="x" * 56, rationale="a rationale")
 
 
 def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
