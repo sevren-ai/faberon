@@ -1,6 +1,6 @@
 [project]
 name = "faberon"
-version = "0.2.1"
+version = "0.2.2"
 description = "Faberon: Autonomous ML Research Harness"
 requires-python = ">=3.14"
 license = { text = "MIT" }
