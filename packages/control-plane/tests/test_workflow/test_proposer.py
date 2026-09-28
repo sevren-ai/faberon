@@ -10,7 +10,7 @@ from pydantic_ai.models.test import TestModel
 
 from faberon.schema.events import Actor, Event, EventType
 from faberon.workflow import AgentProposer, Proposal
-from faberon.workflow.proposer import _run_with_timeout
+from faberon.workflow.proposer import _ProposerLoop, _run_with_timeout
 
 from .._fakes import FakeEvents
 from ..conftest import make_plan
@@ -54,12 +54,16 @@ def test_proposer():
         }
     )
 
-    with capture_run_messages() as messages:
-        proposal = AgentProposer(events, model).propose(
-            campaign_id,
-            make_plan(),
-            "print('baseline')\n",
-        )
+    proposer = AgentProposer(events, model)
+    try:
+        with capture_run_messages() as messages:
+            proposal = proposer.propose(
+                campaign_id,
+                make_plan(),
+                "print('baseline')\n",
+            )
+    finally:
+        proposer.close()
     # Ensure we're getting a correctly typed output object back
     assert proposal == Proposal(
         content=dummy_output,
@@ -91,12 +95,16 @@ def test_proposer_rejects_unchanged():
         }
     )
 
-    with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
-        AgentProposer(FakeEvents(), model).propose(
-            uuid.uuid4(),
-            make_plan(),
-            content,
-        )
+    proposer = AgentProposer(FakeEvents(), model)
+    try:
+        with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
+            proposer.propose(
+                uuid.uuid4(),
+                make_plan(),
+                content,
+            )
+    finally:
+        proposer.close()
 
 
 def test_proposer_rejects_unparseable():
@@ -109,12 +117,16 @@ def test_proposer_rejects_unparseable():
         }
     )
 
-    with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
-        AgentProposer(FakeEvents(), model).propose(
-            uuid.uuid4(),
-            make_plan(),
-            "print('baseline')\n",
-        )
+    proposer = AgentProposer(FakeEvents(), model)
+    try:
+        with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
+            proposer.propose(
+                uuid.uuid4(),
+                make_plan(),
+                "print('baseline')\n",
+            )
+    finally:
+        proposer.close()
 
 
 def test_proposer_requires_model(monkeypatch):
@@ -124,23 +136,39 @@ def test_proposer_requires_model(monkeypatch):
         AgentProposer.from_env(FakeEvents())
 
 
+async def _value(proposal: Proposal) -> Proposal:
+    return proposal
+
+
 def test_run_with_timeout_returns():
-    proposal = Proposal(content="print('x')\n", rationale="r")
-    assert _run_with_timeout(5.0, lambda: proposal) == proposal
+    loop = _ProposerLoop()
+    try:
+        proposal = Proposal(content="print('x')\n", rationale="r")
+        assert _run_with_timeout(loop, 5.0, lambda: _value(proposal)) == proposal
+    finally:
+        loop.close()
 
 
 def test_run_with_timeout_raises():
-    def hang() -> Proposal:
+    async def hang() -> Proposal:
         time.sleep(60)
         raise AssertionError("a timed-out call must not return")
 
-    with pytest.raises(TimeoutError, match="exceeded"):
-        _run_with_timeout(0.1, hang)
+    loop = _ProposerLoop()
+    try:
+        with pytest.raises(TimeoutError, match="exceeded"):
+            _run_with_timeout(loop, 0.1, hang)
+    finally:
+        loop.close()
 
 
 def test_run_with_timeout_reraises():
-    def boom() -> Proposal:
+    async def boom() -> Proposal:
         raise ValueError("model broke")
 
-    with pytest.raises(ValueError, match="model broke"):
-        _run_with_timeout(5.0, boom)
+    loop = _ProposerLoop()
+    try:
+        with pytest.raises(ValueError, match="model broke"):
+            _run_with_timeout(loop, 5.0, boom)
+    finally:
+        loop.close()
