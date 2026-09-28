@@ -99,7 +99,11 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         assert db_url is not None
         original_recovery = dbos._recovery.startup_recovery_thread
-        no_recover = os.environ.get("FABERON_NO_RECOVER", "").lower() in ("1", "true", "yes")
+        no_recover = os.environ.get("FABERON_NO_RECOVER", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
         if no_recover:
             # Serve the API without resuming pending workflows, so the
             # operator can inspect and resume campaigns one by one.
@@ -267,14 +271,10 @@ def _register_routes(app: FastAPI) -> None:
         info = get_campaign_info(ledger, campaign)
         if info.status == CampaignStatus.ENDED:
             raise HTTPException(
-                status_code=409,
-                detail=f"Campaign already ended ({info.stop_reason})"
+                status_code=409, detail=f"Campaign already ended ({info.stop_reason})"
             )
         if info.status == CampaignStatus.DIED:
-            raise HTTPException(
-                status_code=409,
-                detail="Campaign workflow has died"
-            )
+            raise HTTPException(status_code=409, detail="Campaign workflow has died")
         setup = _rebuild_setup(campaign)
         with SetWorkflowID(campaign.workflow_id):
             DBOS.start_workflow(runner.run_campaign, setup)
