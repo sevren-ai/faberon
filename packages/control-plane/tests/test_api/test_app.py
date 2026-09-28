@@ -232,6 +232,30 @@ def test_create_campaign_idempotent(api: ApiFixture):
     assert types.count(EventType.CAMPAIGN_CREATED) == 1
 
 
+def test_resume_pending_campaign(api: ApiFixture):
+    """Resume replays a pending campaign from its checkpoints, exactly once."""
+    executor = api.executor
+    assert isinstance(executor, FakeExecutor)
+    # Park the campaign mid-poll: the job stays RUNNING, the workflow PENDING.
+    executor._state = JobState.RUNNING
+    camp_id = str(uuid.uuid4())
+    created = api.client.post(
+        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
+    )
+    assert created.status_code == 201
+    workflow_id = created.json()["workflow_id"]
+
+    # Resume from the parked state. The workflow was already started by POST
+    # /v0/campaigns, so resume re-attaches without resubmitting.
+    executor._state = JobState.COMPLETED
+    resumed = api.client.post(f"/v0/campaigns/{camp_id}/resume")
+    assert resumed.status_code == 202
+    result = DBOS.retrieve_workflow(workflow_id).get_result()
+    assert result == "max_experiments"
+    # Exactly-once: resume did not resubmit the parked first job.
+    assert executor.submit_count == 3
+
+
 def test_second_campaign_rejected(tmp_path, repo):
     """While one campaign is active on a repo, a second one is rejected."""
     DBOS.destroy()
@@ -294,6 +318,25 @@ def test_no_conflict_with_ended_campaigns(api: ApiFixture):
         json=_create_body(api.metric_path, str(uuid.uuid4()), api.repo_path),
     )
     assert second.status_code == 201
+
+
+def test_resume_ended_campaign_rejected(api: ApiFixture):
+    response = api.client.post(
+        "/v0/campaigns",
+        json=_create_body(api.metric_path, str(uuid.uuid4()), api.repo_path),
+    )
+    assert response.status_code == 201
+    campaign_id = response.json()["campaign_id"]
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+    assert api.client.get(f"/v0/campaigns/{campaign_id}").json()["status"] == "ended"
+
+    resumed = api.client.post(f"/v0/campaigns/{campaign_id}/resume")
+    assert resumed.status_code == 409
+
+
+def test_resume_unknown_campaign(api: ApiFixture):
+    unknown = "00000000-0000-0000-0000-000000000042"
+    assert api.client.post(f"/v0/campaigns/{unknown}/resume").status_code == 404
 
 
 @dataclass

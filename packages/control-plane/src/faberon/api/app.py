@@ -256,6 +256,30 @@ def _register_routes(app: FastAPI) -> None:
         DBOS.send(str(campaign_id), "cancel", "cancel")
         return {"campaign_id": str(campaign_id), "status": "cancel requested"}
 
+    @app.post("/v0/campaigns/{campaign_id}/resume", status_code=202)
+    def resume_campaign(campaign_id: UUID) -> dict[str, str]:
+        """Resume a PENDING campaign's workflow from its last checkpoint."""
+        runner: CampaignRunner = app.state.runner
+        ledger: Ledger = app.state.ledger
+        campaign = ledger.get_campaign(campaign_id)
+        if campaign is None:
+            raise HTTPException(status_code=404, detail="campaign not found")
+        info = get_campaign_info(ledger, campaign)
+        if info.status == CampaignStatus.ENDED:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Campaign already ended ({info.stop_reason})"
+            )
+        if info.status == CampaignStatus.DIED:
+            raise HTTPException(
+                status_code=409,
+                detail="Campaign workflow has died"
+            )
+        setup = _rebuild_setup(campaign)
+        with SetWorkflowID(campaign.workflow_id):
+            DBOS.start_workflow(runner.run_campaign, setup)
+        return {"campaign_id": str(campaign_id), "status": "resume requested"}
+
     @app.get("/v0/campaigns/{campaign_id}")
     def get_campaign(campaign_id: UUID) -> CampaignInfo:
         ledger: Ledger = app.state.ledger
