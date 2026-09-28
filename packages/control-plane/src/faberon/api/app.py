@@ -113,10 +113,8 @@ def create_app(
             )
         ledger = Ledger(db_url)
         runtime = Runtime(executor, ledger, config_name=config_name)
-        runner = CampaignRunner(
-            runtime,
-            proposer=AgentProposer.from_env(ledger),
-        )
+        proposer = AgentProposer.from_env(ledger)
+        runner = CampaignRunner(runtime, proposer=proposer)
         DBOS.register_instance(runtime)
         DBOS.register_instance(runner)
         DBOS.launch()
@@ -137,6 +135,7 @@ def create_app(
             stop_sse.set()
             sse_pool.shutdown(wait=False, cancel_futures=True)
             DBOS.destroy()
+            proposer.close()
             ledger.close()
 
     middleware = (

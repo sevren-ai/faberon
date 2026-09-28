@@ -1,10 +1,12 @@
 """Pydantic AI proposer for single-file experiments."""
 
 import ast
+import asyncio
 import contextvars
 import os
 import threading
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
@@ -48,7 +50,11 @@ class ProposalContext:
 
 
 class AgentProposer:
-    """Runs the experiment proposer against the configured model."""
+    """Runs the experiment proposer against the configured model.
+
+    All agent runs execute on one dedicated worker loop. Creating the
+    proposer starts the thread; call ``close()`` at shutdown.
+    """
 
     _prompt = (
         "Propose one focused ML experiment. Read the target file and the "
@@ -68,6 +74,7 @@ class AgentProposer:
         self._events = events
         self._model = model
         self._timeout = timeout
+        self._loop = _ProposerLoop()
         self._agent: Agent[ProposalContext, Proposal] = Agent(
             deps_type=ProposalContext,
             output_type=Proposal,
@@ -125,49 +132,75 @@ class AgentProposer:
         )
         # Two layers of timeout.
         # 1. Via the model client's HTTP request (some providers ignore it)
-        # 2. _run_with_timeout raises TimeoutError on expiry
-        # A timed-out call keeps running on the daemon thread until its HTTP layer gives
-        # up, but never blocks the caller or process shutdown.
-        return _run_with_timeout(
+        # 2. _run_with_timeout cancels the run and raises TimeoutError
+        result = _run_with_timeout(
+            self._loop,
             self._timeout,
-            lambda: (
-                self._agent.run_sync(
-                    prompt,
-                    model=self._model,
-                    model_settings=ModelSettings(timeout=self._timeout),
-                    deps=ProposalContext(
-                        events=self._events,
-                        campaign_id=campaign_id,
-                        current_content=current_content,
-                    ),
-                ).output
+            lambda: self._agent.run(
+                prompt,
+                model=self._model,
+                model_settings=ModelSettings(timeout=self._timeout),
+                deps=ProposalContext(
+                    events=self._events,
+                    campaign_id=campaign_id,
+                    current_content=current_content,
+                ),
             ),
         )
+        return result.output
+
+    def close(self) -> None:
+        """Shut the worker loop down. The proposer must not be used after."""
+        self._loop.close()
 
 
-def _run_with_timeout(timeout: float, call: Callable[[], Proposal]) -> Proposal:
-    """Run the call on a daemon thread, returning its result within the bound.
+class _ProposerLoop:
+    """One event loop on one daemon thread, driving the agent's coroutines."""
 
-    Raises ``TimeoutError`` on expiry. Re-raises any exception the call
-    raised. The thread is a daemon, so a call that outlives the timeout does
-    not block process shutdown.
+    def __init__(self) -> None:
+        self._ready = threading.Event()
+        self._closed = False
+        self._thread = threading.Thread(
+            target=self._run, name="faberon-proposer", daemon=True
+        )
+        self._thread.start()
+        self._ready.wait()
+
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        return self._loop
+
+    def _run(self) -> None:
+        self._loop = asyncio.new_event_loop()
+        self._ready.set()
+        self._loop.run_forever()
+        self._loop.close()
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self._thread.join()
+
+
+def _run_with_timeout[T](
+    loop: _ProposerLoop, timeout: float, call: Callable[[], Awaitable[T]]
+) -> T:
+    """Run the call on the worker loop, returning its result within the bound.
+
+    ``call`` is invoked on the loop and its awaitable awaited there. On
+    timeout the in-flight call is cancelled and ``TimeoutError`` is raised.
     """
-    result: list[Proposal] = []
-    error: list[BaseException] = []
     # Propagate context to the worker thread
     ctx = contextvars.copy_context()
 
-    def target() -> None:
-        try:
-            result.append(ctx.run(call))
-        except BaseException as e:  # propagate to the joining thread
-            error.append(e)
+    async def run() -> T:
+        return await ctx.run(call)
 
-    thread = threading.Thread(target=target, daemon=True)
-    thread.start()
-    thread.join(timeout)
-    if thread.is_alive():
-        raise TimeoutError(f"proposer call exceeded {timeout} seconds")
-    if error:
-        raise error[0]
-    return result[0]
+    future = asyncio.run_coroutine_threadsafe(run(), loop.loop)
+    try:
+        return future.result(timeout)
+    except FuturesTimeoutError:
+        future.cancel()
+        raise TimeoutError(f"proposer call exceeded {timeout} seconds") from None
