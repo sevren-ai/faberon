@@ -79,21 +79,23 @@ def test_get_campaign(ledger):
     camp_id = uuid.uuid4()
     assert ledger.get_campaign(camp_id) is None
     plan = make_plan()
-    ledger.create_campaign(camp_id, str(camp_id), plan, "/repo/a")
+    ledger.create_campaign(camp_id, str(camp_id), plan, ["true"], "/repo/a", 30.0)
     campaign = ledger.get_campaign(camp_id)
     assert campaign is not None
     assert campaign.campaign_id == camp_id
     assert campaign.workflow_id == str(camp_id)
     assert campaign.plan == plan
+    assert campaign.command == ["true"]
     assert campaign.repo_path == "/repo/a"
+    assert campaign.poll_interval_seconds == 30.0
 
 
 def test_list_campaigns(ledger):
     assert ledger.list_campaigns() == []
     camp_a = uuid.uuid4()
     camp_b = uuid.uuid4()
-    ledger.create_campaign(camp_a, str(camp_a), make_plan(), "/repo/a")
-    ledger.create_campaign(camp_b, str(camp_b), make_plan(), "/repo/b")
+    ledger.create_campaign(camp_a, str(camp_a), make_plan(), ["true"], "/repo/a", 30.0)
+    ledger.create_campaign(camp_b, str(camp_b), make_plan(), ["true"], "/repo/b", 30.0)
     campaigns = ledger.list_campaigns()
     assert [c.campaign_id for c in campaigns] == [camp_a, camp_b]
 
@@ -101,8 +103,14 @@ def test_list_campaigns(ledger):
 def test_create_campaign_idempotent(ledger):
     camp_id = uuid.uuid4()
     plan = make_plan()
-    assert ledger.create_campaign(camp_id, str(camp_id), plan, "/repo/a") is True
-    assert ledger.create_campaign(camp_id, str(camp_id), plan, "/repo/a") is False
+    assert (
+        ledger.create_campaign(camp_id, str(camp_id), plan, ["true"], "/repo/a", 30.0)
+        is True
+    )
+    assert (
+        ledger.create_campaign(camp_id, str(camp_id), plan, ["true"], "/repo/a", 30.0)
+        is False
+    )
     events = list(ledger.tail(camp_id))
     assert len(events) == 1
     assert events[0].type == EventType.CAMPAIGN_CREATED
@@ -113,7 +121,7 @@ def test_campaigns_on_repo(ledger):
     assert ledger.campaigns_on_repo(repo) == []
 
     camp_id = uuid.uuid4()
-    ledger.create_campaign(camp_id, str(camp_id), make_plan(), repo)
+    ledger.create_campaign(camp_id, str(camp_id), make_plan(), ["true"], repo, 30.0)
     # A different repo is not affected.
     assert ledger.campaigns_on_repo("/repo/other") == []
     campaigns = ledger.campaigns_on_repo(repo)

@@ -1,12 +1,14 @@
 """FastAPI application factory and routes."""
 
 import asyncio
+import logging
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from uuid import UUID
 
+import dbos._recovery
 from dbos import DBOS, DBOSConfig, SetWorkflowID
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware import Middleware
@@ -20,7 +22,7 @@ from .. import __version__
 from ..executor import Executor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
-from ..schema.campaign import CampaignInfo
+from ..schema.campaign import Campaign, CampaignInfo, CampaignStatus
 from ..schema.events import Actor, Event, EventType
 from ..workflow import (
     AgentProposer,
@@ -37,6 +39,17 @@ RequestResponseEndpoint = Callable[[StarletteRequest], Awaitable[Response]]
 # How long uvicorn waits before cancelling open connections at shutdown, such
 # as an SSE stream. This would otherwise deadlock.
 GRACEFUL_SHUTDOWN_TIMEOUT = 5
+
+
+def _rebuild_setup(campaign: Campaign) -> CampaignSetup:
+    """Reconstruct the campaign's original inputs from its ledger row."""
+    return CampaignSetup(
+        campaign_id=campaign.campaign_id,
+        plan=campaign.plan,
+        command=campaign.command,
+        repo_path=campaign.repo_path,
+        poll_interval_seconds=campaign.poll_interval_seconds,
+    )
 
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):
@@ -85,6 +98,19 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         assert db_url is not None
+        original_recovery = dbos._recovery.startup_recovery_thread
+        no_recover = os.environ.get("FABERON_NO_RECOVER", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if no_recover:
+            # Serve the API without resuming pending workflows, so the
+            # operator can inspect and resume campaigns one by one.
+            dbos._recovery.startup_recovery_thread = lambda *a, **k: None  # type: ignore
+            logging.getLogger(__name__).info(
+                "FABERON_NO_RECOVER set: not resuming pending workflows at launch"
+            )
         ledger = Ledger(db_url)
         runtime = Runtime(executor, ledger, config_name=config_name)
         runner = CampaignRunner(
@@ -107,6 +133,7 @@ def create_app(
         try:
             yield
         finally:
+            dbos._recovery.startup_recovery_thread = original_recovery
             stop_sse.set()
             sse_pool.shutdown(wait=False, cancel_futures=True)
             DBOS.destroy()
@@ -195,7 +222,14 @@ def _register_routes(app: FastAPI) -> None:
         # existing campaign instead of creating a new one.
         with SetWorkflowID(workflow_id):
             handle = DBOS.start_workflow(runner.run_campaign, setup)
-        ledger.create_campaign(campaign_id, workflow_id, body.plan, body.repo_path)
+        ledger.create_campaign(
+            campaign_id,
+            workflow_id,
+            body.plan,
+            body.command,
+            body.repo_path,
+            body.poll_interval_seconds,
+        )
         return CampaignCreated(
             campaign_id=campaign_id,
             workflow_id=handle.workflow_id,
@@ -225,6 +259,26 @@ def _register_routes(app: FastAPI) -> None:
         )
         DBOS.send(str(campaign_id), "cancel", "cancel")
         return {"campaign_id": str(campaign_id), "status": "cancel requested"}
+
+    @app.post("/v0/campaigns/{campaign_id}/resume", status_code=202)
+    def resume_campaign(campaign_id: UUID) -> dict[str, str]:
+        """Resume a PENDING campaign's workflow from its last checkpoint."""
+        runner: CampaignRunner = app.state.runner
+        ledger: Ledger = app.state.ledger
+        campaign = ledger.get_campaign(campaign_id)
+        if campaign is None:
+            raise HTTPException(status_code=404, detail="campaign not found")
+        info = get_campaign_info(ledger, campaign)
+        if info.status == CampaignStatus.ENDED:
+            raise HTTPException(
+                status_code=409, detail=f"Campaign already ended ({info.stop_reason})"
+            )
+        if info.status == CampaignStatus.DIED:
+            raise HTTPException(status_code=409, detail="Campaign workflow has died")
+        setup = _rebuild_setup(campaign)
+        with SetWorkflowID(campaign.workflow_id):
+            DBOS.start_workflow(runner.run_campaign, setup)
+        return {"campaign_id": str(campaign_id), "status": "resume requested"}
 
     @app.get("/v0/campaigns/{campaign_id}")
     def get_campaign(campaign_id: UUID) -> CampaignInfo:

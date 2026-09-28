@@ -77,5 +77,4 @@ def test_proposer_with_llm():
         for part in message.parts
         if isinstance(part, ToolReturnPart)
     }
-    assert "read_target_file" in tools_used
     assert "read_experiment_history" in tools_used

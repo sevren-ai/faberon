@@ -111,6 +111,7 @@ Optional deployment-side knobs:
 - `FABERON_SLURM_MAX_TIME`: walltime cap in minutes. Each job's walltime comes from its campaign plan; this cap can only lower it, never raise it. Set it to protect the cluster from runaway jobs.
 - `FABERON_SLURM_OUTPUT`: Slurm `--output` path for job stdout/stderr.
 - `FABERON_PROPOSER_TIMEOUT`: timeout in seconds for one proposer LLM call. On expiry the call fails. Defaults to 600 if not set.
+- `FABERON_NO_RECOVER`: when set (`1`, `true`, `yes`), the control plane serves the API without resuming pending campaign workflows at startup. See "Safe restart and recovery" below.
 
 You can generate a random token with:
 
@@ -138,6 +139,35 @@ All `/v0/*` routes require `Authorization: Bearer $FABERON_API_TOKEN`.
 - `POST /v0/campaigns`: accept a plan + command, append `campaign.created`, start the campaign workflow
 - `GET /v0/campaigns`: list all campaign records, oldest first
 - `POST /v0/campaigns/{id}/cancel`: append `cancel.requested`, signal the workflow to stop at its next decision boundary
+- `POST /v0/campaigns/{id}/resume`: resume a pending campaign's workflow from its last checkpoint
 - `GET /v0/campaigns/{id}`: the campaign record (plan, workflow ID, creation time)
 - `GET /v0/campaigns/{id}/events?after=0`: SSE ledger tail for that campaign
 - `GET /v0/campaigns/{id}/events.jsonl?after=0`: bounded snapshot, one JSON event per line
+
+## Safe restart and recovery
+
+By default the control plane resumes every pending campaign workflow at startup (DBOS recovery). If a recovered workflow is what destabilized the cluster, that becomes a crash loop: recover, resubmit, kill, repeat.
+
+To break the loop, start in no-recover mode:
+
+```bash
+FABERON_NO_RECOVER=1 faberon
+```
+
+The API serves normally, but no workflow resumes at boot. Inspect campaigns and act on them one by one:
+
+```bash
+# list campaigns with their live status (active / ended / died)
+curl -H "Authorization: Bearer $FABERON_API_TOKEN" http://127.0.0.1:8000/v0/campaigns
+
+# resume one pending campaign from its last checkpoint
+curl -X POST -H "Authorization: Bearer $FABERON_API_TOKEN" \
+  http://127.0.0.1:8000/v0/campaigns/<id>/resume
+
+# or cancel one you do not want to run again
+curl -X POST -H "Authorization: Bearer $FABERON_API_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"justification": "..."}' \
+  http://127.0.0.1:8000/v0/campaigns/<id>/cancel
+```
+
+`resume` replays the campaign from its last DBOS checkpoint; it does not resubmit a job already submitted. A campaign whose workflow ended or died cannot be resumed in place: start a new campaign seeded from its best metric and head sha, which are recorded in the ledger.
