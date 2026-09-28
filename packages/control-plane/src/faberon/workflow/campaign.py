@@ -121,10 +121,9 @@ class CampaignRunner:
                 prop_fails = 0
                 exp_done += 1
                 self.write_target_step(repo, setup.target_file, proposal.content)
-                summary = proposal.rationale.splitlines()[0].strip()[:60].rstrip()
-                commit_msg = f"exp {exp_done}: {summary}"
+                commit_msg = f"exp {exp_done}: {proposal.title}"
                 result = self.commit_step(repo, setup.target_file, commit_msg)
-                self._record_proposal(setup, exp_done, result, proposal.rationale)
+                self._record_proposal(setup, exp_done, result, proposal)
 
                 exp = ExperimentSetup(
                     campaign_id=setup.campaign_id,
@@ -188,7 +187,7 @@ class CampaignRunner:
         setup: CampaignSetup,
         index: int,
         result: CommitResult,
-        rationale: str,
+        proposal: Proposal,
     ) -> None:
         """Record a proper experiment proposal"""
         self.record_event(
@@ -196,8 +195,9 @@ class CampaignRunner:
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_PROPOSED,
-                justification=rationale,
+                justification=proposal.rationale,
                 payload={
+                    "title": proposal.title,
                     "sha": result.sha,
                     "parent_sha": result.parent_sha,
                     "index": index,
