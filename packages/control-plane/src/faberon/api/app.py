@@ -195,7 +195,14 @@ def _register_routes(app: FastAPI) -> None:
         # existing campaign instead of creating a new one.
         with SetWorkflowID(workflow_id):
             handle = DBOS.start_workflow(runner.run_campaign, setup)
-        ledger.create_campaign(campaign_id, workflow_id, body.plan, body.repo_path)
+        ledger.create_campaign(
+            campaign_id,
+            workflow_id,
+            body.plan,
+            body.command,
+            body.repo_path,
+            body.poll_interval_seconds,
+        )
         return CampaignCreated(
             campaign_id=campaign_id,
             workflow_id=handle.workflow_id,
