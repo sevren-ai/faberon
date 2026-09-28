@@ -7,6 +7,7 @@ from collections.abc import Iterator
 
 import pytest
 from dbos import DBOS, DBOSConfig
+from pydantic import ValidationError
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, UserError
 
 from faberon.ledger import Ledger
