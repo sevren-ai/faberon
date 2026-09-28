@@ -59,9 +59,11 @@ class AgentProposer:
     _prompt = (
         "Propose one focused ML experiment. Read the target file and the "
         "campaign history before deciding. Return the complete replacement "
-        "file and a concise rationale. Start the rationale with a one-line "
-        "summary of the change, at most 55 characters; it becomes the git "
-        "commit message. The replacement must differ from the current file."
+        "file, a title, and a rationale. The title is a one-line summary of "
+        "the change, at most 55 characters; it becomes the git commit "
+        "message. The rationale is a paragraph explaining the hypothesis, "
+        "what changed relative to prior runs, and what each outcome would "
+        "tell us. The replacement must differ from the current file."
     )
 
     def __init__(

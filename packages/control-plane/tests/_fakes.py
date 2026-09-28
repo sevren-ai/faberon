@@ -38,7 +38,8 @@ class FakeProposer:
         self.proposal_count += 1
         return Proposal(
             content=current_content + f"# experiment {self.proposal_count}\n",
-            rationale=f"test proposal {self.proposal_count}",
+            title=f"test proposal {self.proposal_count}",
+            rationale=f"rationale for test proposal {self.proposal_count}",
         )
 
     def close(self) -> None:

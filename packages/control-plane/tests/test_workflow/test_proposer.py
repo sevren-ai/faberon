@@ -46,10 +46,12 @@ def test_proposer():
     events = FakeEvents([proposed, *judged, other_campaign])
     # dummy model
     dummy_output = "print('new experiment')\n"
+    dummy_title = "Lower learning rate"
     dummy_rationale = "Try a smaller learning rate."
     model = TestModel(
         custom_output_args={
             "content": dummy_output,
+            "title": dummy_title,
             "rationale": dummy_rationale,
         }
     )
@@ -67,6 +69,7 @@ def test_proposer():
     # Ensure we're getting a correctly typed output object back
     assert proposal == Proposal(
         content=dummy_output,
+        title=dummy_title,
         rationale=dummy_rationale,
     )
     # Ensure that the model used the correct tools
@@ -91,6 +94,7 @@ def test_proposer_rejects_unchanged():
     model = TestModel(
         custom_output_args={
             "content": content,
+            "title": "No change",
             "rationale": "No change.",
         }
     )
@@ -113,6 +117,7 @@ def test_proposer_rejects_unparseable():
     model = TestModel(
         custom_output_args={
             "content": "def train( nope\n",
+            "title": "Broken Python",
             "rationale": "Broken Python.",
         }
     )
@@ -143,7 +148,9 @@ async def _value(proposal: Proposal) -> Proposal:
 def test_run_with_timeout_returns():
     loop = _ProposerLoop()
     try:
-        proposal = Proposal(content="print('x')\n", rationale="r")
+        proposal = Proposal(
+            content="print('x')\n", title="a title", rationale="a rationale"
+        )
         assert _run_with_timeout(loop, 5.0, lambda: _value(proposal)) == proposal
     finally:
         loop.close()
