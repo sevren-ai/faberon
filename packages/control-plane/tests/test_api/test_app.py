@@ -304,10 +304,12 @@ def test_no_conflict_with_ended_campaigns(api: ApiFixture):
         json=_create_body(api.metric_path, str(uuid.uuid4()), api.repo_path),
     )
     assert first.status_code == 201
-
-    # End the first event
-    DBOS.retrieve_workflow(first.json()["workflow_id"]).get_result()
     first_id = first.json()["campaign_id"]
+
+    # End the first campaign; the workflow completes and frees the repo.
+    DBOS.retrieve_workflow(first.json()["workflow_id"]).get_result()
+    info = api.client.get(f"/v0/campaigns/{first_id}").json()
+    assert info["status"] == "ended"
     events = api.client.get(f"/v0/campaigns/{first_id}/events.jsonl")
     types = [json.loads(line)["type"] for line in events.text.splitlines()]
     assert EventType.CAMPAIGN_ENDED in types
