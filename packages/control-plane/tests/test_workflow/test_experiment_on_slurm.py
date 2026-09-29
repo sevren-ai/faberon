@@ -19,7 +19,7 @@ from dbos import DBOS, DBOSConfig
 
 from faberon.executor.slurm import SlurmExecutor
 from faberon.ledger import Ledger
-from faberon.schema.events import EventType
+from faberon.schema import EventType
 from faberon.workflow import ExperimentSetup, Runtime
 
 pytestmark = [pytest.mark.postgres, pytest.mark.slurm]

@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
-from faberon.schema.plan import ResearchPlan
+from faberon.schema import ResearchPlan
 
 TEST_DB_NAME = "faberon_test"
 

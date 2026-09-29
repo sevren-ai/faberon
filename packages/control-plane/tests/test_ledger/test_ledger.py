@@ -7,7 +7,7 @@ from collections.abc import Iterator
 import pytest
 
 from faberon.ledger import Ledger
-from faberon.schema.events import Actor, Event, EventType
+from faberon.schema import Actor, Event, EventType
 
 from ..conftest import make_plan
 

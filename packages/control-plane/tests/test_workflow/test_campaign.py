@@ -11,8 +11,7 @@ from pydantic import ValidationError
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, UserError
 
 from faberon.ledger import Ledger
-from faberon.schema.events import EventType, StopReason
-from faberon.schema.plan import ResearchPlan
+from faberon.schema import EventType, ResearchPlan, StopReason
 from faberon.workflow import CampaignRunner, CampaignSetup, Runtime
 from faberon.workflow.campaign import MAX_PROP_FAILS
 from faberon.workflow.models import Proposal

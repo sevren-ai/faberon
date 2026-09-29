@@ -22,7 +22,7 @@ from uuid import UUID
 import pytest
 
 from faberon.ledger import Ledger
-from faberon.schema.events import EventType
+from faberon.schema import EventType
 
 from ..._fakes import FakeFileExecutor
 

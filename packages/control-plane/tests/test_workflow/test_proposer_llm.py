@@ -6,7 +6,7 @@ import uuid
 import pytest
 from pydantic_ai import ToolReturnPart, capture_run_messages
 
-from faberon.schema.events import Actor, Event, EventType
+from faberon.schema import Actor, Event, EventType
 from faberon.workflow import AgentProposer, Proposal
 
 from .._fakes import FakeEvents
