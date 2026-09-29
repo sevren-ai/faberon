@@ -3,6 +3,8 @@
 These enum values are persisted in Postgres ledger rows, so renames must
 be deliberate as they can break existing campaigns.
 When adding a new value, the dict here needs to be extended as well.
+If a rename ever is deliberate, it needs an 'UPDATE events SET type = ...'
+migration shipped with the release.
 """
 
 from faberon.schema import Actor, CampaignStatus, EventType, StopReason
