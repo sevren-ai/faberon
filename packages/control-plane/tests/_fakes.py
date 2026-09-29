@@ -6,8 +6,7 @@ import tempfile
 from uuid import UUID
 
 from faberon.executor import JobInfo, JobState, SubmitRequest
-from faberon.schema.events import Event
-from faberon.schema.plan import ResearchPlan
+from faberon.schema import Event, ResearchPlan
 from faberon.workflow.models import Proposal
 
 _STATE_FILE = "executor_state.json"

@@ -8,7 +8,7 @@ from pydantic_ai import ToolReturnPart, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.models.test import TestModel
 
-from faberon.schema.events import Actor, Event, EventType
+from faberon.schema import Actor, Event, EventType
 from faberon.workflow import AgentProposer, Proposal
 from faberon.workflow.proposer import _ProposerLoop, _run_with_timeout
 

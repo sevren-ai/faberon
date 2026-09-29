@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 from faberon.api import create_app
 from faberon.executor import JobState
 from faberon.ledger import Ledger
-from faberon.schema.events import EventType
+from faberon.schema import EventType
 from faberon.workflow import AgentProposer
 
 from .._fakes import FakeExecutor, FakeProposer
