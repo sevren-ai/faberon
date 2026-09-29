@@ -105,7 +105,7 @@ class CampaignRunner:
                     return StopReason.MAX_EXPERIMENTS.value
 
                 current = self.read_target_step(repo, setup.target_file)
-                self._record_designing(setup, exp_done + 1)
+                self._record_designing(setup)
                 try:
                     proposal = self.propose_step(setup, current)
                 except (TimeoutError, AgentRunError) as e:
