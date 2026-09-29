@@ -183,15 +183,14 @@ class CampaignRunner:
             )
         )
 
-    def _record_designing(self, setup: CampaignSetup, index: int) -> None:
+    def _record_designing(self, setup: CampaignSetup) -> None:
         """Record the start of the experiment design phase"""
         self.record_event(
             Event(
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_DESIGNING,
-                justification=f"designing experiment {index}",
-                payload={"index": index},
+                justification="designing the next experiment",
             )
         )
 
