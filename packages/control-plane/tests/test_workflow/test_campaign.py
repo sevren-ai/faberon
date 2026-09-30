@@ -76,6 +76,7 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     types = [e.type for e in events]
     assert types.count(EventType.EXPERIMENT_PROPOSED) == plan.max_experiments
     assert types.count(EventType.EXPERIMENT_JUDGED) == plan.max_experiments
+    assert types.count(EventType.EXPERIMENT_DESIGNING) == plan.max_experiments
     assert types.count(EventType.CAMPAIGN_ENDED) == 1
     proposed = next(e for e in events if e.type == EventType.EXPERIMENT_PROPOSED)
     assert proposed.justification == "rationale for test proposal 1"
@@ -194,17 +195,20 @@ def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
     stop_reason = runner.run_campaign(setup)
 
     assert stop_reason == StopReason.MAX_EXPERIMENTS.value
-    # Three failures were skipped, 2 experiments were run succesfully
-    assert proposer.calls == 5
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
     events = list(ledger.tail(setup.campaign_id))
     ledger.close()
+    # started designing 5 times, 3 of which failed
+    assert proposer.calls == 5
+    designed = [e for e in events if e.type == EventType.EXPERIMENT_DESIGNING]
+    assert len(designed) == 5
     failed = [e for e in events if e.type == EventType.EXPERIMENT_PROPOSE_FAILED]
     assert [e.payload["error"] for e in failed] == [
         "TimeoutError",
         "UnexpectedModelBehavior",
         "ModelHTTPError",
     ]
+    # proposed and ran 2 experiments succesfully
     proposed = [e for e in events if e.type == EventType.EXPERIMENT_PROPOSED]
     assert [e.payload["index"] for e in proposed] == [1, 2]
     ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)

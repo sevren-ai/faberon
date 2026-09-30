@@ -105,6 +105,7 @@ class CampaignRunner:
                     return StopReason.MAX_EXPERIMENTS.value
 
                 current = self.read_target_step(repo, setup.target_file)
+                self._record_designing(setup)
                 try:
                     proposal = self.propose_step(setup, current)
                 except (TimeoutError, AgentRunError) as e:
@@ -179,6 +180,17 @@ class CampaignRunner:
                 type=EventType.CAMPAIGN_CRASHED,
                 justification=f"campaign crashed: {type(error).__name__}: {error}",
                 payload={"error": type(error).__name__},
+            )
+        )
+
+    def _record_designing(self, setup: CampaignSetup) -> None:
+        """Record the start of the experiment design phase"""
+        self.record_event(
+            Event(
+                campaign_id=setup.campaign_id,
+                actor=Actor.AGENT,
+                type=EventType.EXPERIMENT_DESIGNING,
+                justification="designing the next experiment",
             )
         )
 
