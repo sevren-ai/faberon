@@ -152,6 +152,78 @@ def test_get_unknown_campaign(api: ApiFixture):
     assert api.client.get(f"/v0/campaigns/{unknown}/events.jsonl").status_code == 404
 
 
+def _inject_body(text: str = "try a cosine schedule") -> dict:
+    return {"text": text, "justification": "operator hunch"}
+
+
+def test_inject_idea(api: ApiFixture):
+    camp_id = str(uuid.uuid4())
+    created = api.client.post(
+        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
+    )
+    assert created.status_code == 201
+
+    response = api.client.post(f"/v0/campaigns/{camp_id}/ideas", json=_inject_body())
+    assert response.status_code == 202
+    assert response.json() == {"campaign_id": camp_id, "status": "idea injected"}
+
+    DBOS.retrieve_workflow(created.json()["workflow_id"]).get_result()
+    events = api.client.get(f"/v0/campaigns/{camp_id}/events.jsonl")
+    ideas = [
+        json.loads(line)
+        for line in events.text.splitlines()
+        if json.loads(line)["type"] == EventType.IDEA_INJECTED
+    ]
+    assert len(ideas) == 1
+    assert ideas[0]["actor"] == "human"
+    assert ideas[0]["justification"] == "operator hunch"
+    assert ideas[0]["payload"]["text"] == "try a cosine schedule"
+    assert ideas[0]["payload"]["source"] == "api"
+
+
+def test_inject_idea_unknown_campaign(api: ApiFixture):
+    unknown = "00000000-0000-0000-0000-000000000099"
+    response = api.client.post(f"/v0/campaigns/{unknown}/ideas", json=_inject_body())
+    assert response.status_code == 404
+
+
+def test_inject_idea_ended_campaign(api: ApiFixture):
+    camp_id = str(uuid.uuid4())
+    created = api.client.post(
+        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
+    )
+    assert created.status_code == 201
+    DBOS.retrieve_workflow(created.json()["workflow_id"]).get_result()
+
+    response = api.client.post(f"/v0/campaigns/{camp_id}/ideas", json=_inject_body())
+    assert response.status_code == 409
+    events = api.client.get(f"/v0/campaigns/{camp_id}/events.jsonl")
+    assert EventType.IDEA_INJECTED not in {
+        json.loads(line)["type"] for line in events.text.splitlines()
+    }
+
+
+def test_inject_idea_requires_justification(api: ApiFixture):
+    camp_id = str(uuid.uuid4())
+    created = api.client.post(
+        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
+    )
+    assert created.status_code == 201
+
+    # Missing justification.
+    response = api.client.post(
+        f"/v0/campaigns/{camp_id}/ideas", json={"text": "try a cosine schedule"}
+    )
+    assert response.status_code == 422
+    # Justification below the audit floor.
+    response = api.client.post(
+        f"/v0/campaigns/{camp_id}/ideas",
+        json={"text": "try a cosine schedule", "justification": "hunch"},
+    )
+    assert response.status_code == 422
+    DBOS.retrieve_workflow(created.json()["workflow_id"]).get_result()
+
+
 def test_events_jsonl(api: ApiFixture):
     camp_id = str(uuid.uuid4())
     other_id = str(uuid.uuid4())
