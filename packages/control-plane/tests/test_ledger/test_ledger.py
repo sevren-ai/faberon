@@ -29,7 +29,7 @@ def _event(**overrides) -> Event:
         campaign_id=overrides.get("campaign_id", uuid.uuid4()),
         actor=overrides.get("actor", Actor.AGENT),
         type=overrides.get("type", EventType.CAMPAIGN_CREATED),
-        justification=overrides.get("justification", "test"),
+        justification=overrides.get("justification", "test event"),
         payload=overrides.get("payload", {}),
     )
 
