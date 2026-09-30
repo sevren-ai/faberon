@@ -31,7 +31,7 @@ from ..workflow import (
     Runtime,
     get_campaign_info,
 )
-from .models import CampaignCreate, CampaignCreated, CancelCampaign
+from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
 
 _HEALTHZ_PATH = "/healthz"
 RequestResponseEndpoint = Callable[[StarletteRequest], Awaitable[Response]]
@@ -267,6 +267,23 @@ def _register_routes(app: FastAPI) -> None:
         )
         DBOS.send(str(campaign_id), "cancel", "cancel")
         return {"campaign_id": str(campaign_id), "status": "cancel requested"}
+
+    @app.post("/v0/campaigns/{campaign_id}/ideas", status_code=202)
+    def inject_idea(campaign_id: UUID, body: InjectIdea) -> dict[str, str]:
+        ledger: Ledger = app.state.ledger
+        # ensure that the campaign is known and active
+        _get_active_campaign(ledger, campaign_id)
+        ledger.append(
+            Event(
+                campaign_id=campaign_id,
+                actor=Actor.HUMAN,
+                type=EventType.IDEA_INJECTED,
+                justification=body.justification,
+                payload={"source": "api", "text": body.text},
+            )
+        )
+        DBOS.send(str(campaign_id), body.text, "idea")
+        return {"campaign_id": str(campaign_id), "status": "idea injected"}
 
     @app.post("/v0/campaigns/{campaign_id}/resume", status_code=202)
     def resume_campaign(campaign_id: UUID) -> dict[str, str]:
