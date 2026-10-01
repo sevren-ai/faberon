@@ -77,3 +77,22 @@ def test_event_justification_accepts_short_text():
         justification="no",
     )
     assert event.justification == "no"
+
+
+def test_format_event():
+    """Terse rendering is one line; verbose appends the payload."""
+    event = Event(
+        campaign_id=uuid4(),
+        actor=Actor.AGENT,
+        type=EventType.EXPERIMENT_JUDGED,
+        justification="metric improved",
+        payload={"judgment": "keep", "metric_value": 1.1},
+    )
+    terse = event.format()
+    assert "experiment.judged" in terse
+    assert "metric improved" in terse
+    assert "keep" not in terse
+    assert "\n" not in terse
+
+    verbose = event.format(verbose=True)
+    assert '"judgment": "keep"' in verbose

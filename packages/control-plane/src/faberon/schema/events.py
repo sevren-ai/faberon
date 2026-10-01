@@ -1,5 +1,6 @@
 """Ledger event record and event type vocabulary."""
 
+import json
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -60,3 +61,12 @@ class Event(BaseModel):
         # Raises ValueError unless the value is a valid StopReason.
         StopReason(self.payload["stop_reason"])
         return self
+
+    def format(self, *, verbose: bool = False) -> str:
+        """Render the event as a human-readable line for display."""
+        ts = self.ts.strftime("%Y-%m-%dT%H:%M:%SZ")
+        line = f"{ts} {self.actor.value:<5} {self.type.value:<28} {self.justification}"
+        if verbose and self.payload:
+            detail = json.dumps(self.payload, default=str)
+            line += f"\n{'':<20} {detail}"
+        return line
