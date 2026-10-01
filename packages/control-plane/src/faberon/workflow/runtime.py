@@ -27,9 +27,7 @@ class Runtime:
         self.config_name = config_name
 
     @DBOS.step()
-    def submit_step(
-        self, command: list[str], submission_key: str, walltime: int
-    ) -> str:
+    def submit_step(self, command: str, submission_key: str, walltime: int) -> str:
         """Start the job on the cluster. Idempotent on submission_key."""
         request = SubmitRequest(
             command=command, submission_key=submission_key, walltime=walltime
