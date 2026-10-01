@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from faberon.schema import (
-    MIN_JUSTIFICATION_LENGTH,
+    MIN_PROSE_LENGTH,
     Actor,
     Event,
     EventType,
@@ -76,12 +76,12 @@ def test_event_justification_min_length():
             campaign_id=uuid4(),
             actor=Actor.AGENT,
             type=EventType.EXPERIMENT_SUBMITTED,
-            justification="x" * (MIN_JUSTIFICATION_LENGTH - 1),
+            justification="x" * (MIN_PROSE_LENGTH - 1),
         )
     event = Event(
         campaign_id=uuid4(),
         actor=Actor.AGENT,
         type=EventType.EXPERIMENT_SUBMITTED,
-        justification="x" * MIN_JUSTIFICATION_LENGTH,
+        justification="x" * MIN_PROSE_LENGTH,
     )
-    assert len(event.justification) == MIN_JUSTIFICATION_LENGTH
+    assert len(event.justification) == MIN_PROSE_LENGTH

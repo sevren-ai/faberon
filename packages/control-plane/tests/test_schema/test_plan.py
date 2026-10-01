@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from faberon.schema import ResearchPlan
+from faberon.schema import MIN_PROSE_LENGTH, ResearchPlan
 
 
 def _minimal_plan(**overrides) -> ResearchPlan:
@@ -31,6 +31,14 @@ def test_plan_round_trip():
 def test_plan_rejects_blank_goal():
     with pytest.raises(ValidationError):
         _minimal_plan(goal="")
+
+
+def test_plan_goal_min_length():
+    """A goal below the prose floor is rejected; one at the floor passes."""
+    with pytest.raises(ValidationError):
+        _minimal_plan(goal="x" * (MIN_PROSE_LENGTH - 1))
+    plan = _minimal_plan(goal="x" * MIN_PROSE_LENGTH)
+    assert len(plan.goal) == MIN_PROSE_LENGTH
 
 
 def test_plan_rejects_non_positive_budget():

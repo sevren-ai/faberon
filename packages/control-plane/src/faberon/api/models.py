@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..schema.events import MIN_JUSTIFICATION_LENGTH
+from ..schema.constants import MIN_PROSE_LENGTH
 from ..schema.plan import ResearchPlan
 
 
@@ -21,14 +21,14 @@ class CampaignCreate(BaseModel):
 class CancelCampaign(BaseModel):
     """POST /v0/campaigns/{id}/cancel body."""
 
-    justification: str = Field(min_length=MIN_JUSTIFICATION_LENGTH)
+    justification: str = Field(min_length=MIN_PROSE_LENGTH)
 
 
 class InjectIdea(BaseModel):
     """POST /v0/campaigns/{id}/ideas body."""
 
     text: str = Field(min_length=1)
-    justification: str = Field(min_length=MIN_JUSTIFICATION_LENGTH)
+    justification: str = Field(min_length=MIN_PROSE_LENGTH)
 
 
 class CampaignCreated(BaseModel):

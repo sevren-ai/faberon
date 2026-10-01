@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ..executor import JobInfo
-from ..schema.events import MIN_JUSTIFICATION_LENGTH
+from ..schema.constants import MIN_PROSE_LENGTH
 from ..schema.plan import ResearchPlan
 
 
@@ -14,7 +14,7 @@ class Proposal(BaseModel):
 
     content: str = Field(min_length=1)
     title: str = Field(min_length=3, max_length=55)
-    rationale: str = Field(min_length=MIN_JUSTIFICATION_LENGTH)
+    rationale: str = Field(min_length=MIN_PROSE_LENGTH)
 
 
 class ExperimentResult(BaseModel):
