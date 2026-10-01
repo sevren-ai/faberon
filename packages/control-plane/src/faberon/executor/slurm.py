@@ -133,7 +133,7 @@ class SlurmExecutor:
             _render_sbatch(
                 job_name,
                 self._account,
-                request.command,
+                request.argv,
                 output=self._output,
                 gpus=self._gpus,
                 time_limit=self._effective_walltime(request),

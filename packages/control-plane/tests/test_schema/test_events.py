@@ -7,7 +7,6 @@ import pytest
 from pydantic import ValidationError
 
 from faberon.schema import (
-    MIN_PROSE_LENGTH,
     Actor,
     Event,
     EventType,
@@ -20,7 +19,7 @@ def test_event_round_trip():
         campaign_id=uuid4(),
         actor=Actor.AGENT,
         type=EventType.CAMPAIGN_ENDED,
-        justification="Reached max_experiments.",
+        reason="Reached max_experiments.",
         payload={"stop_reason": StopReason.MAX_EXPERIMENTS},
     )
     restored = Event.model_validate_json(event.model_dump_json())
@@ -35,7 +34,7 @@ def test_event_ended_stop_reason():
             campaign_id=uuid4(),
             actor=Actor.AGENT,
             type=EventType.CAMPAIGN_ENDED,
-            justification="Reached max_experiments.",
+            reason="Reached max_experiments.",
         )
     # Raises if stop reason is not a valid enum value
     with pytest.raises(ValidationError):
@@ -43,7 +42,7 @@ def test_event_ended_stop_reason():
             campaign_id=uuid4(),
             actor=Actor.AGENT,
             type=EventType.CAMPAIGN_ENDED,
-            justification="Reached max_experiments.",
+            reason="Reached max_experiments.",
             payload={"stop_reason": "not_a_stop_reason"},
         )
 
@@ -52,36 +51,18 @@ def test_event_ended_stop_reason():
         "campaign_id": "00000000-0000-4444-0000-000000000001",
         "actor": Actor.AGENT.value,
         "type": EventType.CAMPAIGN_ENDED.value,
-        "justification": "Budget exhausted.",
+        "reason": "Budget exhausted.",
         "payload": {"stop_reason": StopReason.BUDGET_EXHAUSTED.value},
     }
     event = Event.model_validate_json(json.dumps(raw))
     assert event.payload["stop_reason"] == StopReason.BUDGET_EXHAUSTED
 
 
-def test_event_requires_justification():
+def test_event_requires_reason():
     with pytest.raises(ValidationError):
         Event(
             campaign_id=uuid4(),
             actor=Actor.AGENT,
             type=EventType.EXPERIMENT_SUBMITTED,
-            justification="",
+            reason="",
         )
-
-
-def test_event_justification_min_length():
-    """A justification below the floor is rejected; one at the floor passes."""
-    with pytest.raises(ValidationError):
-        Event(
-            campaign_id=uuid4(),
-            actor=Actor.AGENT,
-            type=EventType.EXPERIMENT_SUBMITTED,
-            justification="x" * (MIN_PROSE_LENGTH - 1),
-        )
-    event = Event(
-        campaign_id=uuid4(),
-        actor=Actor.AGENT,
-        type=EventType.EXPERIMENT_SUBMITTED,
-        justification="x" * MIN_PROSE_LENGTH,
-    )
-    assert len(event.justification) == MIN_PROSE_LENGTH

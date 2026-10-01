@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS events (
     campaign_id   UUID        NOT NULL,
     actor         TEXT        NOT NULL,
     type          TEXT        NOT NULL,
-    justification TEXT        NOT NULL,
+    reason TEXT        NOT NULL,
     payload       JSONB       NOT NULL
 )
 """
@@ -48,7 +48,6 @@ CREATE TABLE IF NOT EXISTS campaigns (
     campaign_id  UUID        PRIMARY KEY,
     workflow_id   TEXT        NOT NULL,
     plan          JSONB       NOT NULL,
-    command       JSONB       NOT NULL,
     repo_path     TEXT        NOT NULL,
     poll_interval_seconds DOUBLE PRECISION NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL
@@ -74,7 +73,7 @@ class Ledger:
         row = self._conn.execute(
             """
             INSERT INTO events
-                (ts, campaign_id, actor, type, justification, payload)
+                (ts, campaign_id, actor, type, reason, payload)
             VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING seq
             """,
@@ -83,7 +82,7 @@ class Ledger:
                 event.campaign_id,
                 event.actor,
                 event.type,
-                event.justification,
+                event.reason,
                 Jsonb(event.payload),
             ),
         ).fetchone()
@@ -96,7 +95,6 @@ class Ledger:
         campaign_id: UUID,
         workflow_id: str,
         plan: ResearchPlan,
-        command: list[str],
         repo_path: str,
         poll_interval_seconds: float,
     ) -> bool:
@@ -110,9 +108,9 @@ class Ledger:
             row = self._conn.execute(
                 """
                 INSERT INTO campaigns
-                    (campaign_id, workflow_id, plan, command, repo_path,
+                    (campaign_id, workflow_id, plan, repo_path,
                      poll_interval_seconds, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (campaign_id) DO NOTHING
                 RETURNING campaign_id
                 """,
@@ -120,7 +118,6 @@ class Ledger:
                     str(campaign_id),
                     workflow_id,
                     Jsonb(plan_json),
-                    Jsonb(command),
                     repo_path,
                     poll_interval_seconds,
                     datetime.now(UTC),
@@ -133,7 +130,7 @@ class Ledger:
                     campaign_id=campaign_id,
                     actor=Actor.HUMAN,
                     type=EventType.CAMPAIGN_CREATED,
-                    justification="plan accepted",
+                    reason="plan accepted",
                     payload=plan_json,
                 )
             )
@@ -143,7 +140,7 @@ class Ledger:
         """Return the campaign row, or None if it does not exist."""
         row = self._conn.execute(
             """
-            SELECT campaign_id, workflow_id, plan, command, repo_path,
+            SELECT campaign_id, workflow_id, plan, repo_path,
                    poll_interval_seconds, created_at
             FROM campaigns
             WHERE campaign_id = %s
@@ -158,7 +155,7 @@ class Ledger:
         """Return all campaigns, oldest first."""
         rows = self._conn.execute(
             """
-            SELECT campaign_id, workflow_id, plan, command, repo_path,
+            SELECT campaign_id, workflow_id, plan, repo_path,
                    poll_interval_seconds, created_at
             FROM campaigns
             ORDER BY created_at
@@ -170,7 +167,7 @@ class Ledger:
         """Return all campaigns targeting ``repo_path``, oldest first."""
         rows = self._conn.execute(
             """
-            SELECT campaign_id, workflow_id, plan, command, repo_path,
+            SELECT campaign_id, workflow_id, plan, repo_path,
                    poll_interval_seconds, created_at
             FROM campaigns
             WHERE repo_path = %s
@@ -188,9 +185,9 @@ class Ledger:
             text(
                 """
                 INSERT INTO events
-                    (ts, campaign_id, actor, type, justification, payload)
+                    (ts, campaign_id, actor, type, reason, payload)
                 VALUES
-                    (:ts, :campaign_id, :actor, :type, :justification,
+                    (:ts, :campaign_id, :actor, :type, :reason,
                      cast(:payload as jsonb))
                 RETURNING seq
                 """
@@ -200,7 +197,7 @@ class Ledger:
                 "campaign_id": str(event.campaign_id),
                 "actor": str(event.actor),
                 "type": str(event.type),
-                "justification": event.justification,
+                "reason": event.reason,
                 "payload": json.dumps(event.payload),
             },
         ).scalar_one()
@@ -210,7 +207,7 @@ class Ledger:
         """Yield one campaign's events with seq > after, in seq order."""
         rows = self._conn.execute(
             """
-            SELECT seq, ts, campaign_id, actor, type, justification, payload
+            SELECT seq, ts, campaign_id, actor, type, reason, payload
             FROM events
             WHERE campaign_id = %s AND seq > %s
             ORDER BY seq
@@ -224,7 +221,7 @@ class Ledger:
         """Return all events for one campaign, in seq order."""
         rows = self._conn.execute(
             """
-            SELECT seq, ts, campaign_id, actor, type, justification, payload
+            SELECT seq, ts, campaign_id, actor, type, reason, payload
             FROM events
             WHERE campaign_id = %s
             ORDER BY seq
@@ -239,10 +236,9 @@ def _row_to_campaign(row: tuple) -> Campaign:
         campaign_id=row[0],
         workflow_id=row[1],
         plan=ResearchPlan.model_validate(row[2]),
-        command=list(row[3]),
-        repo_path=row[4],
-        poll_interval_seconds=float(row[5]),
-        created_at=row[6],
+        repo_path=row[3],
+        poll_interval_seconds=float(row[4]),
+        created_at=row[5],
     )
 
 
@@ -253,6 +249,6 @@ def _row_to_event(row: tuple) -> Event:
         campaign_id=row[2],
         actor=row[3],
         type=row[4],
-        justification=row[5],
+        reason=row[5],
         payload=row[6],
     )

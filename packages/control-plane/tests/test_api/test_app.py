@@ -83,7 +83,6 @@ def _create_body(metric_path: str, campaign_id: str, repo_path: str) -> dict:
     return {
         "campaign_id": campaign_id,
         "plan": plan.model_dump(mode="json"),
-        "command": ["true"],
         "repo_path": repo_path,
         "poll_interval_seconds": 0.05,
     }
@@ -153,7 +152,7 @@ def test_get_unknown_campaign(api: ApiFixture):
 
 
 def _inject_body(text: str = "try a cosine schedule") -> dict:
-    return {"text": text, "justification": "operator hunch"}
+    return {"text": text, "reason": "operator hunch"}
 
 
 def test_inject_idea(api: ApiFixture):
@@ -176,7 +175,7 @@ def test_inject_idea(api: ApiFixture):
     ]
     assert len(ideas) == 1
     assert ideas[0]["actor"] == "human"
-    assert ideas[0]["justification"] == "operator hunch"
+    assert ideas[0]["reason"] == "operator hunch"
     assert ideas[0]["payload"]["text"] == "try a cosine schedule"
     assert ideas[0]["payload"]["source"] == "api"
 
@@ -203,22 +202,22 @@ def test_inject_idea_ended_campaign(api: ApiFixture):
     }
 
 
-def test_inject_idea_requires_justification(api: ApiFixture):
+def test_inject_idea_requires_reason(api: ApiFixture):
     camp_id = str(uuid.uuid4())
     created = api.client.post(
         "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
     )
     assert created.status_code == 201
 
-    # Missing justification.
+    # Missing reason
     response = api.client.post(
         f"/v0/campaigns/{camp_id}/ideas", json={"text": "try a cosine schedule"}
     )
     assert response.status_code == 422
-    # Justification below the audit floor.
+    # Empty reason
     response = api.client.post(
         f"/v0/campaigns/{camp_id}/ideas",
-        json={"text": "try a cosine schedule", "justification": "hunch"},
+        json={"text": "try a cosine schedule", "reason": ""},
     )
     assert response.status_code == 422
     DBOS.retrieve_workflow(created.json()["workflow_id"]).get_result()

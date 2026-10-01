@@ -1,5 +1,6 @@
 """Job executor contract: submit, poll status, cancel."""
 
+import shlex
 from enum import StrEnum
 from typing import Protocol
 
@@ -23,9 +24,14 @@ _TERMINAL_STATES = frozenset((JobState.COMPLETED, JobState.FAILED, JobState.CANC
 class SubmitRequest(BaseModel):
     """Request to start a job."""
 
-    command: list[str] = Field(min_length=1)
+    command: str = Field(min_length=1)
     submission_key: str = Field(min_length=1)
     walltime: int = Field(gt=0)  # in minutes
+
+    @property
+    def argv(self) -> list[str]:
+        """The command as an argument vector."""
+        return shlex.split(self.command)
 
 
 class JobInfo(BaseModel):

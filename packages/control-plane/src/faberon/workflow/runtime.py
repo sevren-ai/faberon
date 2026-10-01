@@ -27,9 +27,7 @@ class Runtime:
         self.config_name = config_name
 
     @DBOS.step()
-    def submit_step(
-        self, command: list[str], submission_key: str, walltime: int
-    ) -> str:
+    def submit_step(self, command: str, submission_key: str, walltime: int) -> str:
         """Start the job on the cluster. Idempotent on submission_key."""
         request = SubmitRequest(
             command=command, submission_key=submission_key, walltime=walltime
@@ -101,7 +99,7 @@ class Runtime:
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_COMPLETED,
-                justification=f"job {job_id} {info.state.value} exit={exit_code_str}",
+                reason=f"job {job_id} {info.state.value} exit={exit_code_str}",
                 payload={
                     "job_id": job_id,
                     "index": setup.index,
@@ -117,7 +115,7 @@ class Runtime:
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_JUDGED,
-                justification=(
+                reason=(
                     f"metric={metric_value_str} baseline={setup.baseline} "
                     f"judgment={judgment}"
                 ),
