@@ -48,7 +48,6 @@ CREATE TABLE IF NOT EXISTS campaigns (
     campaign_id  UUID        PRIMARY KEY,
     workflow_id   TEXT        NOT NULL,
     plan          JSONB       NOT NULL,
-    command       JSONB       NOT NULL,
     repo_path     TEXT        NOT NULL,
     poll_interval_seconds DOUBLE PRECISION NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL
@@ -96,7 +95,6 @@ class Ledger:
         campaign_id: UUID,
         workflow_id: str,
         plan: ResearchPlan,
-        command: list[str],
         repo_path: str,
         poll_interval_seconds: float,
     ) -> bool:
@@ -110,9 +108,9 @@ class Ledger:
             row = self._conn.execute(
                 """
                 INSERT INTO campaigns
-                    (campaign_id, workflow_id, plan, command, repo_path,
+                    (campaign_id, workflow_id, plan, repo_path,
                      poll_interval_seconds, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (campaign_id) DO NOTHING
                 RETURNING campaign_id
                 """,
@@ -120,7 +118,6 @@ class Ledger:
                     str(campaign_id),
                     workflow_id,
                     Jsonb(plan_json),
-                    Jsonb(command),
                     repo_path,
                     poll_interval_seconds,
                     datetime.now(UTC),
@@ -143,7 +140,7 @@ class Ledger:
         """Return the campaign row, or None if it does not exist."""
         row = self._conn.execute(
             """
-            SELECT campaign_id, workflow_id, plan, command, repo_path,
+            SELECT campaign_id, workflow_id, plan, repo_path,
                    poll_interval_seconds, created_at
             FROM campaigns
             WHERE campaign_id = %s
@@ -158,7 +155,7 @@ class Ledger:
         """Return all campaigns, oldest first."""
         rows = self._conn.execute(
             """
-            SELECT campaign_id, workflow_id, plan, command, repo_path,
+            SELECT campaign_id, workflow_id, plan, repo_path,
                    poll_interval_seconds, created_at
             FROM campaigns
             ORDER BY created_at
@@ -170,7 +167,7 @@ class Ledger:
         """Return all campaigns targeting ``repo_path``, oldest first."""
         rows = self._conn.execute(
             """
-            SELECT campaign_id, workflow_id, plan, command, repo_path,
+            SELECT campaign_id, workflow_id, plan, repo_path,
                    poll_interval_seconds, created_at
             FROM campaigns
             WHERE repo_path = %s
@@ -239,10 +236,9 @@ def _row_to_campaign(row: tuple) -> Campaign:
         campaign_id=row[0],
         workflow_id=row[1],
         plan=ResearchPlan.model_validate(row[2]),
-        command=list(row[3]),
-        repo_path=row[4],
-        poll_interval_seconds=float(row[5]),
-        created_at=row[6],
+        repo_path=row[3],
+        poll_interval_seconds=float(row[4]),
+        created_at=row[5],
     )
 
 

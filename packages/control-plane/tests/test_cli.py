@@ -16,22 +16,24 @@ runner = CliRunner()
 
 CAMPAIGN_ID = str(uuid.uuid4())
 
+_PLAN = {
+    "goal": "Beat val_bpb baseline.",
+    "command": "echo hello",
+    "metric_name": "val_bpb",
+    "metric_command": "cat metric.txt",
+    "baseline": 1.42,
+    "budget_gpu_hours": 100.0,
+    "max_experiments": 3,
+    "max_concurrency": 1,
+    "walltime": 10,
+    "stop_conditions": ["n/a"],
+}
+
 _CAMPAIGN_INFO = {
     "campaign": {
         "campaign_id": CAMPAIGN_ID,
         "workflow_id": CAMPAIGN_ID,
-        "plan": {
-            "goal": "Beat val_bpb baseline.",
-            "metric_name": "val_bpb",
-            "metric_command": "cat metric.txt",
-            "baseline": 1.42,
-            "budget_gpu_hours": 100.0,
-            "max_experiments": 3,
-            "max_concurrency": 1,
-            "walltime": 10,
-            "stop_conditions": ["n/a"],
-        },
-        "command": ["true"],
+        "plan": _PLAN,
         "repo_path": "/tmp/my_repo",
         "poll_interval_seconds": 0.05,
         "created_at": "2026-10-01T03:42:22Z",

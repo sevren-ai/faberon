@@ -128,7 +128,7 @@ class CampaignRunner:
 
                 exp = ExperimentSetup(
                     campaign_id=setup.campaign_id,
-                    command=setup.command,
+                    command=plan.command,
                     submission_key=f"{setup.campaign_id}:{exp_done}",
                     metric_command=plan.metric_command,
                     metric_name=plan.metric_name,

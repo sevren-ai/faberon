@@ -3,10 +3,8 @@
 import contextlib
 import json
 import os
-import shlex
 from collections.abc import Iterator
 from datetime import datetime
-from pathlib import Path
 from uuid import UUID, uuid4
 
 import httpx2

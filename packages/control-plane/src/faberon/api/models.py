@@ -12,7 +12,6 @@ class CampaignCreate(BaseModel):
 
     campaign_id: UUID
     plan: ResearchPlan
-    command: list[str] = Field(min_length=1)
     repo_path: str = Field(min_length=1)
     poll_interval_seconds: float = Field(default=30.0, gt=0)
 

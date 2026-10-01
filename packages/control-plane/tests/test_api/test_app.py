@@ -83,7 +83,6 @@ def _create_body(metric_path: str, campaign_id: str, repo_path: str) -> dict:
     return {
         "campaign_id": campaign_id,
         "plan": plan.model_dump(mode="json"),
-        "command": ["true"],
         "repo_path": repo_path,
         "poll_interval_seconds": 0.05,
     }

@@ -60,7 +60,6 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     setup = CampaignSetup(
         campaign_id=uuid.uuid4(),
         plan=plan,
-        command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",
@@ -118,7 +117,6 @@ def test_campaign_commit_msg(dbos, repo, tmp_path):
             metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
             max_experiments=2,
         ),
-        command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",
@@ -185,7 +183,6 @@ def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
             metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
             max_experiments=2,
         ),
-        command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",
@@ -238,7 +235,6 @@ def test_campaign_ends_max_propose_failure(dbos, repo, tmp_path):
     setup = CampaignSetup(
         campaign_id=campaign_id,
         plan=make_plan(),
-        command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",
@@ -284,7 +280,6 @@ def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
     setup = CampaignSetup(
         campaign_id=campaign_id,
         plan=make_plan(max_experiments=1),
-        command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",
@@ -318,7 +313,6 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
     setup = CampaignSetup(
         campaign_id=uuid.uuid4(),
         plan=make_plan(budget_gpu_hours=7.0, max_experiments=10),
-        command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",
@@ -358,7 +352,6 @@ def test_campaign_metric_command_renders_job_id(dbos, repo, tmp_path):
             metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
             max_experiments=1,
         ),
-        command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",
@@ -393,7 +386,6 @@ def test_campaign_ends_on_cancel(dbos, repo):
     setup = CampaignSetup(
         campaign_id=campaign_id,
         plan=make_plan(),
-        command=["true"],
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",

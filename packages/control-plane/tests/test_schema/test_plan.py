@@ -9,6 +9,7 @@ from faberon.schema import MIN_PROSE_LENGTH, ResearchPlan
 def _minimal_plan(**overrides) -> ResearchPlan:
     data = {
         "goal": "Beat the measured val_bpb baseline on autoresearch.",
+        "command": "uv run train.py",
         "metric_name": "val_bpb",
         "metric_command": "uv run train.py --eval-only",
         "baseline": 1.23,
