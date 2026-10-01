@@ -18,7 +18,10 @@ _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8000
 _DEFAULT_API_URL = f"http://{_DEFAULT_HOST}:{_DEFAULT_PORT}"
 
-app = typer.Typer(help="Faberon: run autonomous ML research campaigns.")
+app = typer.Typer(
+    help="Faberon: run autonomous ML research campaigns.",
+    no_args_is_help=True,
+)
 
 
 @contextlib.contextmanager

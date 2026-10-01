@@ -71,6 +71,14 @@ def api_client(monkeypatch: pytest.MonkeyPatch):
     return responses
 
 
+def test_bare_command_shows_help():
+    """Bare `faberon` prints help"""
+    result = runner.invoke(cli.app, [])
+    assert "Usage" in result.output
+    assert "serve" in result.output
+    assert "list" in result.output
+
+
 def test_client_requires_token(monkeypatch: pytest.MonkeyPatch):
     """Without FABERON_API_TOKEN the CLI exits with guidance, not a traceback."""
     monkeypatch.delenv("FABERON_API_TOKEN", raising=False)
