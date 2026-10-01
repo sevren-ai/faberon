@@ -22,7 +22,7 @@ from .. import __version__
 from ..executor import Executor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
-from ..schema.campaign import Campaign, CampaignInfo, CampaignStatus
+from ..schema.campaign import Campaign, CampaignInfo
 from ..schema.events import Actor, Event, EventType
 from ..workflow import (
     AgentProposer,
@@ -31,7 +31,7 @@ from ..workflow import (
     Runtime,
     get_campaign_info,
 )
-from .models import CampaignCreate, CampaignCreated, CancelCampaign
+from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
 
 _HEALTHZ_PATH = "/healthz"
 RequestResponseEndpoint = Callable[[StarletteRequest], Awaitable[Response]]
@@ -50,6 +50,18 @@ def _rebuild_setup(campaign: Campaign) -> CampaignSetup:
         repo_path=campaign.repo_path,
         poll_interval_seconds=campaign.poll_interval_seconds,
     )
+
+
+def _get_active_campaign(ledger: Ledger, campaign_id: UUID) -> Campaign:
+    """Return the campaign row, raising 404 if unknown or 409 if not active."""
+    campaign = ledger.get_campaign(campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="campaign not found")
+    info = get_campaign_info(ledger, campaign)
+    if not info.status.is_active:
+        explanation = f"campaign not active ({info.status.value})"
+        raise HTTPException(status_code=409, detail=explanation)
+    return campaign
 
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):
@@ -242,11 +254,8 @@ def _register_routes(app: FastAPI) -> None:
     @app.post("/v0/campaigns/{campaign_id}/cancel", status_code=202)
     def cancel_campaign(campaign_id: UUID, body: CancelCampaign) -> dict[str, str]:
         ledger: Ledger = app.state.ledger
-        if ledger.get_campaign(campaign_id) is None:
-            raise HTTPException(status_code=404, detail="campaign not found")
-        events = ledger.campaign_events(campaign_id)
-        if any(e.type == EventType.CAMPAIGN_ENDED for e in events):
-            raise HTTPException(status_code=409, detail="campaign already ended")
+        # ensure that the campaign is known and active
+        _get_active_campaign(ledger, campaign_id)
         ledger.append(
             Event(
                 campaign_id=campaign_id,
@@ -259,21 +268,30 @@ def _register_routes(app: FastAPI) -> None:
         DBOS.send(str(campaign_id), "cancel", "cancel")
         return {"campaign_id": str(campaign_id), "status": "cancel requested"}
 
+    @app.post("/v0/campaigns/{campaign_id}/ideas", status_code=202)
+    def inject_idea(campaign_id: UUID, body: InjectIdea) -> dict[str, str]:
+        ledger: Ledger = app.state.ledger
+        # ensure that the campaign is known and active
+        _get_active_campaign(ledger, campaign_id)
+        ledger.append(
+            Event(
+                campaign_id=campaign_id,
+                actor=Actor.HUMAN,
+                type=EventType.IDEA_INJECTED,
+                justification=body.justification,
+                payload={"source": "api", "text": body.text},
+            )
+        )
+        DBOS.send(str(campaign_id), body.text, "idea")
+        return {"campaign_id": str(campaign_id), "status": "idea injected"}
+
     @app.post("/v0/campaigns/{campaign_id}/resume", status_code=202)
     def resume_campaign(campaign_id: UUID) -> dict[str, str]:
         """Resume a PENDING campaign's workflow from its last checkpoint."""
         runner: CampaignRunner = app.state.runner
         ledger: Ledger = app.state.ledger
-        campaign = ledger.get_campaign(campaign_id)
-        if campaign is None:
-            raise HTTPException(status_code=404, detail="campaign not found")
-        info = get_campaign_info(ledger, campaign)
-        if info.status == CampaignStatus.ENDED:
-            raise HTTPException(
-                status_code=409, detail=f"Campaign already ended ({info.stop_reason})"
-            )
-        if info.status == CampaignStatus.DIED:
-            raise HTTPException(status_code=409, detail="Campaign workflow has died")
+        # ensure that the campaign is known and active
+        campaign = _get_active_campaign(ledger, campaign_id)
         setup = _rebuild_setup(campaign)
         with SetWorkflowID(campaign.workflow_id):
             DBOS.start_workflow(runner.run_campaign, setup)

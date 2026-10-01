@@ -24,7 +24,7 @@ def test_proposer():
             campaign_id=campaign_id,
             actor=Actor.AGENT,
             type=EventType.EXPERIMENT_JUDGED,
-            justification=f"result {index}",
+            justification=f"result number {index}",
             payload={"judgment": "keep", "metric_value": index / 10},
         )
         for index in range(12)

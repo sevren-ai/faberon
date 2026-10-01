@@ -6,7 +6,13 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from faberon.schema import Actor, Event, EventType, StopReason
+from faberon.schema import (
+    MIN_JUSTIFICATION_LENGTH,
+    Actor,
+    Event,
+    EventType,
+    StopReason,
+)
 
 
 def test_event_round_trip():
@@ -61,3 +67,21 @@ def test_event_requires_justification():
             type=EventType.EXPERIMENT_SUBMITTED,
             justification="",
         )
+
+
+def test_event_justification_min_length():
+    """A justification below the floor is rejected; one at the floor passes."""
+    with pytest.raises(ValidationError):
+        Event(
+            campaign_id=uuid4(),
+            actor=Actor.AGENT,
+            type=EventType.EXPERIMENT_SUBMITTED,
+            justification="x" * (MIN_JUSTIFICATION_LENGTH - 1),
+        )
+    event = Event(
+        campaign_id=uuid4(),
+        actor=Actor.AGENT,
+        type=EventType.EXPERIMENT_SUBMITTED,
+        justification="x" * MIN_JUSTIFICATION_LENGTH,
+    )
+    assert len(event.justification) == MIN_JUSTIFICATION_LENGTH
