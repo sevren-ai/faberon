@@ -11,7 +11,7 @@ dependencies = [
     "psycopg[binary]>=3.3.5,<4",
     "pydantic>=2.13.5,<3",
     "pydantic-ai-slim[openrouter]>=2.45.0,<3",
-    "typer>=0.20.0,<1",
+    "typer>=0.20.0,<0.28.0",
     "uvicorn>=0.52.4,<1",
 ]
 
