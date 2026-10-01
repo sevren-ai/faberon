@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS events (
     campaign_id   UUID        NOT NULL,
     actor         TEXT        NOT NULL,
     type          TEXT        NOT NULL,
-    justification TEXT        NOT NULL,
+    reason TEXT        NOT NULL,
     payload       JSONB       NOT NULL
 )
 """
@@ -74,7 +74,7 @@ class Ledger:
         row = self._conn.execute(
             """
             INSERT INTO events
-                (ts, campaign_id, actor, type, justification, payload)
+                (ts, campaign_id, actor, type, reason, payload)
             VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING seq
             """,
@@ -83,7 +83,7 @@ class Ledger:
                 event.campaign_id,
                 event.actor,
                 event.type,
-                event.justification,
+                event.reason,
                 Jsonb(event.payload),
             ),
         ).fetchone()
@@ -133,7 +133,7 @@ class Ledger:
                     campaign_id=campaign_id,
                     actor=Actor.HUMAN,
                     type=EventType.CAMPAIGN_CREATED,
-                    justification="plan accepted",
+                    reason="plan accepted",
                     payload=plan_json,
                 )
             )
@@ -188,9 +188,9 @@ class Ledger:
             text(
                 """
                 INSERT INTO events
-                    (ts, campaign_id, actor, type, justification, payload)
+                    (ts, campaign_id, actor, type, reason, payload)
                 VALUES
-                    (:ts, :campaign_id, :actor, :type, :justification,
+                    (:ts, :campaign_id, :actor, :type, :reason,
                      cast(:payload as jsonb))
                 RETURNING seq
                 """
@@ -200,7 +200,7 @@ class Ledger:
                 "campaign_id": str(event.campaign_id),
                 "actor": str(event.actor),
                 "type": str(event.type),
-                "justification": event.justification,
+                "reason": event.reason,
                 "payload": json.dumps(event.payload),
             },
         ).scalar_one()
@@ -210,7 +210,7 @@ class Ledger:
         """Yield one campaign's events with seq > after, in seq order."""
         rows = self._conn.execute(
             """
-            SELECT seq, ts, campaign_id, actor, type, justification, payload
+            SELECT seq, ts, campaign_id, actor, type, reason, payload
             FROM events
             WHERE campaign_id = %s AND seq > %s
             ORDER BY seq
@@ -224,7 +224,7 @@ class Ledger:
         """Return all events for one campaign, in seq order."""
         rows = self._conn.execute(
             """
-            SELECT seq, ts, campaign_id, actor, type, justification, payload
+            SELECT seq, ts, campaign_id, actor, type, reason, payload
             FROM events
             WHERE campaign_id = %s
             ORDER BY seq
@@ -253,6 +253,6 @@ def _row_to_event(row: tuple) -> Event:
         campaign_id=row[2],
         actor=row[3],
         type=row[4],
-        justification=row[5],
+        reason=row[5],
         payload=row[6],
     )

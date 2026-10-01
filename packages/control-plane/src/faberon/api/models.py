@@ -20,14 +20,14 @@ class CampaignCreate(BaseModel):
 class CancelCampaign(BaseModel):
     """POST /v0/campaigns/{id}/cancel body."""
 
-    justification: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
 
 
 class InjectIdea(BaseModel):
     """POST /v0/campaigns/{id}/ideas body."""
 
     text: str = Field(min_length=1)
-    justification: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
 
 
 class CampaignCreated(BaseModel):

@@ -47,7 +47,7 @@ class Event(BaseModel):
     campaign_id: UUID
     actor: Actor
     type: EventType
-    justification: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
     payload: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -65,7 +65,7 @@ class Event(BaseModel):
     def format(self, *, verbose: bool = False) -> str:
         """Render the event as a human-readable line for display."""
         ts = self.ts.strftime("%Y-%m-%dT%H:%M:%SZ")
-        line = f"{ts} {self.actor.value:<5} {self.type.value:<28} {self.justification}"
+        line = f"{ts} {self.actor.value:<5} {self.type.value:<28} {self.reason}"
         if verbose and self.payload:
             detail = json.dumps(self.payload, default=str)
             line += f"\n{'':<20} {detail}"

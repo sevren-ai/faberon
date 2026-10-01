@@ -29,7 +29,7 @@ def _event(**overrides) -> Event:
         campaign_id=overrides.get("campaign_id", uuid.uuid4()),
         actor=overrides.get("actor", Actor.AGENT),
         type=overrides.get("type", EventType.CAMPAIGN_CREATED),
-        justification=overrides.get("justification", "test event"),
+        reason=overrides.get("reason", "test event"),
         payload=overrides.get("payload", {}),
     )
 
@@ -67,11 +67,11 @@ def test_tail_scopes_to_campaign(ledger):
 
 
 def test_append_preserves_fields(ledger):
-    event = _event(justification="plan accepted", payload={"k": "v"})
+    event = _event(reason="plan accepted", payload={"k": "v"})
     stored = ledger.append(event)
     again = next(ledger.tail(stored.campaign_id))
     assert again == stored
-    assert again.justification == "plan accepted"
+    assert again.reason == "plan accepted"
     assert again.payload == {"k": "v"}
 
 

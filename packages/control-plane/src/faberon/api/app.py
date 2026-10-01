@@ -261,7 +261,7 @@ def _register_routes(app: FastAPI) -> None:
                 campaign_id=campaign_id,
                 actor=Actor.HUMAN,
                 type=EventType.CANCEL_REQUESTED,
-                justification=body.justification,
+                reason=body.reason,
                 payload={"source": "api"},
             )
         )
@@ -278,7 +278,7 @@ def _register_routes(app: FastAPI) -> None:
                 campaign_id=campaign_id,
                 actor=Actor.HUMAN,
                 type=EventType.IDEA_INJECTED,
-                justification=body.justification,
+                reason=body.reason,
                 payload={"source": "api", "text": body.text},
             )
         )
