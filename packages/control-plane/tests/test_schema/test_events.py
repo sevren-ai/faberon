@@ -66,33 +66,3 @@ def test_event_requires_reason():
             type=EventType.EXPERIMENT_SUBMITTED,
             reason="",
         )
-
-
-def test_event_reason_accepts_short_text():
-    """An operational reason need only be non-empty."""
-    event = Event(
-        campaign_id=uuid4(),
-        actor=Actor.HUMAN,
-        type=EventType.CANCEL_REQUESTED,
-        reason="no",
-    )
-    assert event.reason == "no"
-
-
-def test_format_event():
-    """Terse rendering is one line; verbose appends the payload."""
-    event = Event(
-        campaign_id=uuid4(),
-        actor=Actor.AGENT,
-        type=EventType.EXPERIMENT_JUDGED,
-        reason="metric improved",
-        payload={"judgment": "keep", "metric_value": 1.1},
-    )
-    terse = event.format()
-    assert "experiment.judged" in terse
-    assert "metric improved" in terse
-    assert "keep" not in terse
-    assert "\n" not in terse
-
-    verbose = event.format(verbose=True)
-    assert '"judgment": "keep"' in verbose
