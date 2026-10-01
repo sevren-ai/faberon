@@ -46,11 +46,7 @@ def dbos() -> Iterator[None]:
 def test_experiment_on_slurm(dbos, tmp_path):
     metric_file = tmp_path / "metric.txt"
     # The sbatch job writes the metric file; the workflow reads it back locally.
-    command = [
-        "sh",
-        "-c",
-        f"echo 'val_bpb: 1.10' > {shlex.quote(str(metric_file))}",
-    ]
+    command = f"sh -c \"echo 'val_bpb: 1.10' > {shlex.quote(str(metric_file))}\""
     executor = SlurmExecutor(
         account=os.environ["FABERON_SLURM_ACCOUNT"],
         output=str(tmp_path / "slurm-%j.out"),

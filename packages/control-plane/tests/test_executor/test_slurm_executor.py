@@ -58,13 +58,13 @@ def test_render_sbatch():
 )
 def test_effective_walltime(walltime, max_walltime, expected):
     executor = SlurmExecutor("minerva", max_walltime=max_walltime)
-    request = SubmitRequest(command=["true"], submission_key="k", walltime=walltime)
+    request = SubmitRequest(command="echo hello", submission_key="k", walltime=walltime)
     assert executor._effective_walltime(request) == expected
 
 
 def test_effective_walltime_no_cap():
     executor = SlurmExecutor("minerva")
-    request = SubmitRequest(command=["true"], submission_key="k", walltime=90)
+    request = SubmitRequest(command="echo hello", submission_key="k", walltime=90)
     assert executor._effective_walltime(request) == 90
 
 

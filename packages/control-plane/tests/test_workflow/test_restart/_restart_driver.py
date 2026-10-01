@@ -53,7 +53,7 @@ def _make_runtime() -> Runtime:
 def _experiment_setup() -> ExperimentSetup:
     return ExperimentSetup(
         campaign_id=UUID(os.environ["FABERON_TEST_CAMPAIGN_ID"]),
-        command=["sleep", "30"],
+        command="sleep 30",
         submission_key=os.environ["FABERON_TEST_WF_ID"],
         metric_command=f"cat {os.environ['FABERON_TEST_RUN_DIR']}/metric.txt",
         metric_name="val_bpb",

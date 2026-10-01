@@ -96,6 +96,7 @@ def make_plan(**overrides) -> ResearchPlan:
     """A valid research plan; tests override the fields they care about."""
     data = {
         "goal": "Beat val_bpb baseline.",
+        "command": "echo hello",
         "metric_name": "val_bpb",
         "metric_command": "cat metric.txt",
         "baseline": 1.23,

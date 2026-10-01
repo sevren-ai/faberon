@@ -49,14 +49,14 @@ def test_proposer_with_llm():
                 campaign_id=campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_JUDGED,
-                justification="baseline run",
+                reason="baseline run",
                 payload={"judgment": "keep", "metric_value": 1.23},
             ),
             Event(
                 campaign_id=campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_JUDGED,
-                justification="lower learning rate",
+                reason="lower learning rate",
                 payload={"judgment": "keep", "metric_value": 1.10},
             ),
         ]

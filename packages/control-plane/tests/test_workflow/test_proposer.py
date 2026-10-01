@@ -24,7 +24,7 @@ def test_proposer():
             campaign_id=campaign_id,
             actor=Actor.AGENT,
             type=EventType.EXPERIMENT_JUDGED,
-            justification=f"result number {index}",
+            reason=f"result number {index}",
             payload={"judgment": "keep", "metric_value": index / 10},
         )
         for index in range(12)
@@ -33,14 +33,14 @@ def test_proposer():
         campaign_id=campaign_id,
         actor=Actor.AGENT,
         type=EventType.EXPERIMENT_PROPOSED,
-        justification="earlier proposal",
+        reason="earlier proposal",
         payload={},
     )
     other_campaign = Event(
         campaign_id=other_campaign_id,
         actor=Actor.AGENT,
         type=EventType.EXPERIMENT_JUDGED,
-        justification="another campaign",
+        reason="another campaign",
         payload={"judgment": "keep", "metric_value": 0.5},
     )
     events = FakeEvents([proposed, *judged, other_campaign])

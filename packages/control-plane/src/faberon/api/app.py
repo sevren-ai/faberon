@@ -46,7 +46,6 @@ def _rebuild_setup(campaign: Campaign) -> CampaignSetup:
     return CampaignSetup(
         campaign_id=campaign.campaign_id,
         plan=campaign.plan,
-        command=campaign.command,
         repo_path=campaign.repo_path,
         poll_interval_seconds=campaign.poll_interval_seconds,
     )
@@ -224,7 +223,6 @@ def _register_routes(app: FastAPI) -> None:
         setup = CampaignSetup(
             campaign_id=campaign_id,
             plan=body.plan,
-            command=body.command,
             repo_path=body.repo_path,
             poll_interval_seconds=body.poll_interval_seconds,
         )
@@ -237,7 +235,6 @@ def _register_routes(app: FastAPI) -> None:
             campaign_id,
             workflow_id,
             body.plan,
-            body.command,
             body.repo_path,
             body.poll_interval_seconds,
         )
@@ -261,7 +258,7 @@ def _register_routes(app: FastAPI) -> None:
                 campaign_id=campaign_id,
                 actor=Actor.HUMAN,
                 type=EventType.CANCEL_REQUESTED,
-                justification=body.justification,
+                reason=body.reason,
                 payload={"source": "api"},
             )
         )
@@ -278,7 +275,7 @@ def _register_routes(app: FastAPI) -> None:
                 campaign_id=campaign_id,
                 actor=Actor.HUMAN,
                 type=EventType.IDEA_INJECTED,
-                justification=body.justification,
+                reason=body.reason,
                 payload={"source": "api", "text": body.text},
             )
         )

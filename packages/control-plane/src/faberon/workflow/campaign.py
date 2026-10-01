@@ -128,7 +128,7 @@ class CampaignRunner:
 
                 exp = ExperimentSetup(
                     campaign_id=setup.campaign_id,
-                    command=setup.command,
+                    command=plan.command,
                     submission_key=f"{setup.campaign_id}:{exp_done}",
                     metric_command=plan.metric_command,
                     metric_name=plan.metric_name,
@@ -166,7 +166,7 @@ class CampaignRunner:
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_PROPOSE_FAILED,
-                justification=f"propose step failed: {error}",
+                reason=f"propose step failed: {error}",
                 payload={"error": type(error).__name__},
             )
         )
@@ -178,7 +178,7 @@ class CampaignRunner:
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.CAMPAIGN_CRASHED,
-                justification=f"campaign crashed: {type(error).__name__}: {error}",
+                reason=f"campaign crashed: {type(error).__name__}: {error}",
                 payload={"error": type(error).__name__},
             )
         )
@@ -190,7 +190,7 @@ class CampaignRunner:
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_DESIGNING,
-                justification="designing the next experiment",
+                reason="designing the next experiment",
             )
         )
 
@@ -207,7 +207,7 @@ class CampaignRunner:
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_PROPOSED,
-                justification=proposal.rationale,
+                reason=proposal.rationale,
                 payload={
                     "title": proposal.title,
                     "sha": result.sha,
@@ -231,7 +231,7 @@ class CampaignRunner:
                 campaign_id=setup.campaign_id,
                 actor=actor,
                 type=EventType.CAMPAIGN_ENDED,
-                justification=f"campaign ended: {reason.value}",
+                reason=f"campaign ended: {reason.value}",
                 payload={
                     "stop_reason": reason,
                     "experiments_done": exp_done,

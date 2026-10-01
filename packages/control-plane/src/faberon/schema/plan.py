@@ -9,6 +9,7 @@ class ResearchPlan(BaseModel):
     """Typed research plan accepted by the control plane."""
 
     goal: str = Field(min_length=MIN_PROSE_LENGTH)
+    command: str = Field(min_length=1)
     metric_name: str = Field(min_length=1)
     metric_command: str = Field(min_length=1)
     baseline: float

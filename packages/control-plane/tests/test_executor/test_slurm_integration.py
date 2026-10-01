@@ -65,7 +65,7 @@ def _wait_for_terminal(executor: SlurmExecutor, job_id: str) -> JobState:
     )
 
 
-def _request(command: list[str], key: str) -> SubmitRequest:
+def _request(command: str, key: str) -> SubmitRequest:
     return SubmitRequest.model_validate(
         {"command": command, "submission_key": key, "walltime": 10}
     )
@@ -73,14 +73,14 @@ def _request(command: list[str], key: str) -> SubmitRequest:
 
 def test_submit_success(executor: SlurmExecutor):
     key = f"test-true-{uuid.uuid4().hex[:8]}"
-    job_id = executor.submit(_request(["true"], key))
+    job_id = executor.submit(_request("true", key))
     assert _wait_for_terminal(executor, job_id) == JobState.COMPLETED
     assert executor.status(job_id).exit_code == 0
 
 
 def test_submit_failure(executor: SlurmExecutor):
     key = f"test-false-{uuid.uuid4().hex[:8]}"
-    job_id = executor.submit(_request(["false"], key))
+    job_id = executor.submit(_request("false", key))
     assert _wait_for_terminal(executor, job_id) == JobState.FAILED
     assert executor.status(job_id).exit_code != 0
 
@@ -88,7 +88,7 @@ def test_submit_failure(executor: SlurmExecutor):
 def test_terminal_jobs_report_elapsed(executor: SlurmExecutor):
     """Terminal status carries ElapsedRaw seconds; the budget depends on it."""
     key = f"test-elapsed-{uuid.uuid4().hex[:8]}"
-    job_id = executor.submit(_request(["sleep", "2"], key))
+    job_id = executor.submit(_request("sleep 2", key))
     _wait_for_terminal(executor, job_id)
     info = executor.status(job_id)
     assert info.elapsed_seconds is not None
@@ -97,13 +97,13 @@ def test_terminal_jobs_report_elapsed(executor: SlurmExecutor):
 
 def test_cancel(executor: SlurmExecutor):
     key = f"test-sleep-{uuid.uuid4().hex[:8]}"
-    job_id = executor.submit(_request(["sleep", "300"], key))
+    job_id = executor.submit(_request("sleep 300", key))
     executor.cancel(job_id)
     assert _wait_for_terminal(executor, job_id) == JobState.CANCELLED
 
 
 def test_submit_same_key(executor: SlurmExecutor):
     key = f"test-idem-{uuid.uuid4().hex[:8]}"
-    first = executor.submit(_request(["true"], key))
-    second = executor.submit(_request(["true"], key))
+    first = executor.submit(_request("echo hello", key))
+    second = executor.submit(_request("echo hello", key))
     assert first == second

@@ -28,7 +28,6 @@ class Campaign(BaseModel):
     campaign_id: UUID
     workflow_id: str
     plan: ResearchPlan
-    command: list[str]
     repo_path: str
     poll_interval_seconds: float
     created_at: datetime
