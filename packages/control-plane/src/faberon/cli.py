@@ -3,13 +3,16 @@
 import contextlib
 import json
 import os
+import shlex
 from collections.abc import Iterator
 from datetime import datetime
-from uuid import UUID
+from pathlib import Path
+from uuid import UUID, uuid4
 
 import httpx2
 import typer
 import uvicorn
+from typer import Argument, FileText, Option, echo
 
 from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_slurm
 from .schema import Event
@@ -30,7 +33,7 @@ def _client() -> Iterator[httpx2.Client]:
     base_url = os.environ.get("FABERON_API_URL", _DEFAULT_API_URL)
     token = os.environ.get("FABERON_API_TOKEN")
     if not token:
-        typer.echo("FABERON_API_TOKEN is not set", err=True)
+        echo("FABERON_API_TOKEN is not set", err=True)
         raise typer.Exit(code=2)
     client = httpx2.Client(
         base_url=base_url,
@@ -40,7 +43,7 @@ def _client() -> Iterator[httpx2.Client]:
     try:
         yield client
     except httpx2.ConnectError:
-        typer.echo(f"Cannot reach the Faberon server at {base_url}", err=True)
+        echo(f"Cannot reach the Faberon server at {base_url}", err=True)
         raise typer.Exit(code=1) from None
     finally:
         client.close()
@@ -55,14 +58,14 @@ def _check(response: httpx2.Response) -> httpx2.Response:
     except json.JSONDecodeError:
         detail = None
     message = detail or response.text or "request failed"
-    typer.echo(f"error {response.status_code}: {message}", err=True)
+    echo(f"error {response.status_code}: {message}", err=True)
     raise typer.Exit(code=1)
 
 
 @app.command("serve")
 def serve(
-    host: str = typer.Option(_DEFAULT_HOST, envvar="FABERON_HOST"),
-    port: int = typer.Option(_DEFAULT_PORT, envvar="FABERON_PORT"),
+    host: str = Option(_DEFAULT_HOST, envvar="FABERON_HOST"),
+    port: int = Option(_DEFAULT_PORT, envvar="FABERON_PORT"),
 ) -> None:
     """Start the Faberon server with the Slurm executor.
 
@@ -80,18 +83,16 @@ def serve(
 
 @app.command("list")
 def list_campaigns(
-    as_json: bool = typer.Option(
-        False, "--json", "-j", help="Emit machine-readable JSON."
-    ),
+    as_json: bool = Option(False, "--json", "-j", help="Emit machine-readable JSON."),
 ) -> None:
     """List all campaigns with their live status."""
     with _client() as client:
         response = _check(client.get("/v0/campaigns"))
         infos = response.json()
         if as_json:
-            typer.echo(json.dumps(infos, indent=2))
+            echo(json.dumps(infos, indent=2))
             return
-        typer.echo(f"{'ID':<36}  {'CREATED':<16}  {'STATUS':<6}  {'METRIC':<12}  REPO")
+        echo(f"{'ID':<36}  {'CREATED':<16}  {'STATUS':<6}  {'METRIC':<12}  REPO")
         for info in infos:
             campaign = info["campaign"]
             created = datetime.fromisoformat(campaign["created_at"])
@@ -102,45 +103,41 @@ def list_campaigns(
                 f"{campaign['plan']['metric_name']:<12}  "
                 f"{campaign['repo_path']}"
             )
-            typer.echo(line)
+            echo(line)
 
 
 @app.command("show")
 def show_campaign(
     campaign_id: UUID,
-    as_json: bool = typer.Option(
-        False, "--json", "-j", help="Emit machine-readable JSON."
-    ),
+    as_json: bool = Option(False, "--json", "-j", help="Emit machine-readable JSON."),
 ) -> None:
     """Show one campaign's status and plan."""
     with _client() as client:
         response = _check(client.get(f"/v0/campaigns/{campaign_id}"))
         info = response.json()
         if as_json:
-            typer.echo(json.dumps(info, indent=2))
+            echo(json.dumps(info, indent=2))
             return
         campaign = info["campaign"]
         created = datetime.fromisoformat(campaign["created_at"])
-        typer.echo(f"campaign: {campaign['campaign_id']}")
-        typer.echo(f"created:  {created.strftime('%Y-%m-%d %H:%M')}")
-        typer.echo(f"repo:     {campaign['repo_path']}")
-        typer.echo(f"goal:     {campaign['plan']['goal']}")
-        typer.echo(f"metric:   {campaign['plan']['metric_name']}")
-        typer.echo(f"budget:   {campaign['plan']['budget_gpu_hours']} gpu-hours")
-        typer.echo(f"max exp:  {campaign['plan']['max_experiments']}")
-        typer.echo(f"status:   {info['status']}")
+        echo(f"campaign: {campaign['campaign_id']}")
+        echo(f"created:  {created.strftime('%Y-%m-%d %H:%M')}")
+        echo(f"repo:     {campaign['repo_path']}")
+        echo(f"goal:     {campaign['plan']['goal']}")
+        echo(f"metric:   {campaign['plan']['metric_name']}")
+        echo(f"budget:   {campaign['plan']['budget_gpu_hours']} gpu-hours")
+        echo(f"max exp:  {campaign['plan']['max_experiments']}")
+        echo(f"status:   {info['status']}")
         if info["stop_reason"] is not None:
-            typer.echo(f"reason:   {info['stop_reason']}")
+            echo(f"reason:   {info['stop_reason']}")
 
 
 @app.command("events")
 def campaign_events(
     campaign_id: UUID,
-    follow: bool = typer.Option(
-        False, "--follow", "-f", help="Stream new events live."
-    ),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show event details."),
-    as_json: bool = typer.Option(
+    follow: bool = Option(False, "--follow", "-f", help="Stream new events live."),
+    verbose: bool = Option(False, "--verbose", "-v", help="Show event details."),
+    as_json: bool = Option(
         False, "--json", "-j", help="Emit raw events as JSONL, one per line."
     ),
 ) -> None:
@@ -153,14 +150,14 @@ def campaign_events(
         if not follow:
             response = _check(client.get(f"/v0/campaigns/{campaign_id}/events.jsonl"))
             for line in response.text.splitlines():
-                typer.echo(_render(Event.model_validate_json(line)))
+                echo(_render(Event.model_validate_json(line)))
             return
         with client.stream("GET", f"/v0/campaigns/{campaign_id}/events") as stream:
             _check(stream)
             for line in stream.iter_lines():
                 if line.startswith("data: "):
                     event = Event.model_validate_json(line.removeprefix("data: "))
-                    typer.echo(_render(event))
+                    echo(_render(event))
 
 
 def _read_reason() -> str:
@@ -169,24 +166,21 @@ def _read_reason() -> str:
         value = typer.prompt("Reason to cancel").strip()
         if value:
             return value
-        typer.echo("Reason must not be empty", err=True)
+        echo("Reason must not be empty", err=True)
 
 
 @app.command("cancel")
 def cancel_campaign(
     campaign_id: UUID,
-    reason: str | None = typer.Option(
-        None,
-        "--reason",
-        "-r",
-        help="Why the campaign is cancelled.",
+    reason: str | None = Option(
+        None, "--reason", "-r", help="Why the campaign is cancelled."
     ),
 ) -> None:
     """Request cancellation of an active campaign."""
     if reason is None:
         reason = _read_reason()
     elif not reason.strip():
-        typer.echo("reason must not be empty", err=True)
+        echo("reason must not be empty", err=True)
         raise typer.Exit(code=2)
     with _client() as client:
         response = _check(
