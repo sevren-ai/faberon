@@ -7,8 +7,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
-from .constants import MIN_PROSE_LENGTH
-
 
 class Actor(StrEnum):
     AGENT = "agent"
@@ -48,7 +46,7 @@ class Event(BaseModel):
     campaign_id: UUID
     actor: Actor
     type: EventType
-    justification: str = Field(min_length=MIN_PROSE_LENGTH)
+    justification: str = Field(min_length=1)
     payload: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")

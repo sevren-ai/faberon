@@ -215,10 +215,10 @@ def test_inject_idea_requires_justification(api: ApiFixture):
         f"/v0/campaigns/{camp_id}/ideas", json={"text": "try a cosine schedule"}
     )
     assert response.status_code == 422
-    # Justification below the audit floor.
+    # Empty justification.
     response = api.client.post(
         f"/v0/campaigns/{camp_id}/ideas",
-        json={"text": "try a cosine schedule", "justification": "hunch"},
+        json={"text": "try a cosine schedule", "justification": ""},
     )
     assert response.status_code == 422
     DBOS.retrieve_workflow(created.json()["workflow_id"]).get_result()

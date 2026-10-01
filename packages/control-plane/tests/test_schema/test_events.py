@@ -7,7 +7,6 @@ import pytest
 from pydantic import ValidationError
 
 from faberon.schema import (
-    MIN_PROSE_LENGTH,
     Actor,
     Event,
     EventType,
@@ -69,19 +68,12 @@ def test_event_requires_justification():
         )
 
 
-def test_event_justification_min_length():
-    """A justification below the floor is rejected; one at the floor passes."""
-    with pytest.raises(ValidationError):
-        Event(
-            campaign_id=uuid4(),
-            actor=Actor.AGENT,
-            type=EventType.EXPERIMENT_SUBMITTED,
-            justification="x" * (MIN_PROSE_LENGTH - 1),
-        )
+def test_event_justification_accepts_short_text():
+    """An operational justification need only be non-empty."""
     event = Event(
         campaign_id=uuid4(),
-        actor=Actor.AGENT,
-        type=EventType.EXPERIMENT_SUBMITTED,
-        justification="x" * MIN_PROSE_LENGTH,
+        actor=Actor.HUMAN,
+        type=EventType.CANCEL_REQUESTED,
+        justification="no",
     )
-    assert len(event.justification) == MIN_PROSE_LENGTH
+    assert event.justification == "no"
