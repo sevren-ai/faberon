@@ -260,3 +260,26 @@ def test_cancel_prompt(api_client, monkeypatch: pytest.MonkeyPatch):
     assert result.exit_code == 0
     assert "empty" in result.output
     assert "cancel requested" in result.output
+
+
+def test_resume(api_client):
+    api_client[("POST", f"/v0/campaigns/{CAMPAIGN_ID}/resume")] = {
+        "campaign_id": CAMPAIGN_ID,
+        "status": "resume requested",
+    }
+    result = runner.invoke(cli.app, ["resume", CAMPAIGN_ID])
+    assert result.exit_code == 0
+    assert "resume requested" in result.output
+
+
+def test_create(api_client, tmp_path):
+    api_client[("POST", "/v0/campaigns")] = {
+        "campaign_id": CAMPAIGN_ID,
+        "workflow_id": CAMPAIGN_ID,
+    }
+    plan_file = tmp_path / "plan.json"
+    plan_file.write_text(json.dumps(_PLAN))
+    result = runner.invoke(cli.app, ["create", str(plan_file), str(tmp_path)])
+    assert result.exit_code == 0
+    assert CAMPAIGN_ID in result.output
+    assert "workflow" in result.output

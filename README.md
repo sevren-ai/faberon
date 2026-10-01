@@ -131,7 +131,7 @@ faberon serve
 All `/v0/*` routes require `Authorization: Bearer $FABERON_API_TOKEN`.
 
 - `GET /healthz`: liveness check (no auth required)
-- `POST /v0/campaigns`: accept a plan + command, append `campaign.created`, start the campaign workflow
+- `POST /v0/campaigns`: accept a reasearch plan, append `campaign.created`, start the campaign workflow
 - `GET /v0/campaigns`: list all campaign records, oldest first
 - `POST /v0/campaigns/{id}/cancel`: append `cancel.requested`, signal the workflow to stop at its next decision boundary
 - `POST /v0/campaigns/{id}/resume`: resume a pending campaign's workflow from its last checkpoint
@@ -144,15 +144,20 @@ All `/v0/*` routes require `Authorization: Bearer $FABERON_API_TOKEN`.
 Set `FABERON_API_TOKEN` before running any of these commands. The CLI also reads `FABERON_API_URL` (default `http://127.0.0.1:8000`).
 
 ```bash
+faberon create plan.json     # submit a new campaign
 faberon list                 # all campaigns, oldest first
 faberon show <id>            # one campaign's plan and status
 faberon events <id>          # the campaign's ledger
 faberon events <id> -f       # stream events live
 faberon events <id> -v       # include event details
+faberon resume <id>          # resume a pending campaign
 faberon cancel <id>          # request cancellation (prompts for a reason)
 ```
 
-`list`, `show`, and `events` default to human-readable output. Pass `--json` (`-j`) for machine-readable output. `cancel` takes `--reason` (`-r`) to skip the prompt.
+Some notes:
+- `create` reads a JSON plan file. The repo defaults to the current directory; pass it as a positional argument to override. `--poll` (`-p`) sets the poll interval.
+- `list`, `show`, and `events` default to human-readable output. Pass `--json` (`-j`) for machine-readable output. 
+- `cancel` takes `--reason` (`-r`) to skip the prompt. 
 
 ## Safe restart and recovery
 
@@ -171,8 +176,7 @@ The API serves normally, but no workflow resumes at boot. Inspect campaigns and 
 faberon list
 
 # resume one pending campaign from its last checkpoint
-curl -X POST -H "Authorization: Bearer $FABERON_API_TOKEN" \
-  http://127.0.0.1:8000/v0/campaigns/<id>/resume
+faberon resume <id>
 
 # or cancel one you do not want to run again
 faberon cancel <id>

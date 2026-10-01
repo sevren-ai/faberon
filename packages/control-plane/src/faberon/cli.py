@@ -5,6 +5,7 @@ import json
 import os
 from collections.abc import Iterator
 from datetime import datetime
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import httpx2
@@ -77,6 +78,33 @@ def serve(
         factory=True,
         timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_TIMEOUT,
     )
+
+
+@app.command("create")
+def create_campaign(
+    plan: FileText = Argument(..., help="JSON file with the research plan."),
+    repo: Path = Argument(
+        Path("."),
+        help="Path to the target repo.",
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+        resolve_path=True,
+    ),
+    poll: float = Option(30.0, "--poll", "-p", help="Poll interval in seconds."),
+) -> None:
+    """Submit a new campaign from a research plan."""
+    payload = {
+        "campaign_id": str(uuid4()),
+        "plan": json.load(plan),
+        "repo_path": str(repo),
+        "poll_interval_seconds": poll,
+    }
+    with _client() as client:
+        response = _check(client.post("/v0/campaigns", json=payload))
+        created = response.json()
+        echo(f"campaign: {created['campaign_id']}")
+        echo(f"workflow: {created['workflow_id']}")
 
 
 @app.command("list")
@@ -187,7 +215,15 @@ def cancel_campaign(
                 json={"reason": reason},
             )
         )
-        typer.echo(response.json()["status"])
+        echo(response.json()["status"])
+
+
+@app.command("resume")
+def resume_campaign(campaign_id: UUID) -> None:
+    """Resume a pending campaign from its last checkpoint."""
+    with _client() as client:
+        response = _check(client.post(f"/v0/campaigns/{campaign_id}/resume"))
+        echo(response.json()["status"])
 
 
 def main() -> None:
