@@ -7,9 +7,11 @@ license = { text = "MIT" }
 dependencies = [
     "dbos>=2.31.0,<3",
     "fastapi>=0.141.1,<1",
+    "httpx2>=2.12.0,<3",
     "psycopg[binary]>=3.3.5,<4",
     "pydantic>=2.13.5,<3",
     "pydantic-ai-slim[openrouter]>=2.45.0,<3",
+    "typer>=0.20.0,<1",
     "uvicorn>=0.52.4,<1",
 ]
 
@@ -22,7 +24,6 @@ faberon = "faberon.cli:main"
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.12.0,<3",
     "pytest>=9.1.1,<10",
     "ruff>=0.16.5,<0.17",
     "ty>=0.0.78,<0.0.79",
