@@ -166,7 +166,7 @@ curl -X POST -H "Authorization: Bearer $FABERON_API_TOKEN" \
 
 # or cancel one you do not want to run again
 curl -X POST -H "Authorization: Bearer $FABERON_API_TOKEN" \
-  -H 'Content-Type: application/json' -d '{"justification": "..."}' \
+  -H 'Content-Type: application/json' -d '{"reason": "..."}' \
   http://127.0.0.1:8000/v0/campaigns/<id>/cancel
 ```
 
