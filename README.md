@@ -4,11 +4,10 @@ Sevren's autonomous ML Research Harness
 ## Layout
 
 - `packages/control-plane/`: the brain (Python, `uv`-managed, import name `faberon`)
+- `packages/console/`: the console (Pi extension, TypeScript, npm-managed)
 - `docs/design/`: [system design](docs/design/design.md), [roadmap](docs/design/roadmap.md), [future ideas](docs/design/future.md), and one doc per release (shipped releases in [archive/](docs/design/archive/))
 - `CONTRIBUTING.md`: the process rules for every contributor, human or agent
 - `AGENTS.md`: agent-specific rules (context loading, writing style), read first by any coding agent
-
-The console (Pi extension, TypeScript) joins as a sibling package in upcoming work.
 
 ## Setup
 
@@ -158,6 +157,30 @@ Some notes:
 - `create` reads a JSON plan file. The repo defaults to the current directory; pass it as a positional argument to override. `--poll` (`-p`) sets the poll interval.
 - `list`, `show`, and `events` default to human-readable output. Pass `--json` (`-j`) for machine-readable output. 
 - `cancel` takes `--reason` (`-r`) to skip the prompt. 
+
+## The console (Pi extension)
+
+`packages/console/` is a Pi extension for drafting plans and operating campaigns from a chat session. It talks to the control plane over the v0 API with `FABERON_API_TOKEN` and `FABERON_API_URL` from the environment, like the CLI.
+
+Develop it with Node 22.19 or newer:
+
+```bash
+cd packages/console
+npm ci --legacy-peer-deps   # npm 10's peer resolver mis-handles Pi's tree
+npx tsc --noEmit            # typecheck
+npx vitest run              # tests
+```
+
+To try it in Pi, load the extension from source:
+
+```bash
+export FABERON_API_TOKEN=<token>
+pi -e packages/console/src/index.ts
+```
+
+This adds the `faberon_list_campaigns` tool and a `/faberon-list` command. Write operations, live status, and the drafter build on this layer; see [docs/design/v0.3.0.md](docs/design/v0.3.0.md).
+
+Once released, users install the console as a Pi package straight from the repo (`pi install git:github.com/sevren-ai/faberon@console-v0.1.0`), with no clone or build step. The console versions independently of the control plane; see [CONTRIBUTING.md](CONTRIBUTING.md#releases-and-versioning).
 
 ## Safe restart and recovery
 

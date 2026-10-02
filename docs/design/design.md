@@ -40,10 +40,10 @@ Three tiers connected by explicit contracts (typed JSON over HTTP/SSE). Any tier
 ```
 
 - **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the console is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps console and brain independently replaceable.
-- **Console**: a Pi extension. Hosts the drafter, live status, idea injection, and approvals. It reasons conversationally, but every write is a human-initiated API call. Default: runs on the login node next to the brain.
+- **Console**: a Pi extension. It exposes the v0 operations as Pi tools and slash commands, and hosts the drafter, live status, idea injection, and approvals on top. It reasons conversationally, but every write is a human-initiated API call. Default: runs on the login node next to the brain. Distributed as a Pi package, pinned to Pi `^1.0.0`.
 - **Execution**: the Slurm cluster. The experiment repo (for example `autoresearch`) lives on the cluster filesystem so compute nodes and the brain see the same tree.
 
-Design rule: **one brain**. The console and the drafter propose; the brain disposes; the ledger remembers.
+Design rule: **one brain**. The console and the drafter propose; the brain decides; the ledger remembers.
 
 **Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, console (when present), and the experiment checkout. All state (Postgres, notes, artifacts) lives there; there is no central Faberon server. FastAPI binds to localhost. A bearer token (`FABERON_API_TOKEN`) guards the API: on a shared login node, the token is mandatory. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote console, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
 
