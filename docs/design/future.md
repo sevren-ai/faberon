@@ -17,6 +17,10 @@ Default is Pi on the login node next to the brain (see [design.md](design.md)).
 
 - **Remote console**: Pi on a laptop (or other machine) talking to the control plane over the network. Needs the API reachable off-host and the optional bearer token.
 
+## CLI configuration
+
+- **`faberon serve --model` flag.** v0.3.0 reads `FABERON_MODEL` only from the environment. A `--model` flag would suit users who swap models between campaigns. The clean path threads the value as an explicit parameter through `create_app_slurm` / `create_app` into the proposer construction (which today reads env in `AgentProposer.from_env`), not by mutating `os.environ` from the CLI. The other `serve` settings stay env-only: the API token and database URL are secrets that must not appear in shell history or `ps` output on a shared login node, and the Slurm account is stable per deployment.
+
 ## Observability
 
 - **LLM call tracing via Langfuse.** It could fit as an *addition* alongside Postgres once the agent chassis (Pydantic AI) is in the loop, for tracing the drafter's and judge's LLM calls (token cost, prompt versions, eval scores). Pydantic AI has Langfuse integration. Caveat: Langfuse is either SaaS (needs login-node egress, which is unverified, see [roadmap.md](roadmap.md)) or self-hosted (another service to operate), both of which cut against the minimal-infra, self-hosted-per-deployment stance in [design.md](design.md).

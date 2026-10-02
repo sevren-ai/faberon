@@ -119,30 +119,45 @@ You can generate a random token with:
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-Now start the control plane, either by running it directly: 
-
-```bash
-cd packages/control-plane
-uv run uvicorn --factory faberon.api:create_app_slurm --host 127.0.0.1 --port 8000
-```
-
-Or install the `faberon` command once and run it from anywhere:
+Now install and start the control plane:
 
 ```bash
 uv tool install packages/control-plane
-faberon
+faberon serve
 ```
+
+`faberon serve` runs in the foreground. On a login node, run it inside `tmux` or `screen` so it survives your SSH session. Host and port come from `FABERON_HOST` and `FABERON_PORT` (default `127.0.0.1:8000`), or from the command line.
 
 All `/v0/*` routes require `Authorization: Bearer $FABERON_API_TOKEN`.
 
 - `GET /healthz`: liveness check (no auth required)
-- `POST /v0/campaigns`: accept a plan + command, append `campaign.created`, start the campaign workflow
+- `POST /v0/campaigns`: accept a reasearch plan, append `campaign.created`, start the campaign workflow
 - `GET /v0/campaigns`: list all campaign records, oldest first
 - `POST /v0/campaigns/{id}/cancel`: append `cancel.requested`, signal the workflow to stop at its next decision boundary
 - `POST /v0/campaigns/{id}/resume`: resume a pending campaign's workflow from its last checkpoint
 - `GET /v0/campaigns/{id}`: the campaign record (plan, workflow ID, creation time)
 - `GET /v0/campaigns/{id}/events?after=0`: SSE ledger tail for that campaign
 - `GET /v0/campaigns/{id}/events.jsonl?after=0`: bounded snapshot, one JSON event per line
+
+## Using the CLI
+
+Set `FABERON_API_TOKEN` before running any of these commands. The CLI also reads `FABERON_API_URL` (default `http://127.0.0.1:8000`).
+
+```bash
+faberon create plan.json     # submit a new campaign
+faberon list                 # all campaigns, oldest first
+faberon show <id>            # one campaign's plan and status
+faberon events <id>          # the campaign's ledger
+faberon events <id> -f       # stream events live
+faberon events <id> -v       # include event details
+faberon resume <id>          # resume a pending campaign
+faberon cancel <id>          # request cancellation (prompts for a reason)
+```
+
+Some notes:
+- `create` reads a JSON plan file. The repo defaults to the current directory; pass it as a positional argument to override. `--poll` (`-p`) sets the poll interval.
+- `list`, `show`, and `events` default to human-readable output. Pass `--json` (`-j`) for machine-readable output. 
+- `cancel` takes `--reason` (`-r`) to skip the prompt. 
 
 ## Safe restart and recovery
 
@@ -151,23 +166,20 @@ By default the control plane resumes every pending campaign workflow at startup 
 To break the loop, start in no-recover mode:
 
 ```bash
-FABERON_NO_RECOVER=1 faberon
+FABERON_NO_RECOVER=1 faberon serve
 ```
 
 The API serves normally, but no workflow resumes at boot. Inspect campaigns and act on them one by one:
 
 ```bash
 # list campaigns with their live status (active / ended / died)
-curl -H "Authorization: Bearer $FABERON_API_TOKEN" http://127.0.0.1:8000/v0/campaigns
+faberon list
 
 # resume one pending campaign from its last checkpoint
-curl -X POST -H "Authorization: Bearer $FABERON_API_TOKEN" \
-  http://127.0.0.1:8000/v0/campaigns/<id>/resume
+faberon resume <id>
 
 # or cancel one you do not want to run again
-curl -X POST -H "Authorization: Bearer $FABERON_API_TOKEN" \
-  -H 'Content-Type: application/json' -d '{"justification": "..."}' \
-  http://127.0.0.1:8000/v0/campaigns/<id>/cancel
+faberon cancel <id>
 ```
 
 `resume` replays the campaign from its last DBOS checkpoint; it does not resubmit a job already submitted. A campaign whose workflow ended or died cannot be resumed in place: start a new campaign seeded from its best metric and head sha, which are recorded in the ledger.
