@@ -15,7 +15,9 @@ export interface ClientConfig {
 }
 
 /** Resolve the client config from the environment. */
-export function configFromEnv(env: NodeJS.ProcessEnv = process.env): ClientConfig {
+export function configFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): ClientConfig {
   const token = env.FABERON_API_TOKEN;
   if (!token) {
     throw new Error(
