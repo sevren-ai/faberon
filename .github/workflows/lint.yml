@@ -50,4 +50,5 @@ jobs:
           cache: npm
           cache-dependency-path: packages/console/package-lock.json
       - run: npm ci --legacy-peer-deps
+      - run: npx prettier --check .
       - run: npx tsc --noEmit

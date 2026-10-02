@@ -64,14 +64,14 @@ describe("FaberonClient", () => {
 
   it("sends the bearer token and parses the response", async () => {
     fetchMock.mockResolvedValue(
-      new Response(JSON.stringify([sampleInfo]), { status: 200 })
+      new Response(JSON.stringify([sampleInfo]), { status: 200 }),
     );
     const infos = await client().listCampaigns();
     expect(infos).toEqual([sampleInfo]);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("http://x/v0/campaigns");
     expect((init.headers as Record<string, string>).Authorization).toBe(
-      "Bearer tok"
+      "Bearer tok",
     );
   });
 
@@ -79,7 +79,7 @@ describe("FaberonClient", () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ detail: "campaign not found" }), {
         status: 404,
-      })
+      }),
     );
     const err = await client()
       .getCampaign("nope")
@@ -91,6 +91,8 @@ describe("FaberonClient", () => {
 
   it("raises a helpful error when the brain is unreachable", async () => {
     fetchMock.mockRejectedValue(new Error("fetch failed: ECONNREFUSED"));
-    await expect(client().listCampaigns()).rejects.toThrow(/Cannot reach the brain/);
+    await expect(client().listCampaigns()).rejects.toThrow(
+      /Cannot reach the brain/,
+    );
   });
 });

@@ -8,9 +8,10 @@ set -euo pipefail
 # Resolve the repo root from the script location so it works from any cwd.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-pkg="$repo_root/packages/control-plane"
+brain="$repo_root/packages/control-plane"
+console="$repo_root/packages/console"
 
-cd "$pkg"
+cd "$brain"
 
 echo ">> uv sync --locked"
 uv sync --locked
@@ -23,5 +24,16 @@ uv run ruff check --fix src tests
 
 echo ">> ty check src tests"
 uv run ty check src tests
+
+cd "$console"
+
+echo ">> npm ci --legacy-peer-deps"
+npm ci --legacy-peer-deps --no-audit --no-fund
+
+echo ">> prettier --write ."
+npx prettier --write .
+
+echo ">> tsc --noEmit"
+npx tsc --noEmit
 
 echo "Lint passed."

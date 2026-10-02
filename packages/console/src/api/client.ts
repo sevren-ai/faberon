@@ -20,7 +20,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): ClientConfi
   if (!token) {
     throw new Error(
       "FABERON_API_TOKEN is not set. The console talks to the brain " +
-        "over an authenticated API; set the same token the brain uses."
+        "over an authenticated API; set the same token the brain uses.",
     );
   }
   const baseUrl = (env.FABERON_API_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
@@ -30,7 +30,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): ClientConfi
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
-    message: string
+    message: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -59,7 +59,7 @@ export class FaberonClient {
       const cause = err instanceof Error ? err.message : String(err);
       throw new Error(
         `Cannot reach the brain at ${this.config.baseUrl}: ${cause}. ` +
-          "Is `faberon serve` running?"
+          "Is `faberon serve` running?",
       );
     }
     if (!res.ok) {
