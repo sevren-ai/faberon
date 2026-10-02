@@ -17,7 +17,26 @@ How to use them:
 - Update docs in the same commit/PR that changes a decision: `roadmap.md` for plan changes, `design.md` only when the stable architecture genuinely changes.
 - Speculative ideas belong in `docs/design/future.md`, not in the roadmap or in code comments.
 - The current WIP release doc stays editable until it ships. Never edit a `vX.Y.Z.md` after that version has shipped.
-- Bump the version (`packages/control-plane/pyproject.toml` and `faberon.__version__`) right before a release is cut.
+- Bump the version right before a release is cut: `packages/control-plane/pyproject.toml` and `faberon.__version__` for the control plane, `packages/console/package.json` for the console.
+
+### Releases and versioning
+
+The two packages version independently; the design makes them independently replaceable. What keeps them compatible is the API contract version (`v0` today), not a shared release number. The tag names are asymmetric on purpose:
+
+- **Control plane** (`packages/control-plane/`, the default artifact): tag `vX.Y.Z`, for example `v0.2.2`. Bare, no prefix, matching the tags that already exist.
+- **Console** (`packages/console/`): tag `console-vX.Y.Z`, first release `console-v0.1.0`. Prefixed so console tags never collide with control-plane tags.
+
+Cut a release by merging to `main`, bumping that package's version, and pushing the package's tag:
+
+```bash
+# control plane
+git tag v0.3.0 && git push origin v0.3.0
+
+# console
+git tag console-v0.1.0 && git push origin console-v0.1.0
+```
+
+GitHub Releases keys off the tag you push; each release notes which contract version it speaks. The console is distributed as a Pi package from the repo (`pi install git:github.com/sevren-ai/faberon@console-v0.1.0`), no npm publish step.
 
 ## Git and pull requests
 
@@ -25,7 +44,7 @@ How to use them:
 - Agents must not commit, push, or open PRs. A human reviews the changes, commits, pushes, and opens the PR.
 - Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Agents must not draft the description, not even in chat. Follow the PR template in `.github/PULL_REQUEST_TEMPLATE.md` (summary, AI disclaimer, and the on-cluster integration test output).
 - `main` stays green. CI runs `ruff`, `ty`, and the test suite (`.github/workflows/lint.yml`, `.github/workflows/test.yml`) on every PR and on `main`; a red run blocks the merge.
-- A release is cut by merging to `main` and tagging `vX.Y.Z`.
+- A release is cut by merging to `main` and pushing the package's tag.
 
 ## Testing
 
