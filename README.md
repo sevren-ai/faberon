@@ -1,208 +1,71 @@
 # Faberon
-Sevren's autonomous ML Research Harness
 
-## Layout
+[Sevren](https://sevren.ai)'s autonomous ML research harness.
 
-- `packages/control-plane/`: the brain (Python, `uv`-managed, import name `faberon`)
-- `packages/console/`: the console (Pi extension, TypeScript, npm-managed)
-- `docs/design/`: [system design](docs/design/design.md), [roadmap](docs/design/roadmap.md), [future ideas](docs/design/future.md), and one doc per release (shipped releases in [archive/](docs/design/archive/))
-- `CONTRIBUTING.md`: the process rules for every contributor, human or agent
-- `AGENTS.md`: agent-specific rules (context loading, writing style), read first by any coding agent
+Faberon runs LLM/ML research autonomously. Give it a research plan (goal, metric, budget, stop conditions) and it proposes experiments, submits training jobs, waits for results, judges them against your expectations, and decides what to try next. Every decision lands in an append-only ledger, and you can steer it mid-run.
 
-## Setup
+Three tiers, one contract:
 
-The control plane stores its ledger in Postgres. Setup is two layers:
+- The **brain** is the only component with autonomous authority: a durable agent loop behind a small HTTP API, with Postgres as its only infrastructure.
+- The **console** is a Pi extension for drafting plans and steering campaigns from a chat session.
+- The **CLI** covers the same operations from a shell (no LLM).
 
-1. **Install a Postgres server** (once per machine).
-2. **Create the databases** with `scripts/db/create-faberon-db.sh` (once per server, with Postgres running). This creates `faberon` for the control plane and `faberon_test` for the test suite.
-
-How you do step 1 depends on the machine. Run the `scripts/` commands from the Faberon repo root.
-
-### Dev machine (system Postgres)
-
-On Fedora:
-
-```bash
-sudo dnf install postgresql-server postgresql-contrib
-sudo postgresql-setup --initdb          # creates the data dir with peer auth
-sudo systemctl enable --now postgresql  # start it, and on boot
-sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-bash scripts/db/create-faberon-db.sh
-export FABERON_DATABASE_URL=postgres:///faberon
+The console and the CLI propose, the brain decides, the ledger remembers. 
+```
+     ┌───────────┐   ┌─────────────┐
+     │ Console   │   │ CLI         │
+     │ (Pi, TS)  │   │ (Typer, Py) │
+     └───────────┘   └─────────────┘
+        │                  │
+        └────────┬─────────┘
+                 │  v0 API (HTTP + SSE, bearer token)
+        ┌────────┴───────────────────────────┐
+        │ Brain: the only authority          │
+        │    Pydantic AI, DBOS, FastAPI      │
+        │    Postgres (ledger)               │
+        └────────────┬───────────┬───────────┘
+              submit ▼           ▲ status
+        ┌────────────┴───────────┴───────────┐
+        │ Executors (submit/status/cancel):  │
+        │  · Slurm cluster                   │
+        │  · local subprocess                │
+        └────────────────────────────────────┘
 ```
 
-On Ubuntu:
+## Install
+
+Pick the guide for your machine:
+
+- [Install on a workstation](docs/install-workstation.md): you have sudo.
+- [Install on a login node](docs/install-login-node.md): shared cluster node, no sudo.
+
+To work on the Faberon repo itself, see [docs/developing.md](docs/developing.md).
+
+## Quickstart
+
+With the brain running (`faberon serve`) and `FABERON_API_TOKEN` set, submit a campaign and watch it:
 
 ```bash
-sudo apt install postgresql postgresql-contrib   # package inits the cluster and starts the service
-sudo -u postgres createuser --superuser "$USER"  # create a DB role matching your OS user
-bash scripts/db/create-faberon-db.sh
-export FABERON_DATABASE_URL=postgres:///faberon
+faberon create plan.json   # submit a research plan
+faberon list               # campaigns and live status
+faberon events <id> -f     # stream the ledger live
+faberon cancel <id>        # stop at the next decision boundary
 ```
 
-`postgres:///faberon` connects over the local unix socket using peer auth (you are authenticated as your OS user, no password, no network). Data persists on disk under the Postgres data directory.
+Or do the same from a Pi chat session with the console extension loaded: ask it to list campaigns, inject an idea, draft a plan, etc.
 
-The system package runs Postgres as a background service that starts on boot, so there is nothing to start or stop by hand. Do not use `scripts/db/start-postgres.sh` or `scripts/db/stop-postgres.sh` here; those are for the no-sudo install below.
+Both clients talk to the brain over a small HTTP API (`/v0/*`, bearer token). A running brain serves its live API reference at `/docs`.
 
-### Login node (no sudo)
 
-Login nodes typically have no working sudo. Install a personal Postgres instead of the system package.
+## Feedback and contributing
 
-Once:
+- Found a bug? File an [issue](https://github.com/sevren-ai/faberon/issues).
+- Have a feature idea? Post a new thread in the [discussion forum](https://github.com/sevren-ai/faberon/discussions/categories/feature-requests). For now we are not accepting feature pull requests.
+- Ran Faberon and got some cool results? [Tell us](https://github.com/sevren-ai/faberon/discussions/categories/show-and-tell) all about it!
+- Have a question or ran into a problem not covered by our [troubleshooting guide](docs/troubleshooting.md)? Ask it [here](https://github.com/sevren-ai/faberon/discussions/categories/q-a)!
 
-```bash
-bash scripts/db/install-postgres-no-sudo.sh  # binaries + initdb + env file
-```
+For contributors and maintainers, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The installer writes an env file to `~/.config/faberon/postgres.env` (or `$XDG_CONFIG_HOME/faberon/postgres.env`). It records the install paths and connection settings. `scripts/db/start-postgres.sh` and `scripts/db/stop-postgres.sh` source this file.
+## License
 
-To start the postgres (each session, from the repo root):
-
-```bash
-bash scripts/db/start-postgres.sh
-```
-
-Once (with Postgres running):
-
-```bash
-bash scripts/db/create-faberon-db.sh         # creates the faberon and faberon_test databases
-```
-
-To stop it:
-
-```bash
-bash scripts/db/stop-postgres.sh
-```
-
-PGDATA sits next to the binaries on your home filesystem. On many clusters that is a network FS (for example Weka); that is fine for Faberon's small ledger and DBOS state.
-
-## Running the API
-
-Ensure the following vars are set:
-
-```bash
-export FABERON_SLURM_ACCOUNT=<account>
-export FABERON_API_TOKEN=<random_token>
-```
-
-`FABERON_API_TOKEN` is mandatory for the Slurm entrypoint.
-
-Then, set the model's parameters, either using OpenRouter:
-
-```bash
-export FABERON_MODEL=openrouter:<provider>/<model>
-export OPENROUTER_API_KEY=<key>
-```
-
-Or a local server with an OpenAI-compatible API:
-
-```bash
-export FABERON_MODEL=openai:<model>
-export OPENAI_BASE_URL=http://localhost:<port>/v1
-export OPENAI_API_KEY=local
-```
-
-The OpenAI client requires a key value. A local server may ignore it.
-
-Optional deployment-side knobs:
-
-- `FABERON_SLURM_GPUS`: GPU count per job (default 1).
-- `FABERON_SLURM_MAX_TIME`: walltime cap in minutes. Each job's walltime comes from its campaign plan; this cap can only lower it, never raise it. Set it to protect the cluster from runaway jobs.
-- `FABERON_SLURM_OUTPUT`: Slurm `--output` path for job stdout/stderr.
-- `FABERON_PROPOSER_TIMEOUT`: timeout in seconds for one proposer LLM call. On expiry the call fails. Defaults to 600 if not set.
-- `FABERON_NO_RECOVER`: when set (`1`, `true`, `yes`), the control plane serves the API without resuming pending campaign workflows at startup. See "Safe restart and recovery" below.
-
-You can generate a random token with:
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-Now install and start the control plane:
-
-```bash
-uv tool install packages/control-plane
-faberon serve
-```
-
-`faberon serve` runs in the foreground. On a login node, run it inside `tmux` or `screen` so it survives your SSH session. Host and port come from `FABERON_HOST` and `FABERON_PORT` (default `127.0.0.1:8000`), or from the command line.
-
-All `/v0/*` routes require `Authorization: Bearer $FABERON_API_TOKEN`.
-
-- `GET /healthz`: liveness check (no auth required)
-- `POST /v0/campaigns`: accept a reasearch plan, append `campaign.created`, start the campaign workflow
-- `GET /v0/campaigns`: list all campaign records, oldest first
-- `POST /v0/campaigns/{id}/cancel`: append `cancel.requested`, signal the workflow to stop at its next decision boundary
-- `POST /v0/campaigns/{id}/resume`: resume a pending campaign's workflow from its last checkpoint
-- `GET /v0/campaigns/{id}`: the campaign record (plan, workflow ID, creation time)
-- `GET /v0/campaigns/{id}/events?after=0`: SSE ledger tail for that campaign
-- `GET /v0/campaigns/{id}/events.jsonl?after=0`: bounded snapshot, one JSON event per line
-
-## Using the CLI
-
-Set `FABERON_API_TOKEN` before running any of these commands. The CLI also reads `FABERON_API_URL` (default `http://127.0.0.1:8000`).
-
-```bash
-faberon create plan.json     # submit a new campaign
-faberon list                 # all campaigns, oldest first
-faberon show <id>            # one campaign's plan and status
-faberon events <id>          # the campaign's ledger
-faberon events <id> -f       # stream events live
-faberon events <id> -v       # include event details
-faberon resume <id>          # resume a pending campaign
-faberon cancel <id>          # request cancellation (prompts for a reason)
-```
-
-Some notes:
-- `create` reads a JSON plan file. The repo defaults to the current directory; pass it as a positional argument to override. `--poll` (`-p`) sets the poll interval.
-- `list`, `show`, and `events` default to human-readable output. Pass `--json` (`-j`) for machine-readable output. 
-- `cancel` takes `--reason` (`-r`) to skip the prompt. 
-
-## The console (Pi extension)
-
-`packages/console/` is a Pi extension for drafting plans and operating campaigns from a chat session. It talks to the control plane over the v0 API with `FABERON_API_TOKEN` and `FABERON_API_URL` from the environment, like the CLI.
-
-Develop it with Node 22.19 or newer:
-
-```bash
-cd packages/console
-npm ci --legacy-peer-deps   # npm 10's peer resolver mis-handles Pi's tree
-npx tsc --noEmit            # typecheck
-npx vitest run              # tests
-```
-
-To try it in Pi, load the extension from source:
-
-```bash
-export FABERON_API_TOKEN=<token>
-pi -e packages/console/src/index.ts
-```
-
-This adds the `faberon_list_campaigns` tool and a `/faberon-list` command. Write operations, live status, and the drafter build on this layer; see [docs/design/v0.3.0.md](docs/design/v0.3.0.md).
-
-Once released, users install the console as a Pi package straight from the repo (`pi install git:github.com/sevren-ai/faberon@console-v0.1.0`), with no clone or build step. The console versions independently of the control plane; see [CONTRIBUTING.md](CONTRIBUTING.md#releases-and-versioning).
-
-## Safe restart and recovery
-
-By default the control plane resumes every pending campaign workflow at startup (DBOS recovery). If a recovered workflow is what destabilized the cluster, that becomes a crash loop: recover, resubmit, kill, repeat.
-
-To break the loop, start in no-recover mode:
-
-```bash
-FABERON_NO_RECOVER=1 faberon serve
-```
-
-The API serves normally, but no workflow resumes at boot. Inspect campaigns and act on them one by one:
-
-```bash
-# list campaigns with their live status (active / ended / died)
-faberon list
-
-# resume one pending campaign from its last checkpoint
-faberon resume <id>
-
-# or cancel one you do not want to run again
-faberon cancel <id>
-```
-
-`resume` replays the campaign from its last DBOS checkpoint; it does not resubmit a job already submitted. A campaign whose workflow ended or died cannot be resumed in place: start a new campaign seeded from its best metric and head sha, which are recorded in the ledger.
+MIT. See [LICENSE](LICENSE).
