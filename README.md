@@ -39,7 +39,7 @@ Pick the guide for your machine:
 - [Install on a workstation](docs/install-workstation.md): you have sudo.
 - [Install on a login node](docs/install-login-node.md): shared cluster node, no sudo.
 
-To work on the Faberon repo itself, see [docs/developing.md](docs/developing.md).
+To work on the Faberon repo itself, see [docs/install-developer.md](docs/install-developer.md).
 
 ## Quickstart
 

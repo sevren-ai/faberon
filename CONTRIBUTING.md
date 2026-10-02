@@ -45,7 +45,7 @@ git tag console-v0.1.0 && git push origin console-v0.1.0
 
 GitHub Releases keys off the tag you push; each release notes which contract version it speaks. Both packages are also published to their registries: the brain to PyPI as `faberon` (`uv publish`, built from a worktree at the tag, never from a feature branch) and the console to npm as `@faberon/console` (`npm publish --access public`). Until the first registry publish lands (see the v0.3.0 design doc), the console installs from the repo with `pi install git:github.com/sevren-ai/faberon@console-v0.1.0`.
 
-For environment setup to develop Faberon (both packages, the test and lint scripts), see [docs/developing.md](docs/developing.md).
+For environment setup to develop Faberon (both packages, the test and lint scripts), see [docs/install-developer.md](docs/install-developer.md).
 
 ## Git and pull requests
 
