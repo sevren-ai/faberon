@@ -102,4 +102,4 @@ For contributors and maintainers, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+The software is provided "as is" without warranty of any kind, under an MIT [LICENSE](LICENSE).
