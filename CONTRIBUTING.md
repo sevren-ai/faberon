@@ -9,6 +9,14 @@ We are not accepting pull requests for new features right now. Please do not ope
 - **Bug reports:** file an issue at [github.com/sevren-ai/faberon/issues](https://github.com/sevren-ai/faberon/issues).
 - **Feature requests:** post in the [feature-requests discussion](https://github.com/sevren-ai/faberon/discussions/categories/feature-requests), not as an issue or PR.
 
+## Code Layout
+
+- `packages/control-plane/`: the brain (Python, `uv`-managed, import name `faberon`)
+- `packages/console/`: the console (Pi extension, TypeScript, npm-managed)
+- `docs/design/`: [system design](docs/design/design.md), [roadmap](docs/design/roadmap.md), [future ideas](docs/design/future.md), one doc per release (shipped releases in [archive/](docs/design/archive/))
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md) (this document): process rules for every contributor, human or agent
+- [`AGENTS.md`](../AGENTS.md): agent-specific rules, read first by any coding agent
+
 ## What is work in progress
 
 Read the design docs before starting, in this order:
@@ -43,9 +51,7 @@ git tag v0.3.0 && git push origin v0.3.0
 git tag console-v0.1.0 && git push origin console-v0.1.0
 ```
 
-GitHub Releases keys off the tag you push; each release notes which contract version it speaks. Both packages are also published to their registries: the brain to PyPI as `faberon` (`uv publish`, built from a worktree at the tag, never from a feature branch) and the console to npm as `@faberon/console` (`npm publish --access public`). Until the first registry publish lands (see the v0.3.0 design doc), the console installs from the repo with `pi install git:github.com/sevren-ai/faberon@console-v0.1.0`.
-
-For environment setup to develop Faberon (both packages, the test and lint scripts), see [docs/install-developer.md](docs/install-developer.md).
+GitHub Releases keys off the tag you push; each release notes which contract version it speaks. Both packages are also published to their registries: the brain to PyPI as `faberon` (`uv publish`, built from a worktree at the tag, never from a feature branch) and the console to npm as `@faberon/console` (`npm publish --access public`).
 
 ## Git and pull requests
 
@@ -56,6 +62,8 @@ For environment setup to develop Faberon (both packages, the test and lint scrip
 - A release is cut by merging to `main` and pushing the package's tag.
 
 ## Testing
+
+### Local tests (workspace)
 
 From the repo root:
 
@@ -71,32 +79,47 @@ This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, m
 - Every test should protect a behaviour we care about. Prefer a few meaningful tests over many trivial ones that only restate the implementation.
 - Tests that start DBOS workflows must wait for them to finish before DBOS teardown. A running parent can otherwise remain blocked on a child workflow during Python shutdown.
 
-### Ledger tests
+#### Postgres ledger tests
 
-The ledger tests need a local Postgres and `FABERON_DATABASE_URL` exported in your shell (see `## Prerequisites` and the `## Setup` section of `README.md`). They skip themselves when `FABERON_DATABASE_URL` is unset or when the postgres isn't running,
-so a plain `scripts/test/local.sh` run doesn't need a database.
+They are included in the local tests, but skip themselves when `FABERON_DATABASE_URL` is unset or when the postgres isn't running.
 
-The test suite runs against the `faberon_test` database, not the actual (production) database named in `FABERON_DATABASE_URL`. The tests truncate tables and reset the DBOS system database, so this separation keeps production data safe. `scripts/db/create-faberon-db.sh` creates both databases.
+The test suite runs against the `faberon_test` database, not the actual (production) database named in `FABERON_DATABASE_URL`. The tests truncate tables and reset the DBOS system database, so this separation keeps production data safe.
 
-### On-cluster Slurm tests
 
-Tests that submit real jobs to Slurm live in `tests/test_executor/test_slurm_integration.py`. They are skipped by default so a plain `pytest` run never submits jobs, in CI or on a login node. To run them on a login node that has `sbatch` on `PATH`:
+### Slurm tests (login node)
 
 ```bash
-FABERON_SLURM_ACCOUNT=<account> bash scripts/test/slurm.sh
+bash scripts/test/slurm.sh
 ```
 
-`FABERON_SLURM_ACCOUNT` is the Slurm account jobs are billed to; the cluster requires it. The script sets `FABERON_SLURM_INTEGRATION=1` to opt in and runs `pytest -m slurm`. These verify actual behaviour on the cluster.
+This (only) runs the tests that submit real jobs to Slurm. It requires `sbatch` on `PATH` and `̀FABERON_SLURM_ACCOUNT`. 
+
+To run them on a login node that has `sbatch` on `PATH`:
 
 ### LLM tests
 
-`tests/test_workflow/test_proposer_llm.py` runs the proposer against the real model configured in `FABERON_MODEL`. It is skipped by default. To run it:
-
 ```bash
-FABERON_MODEL=openrouter:<provider>/<model> OPENROUTER_API_KEY=<key> bash scripts/test/llm.sh
+bash scripts/test/llm.sh
 ```
 
-Use `scripts/test/prod.sh` to run the Slurm and LLM integration tests together; it needs both sets of env vars.
+This runs the proposer against the real model configured in `FABERON_MODEL`. 
+
+### LLM + Slurm tests (login node)
+
+```bash
+bash scripts/test/prod.sh
+```
+
+Run the Slurm and LLM integration tests together.
+
+### Console tests
+
+```bash
+npm ci --legacy-peer-deps   # npm 10's peer resolver mis-handles Pi's tree
+npx tsc --noEmit            # typecheck
+npx vitest run              # tests
+```
+
 
 ## Formatting and linting
 
