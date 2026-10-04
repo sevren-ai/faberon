@@ -43,3 +43,5 @@ export PATH="$HOME/.local/node/bin:$PATH"   # add to your shell profile
 ```
 
 A version manager such as `nvm` or `mise` works too.
+
+From here onwards, continue with the install/quickstart guide in the README.
