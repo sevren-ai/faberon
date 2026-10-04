@@ -1,10 +1,5 @@
 ## Faberon environment
 
-When you've created the database(s), the `create-faberon-db.sh` script should print `FABERON_DATABASE_URL` that needs to be set in your env, e.g.:
-```bash 
-export FABERON_DATABASE_URL=postgres:///faberon
-```
-
 By default, `FABERON_API_URL` will be set to `http://127.0.0.1:8000`, but if you want to serve the brain elsewhere you can set this envvar.
 
 Next, generate a unique `<token>` that will secure the API on a shared host:
@@ -44,6 +39,8 @@ export FABERON_MODEL=openai:<model>
 
 When you're running Faberon, there are some optional settings you can set through envvars as well:
 
+- `FABERON_HOST`: address `faberon serve` binds to (default `127.0.0.1`).
+- `FABERON_PORT`: port `faberon serve` binds to (default `8000`).
 - `FABERON_SLURM_GPUS`: GPU count per job (default 1).
 - `FABERON_SLURM_MAX_TIME`: walltime cap in minutes; can only lower a plan's walltime, never raise it.
 - `FABERON_SLURM_OUTPUT`: Slurm `--output` path for job stdout/stderr.

@@ -18,8 +18,9 @@ Start Postgres (each session, from the repo root), then create the databases onc
 ```bash
 bash scripts/db/start-postgres.sh
 bash scripts/db/create-faberon-db.sh         # creates faberon and faberon_test
-export FABERON_DATABASE_URL=postgres:///faberon
 ```
+
+The create script prints the `FABERON_DATABASE_URL` to export. It is also recorded in the env file `~/.config/faberon/postgres.env`.
 
 To stop it: `bash scripts/db/stop-postgres.sh`.
 

@@ -70,11 +70,11 @@ faberon serve
 With the brain running, submit a campaign and watch it through the CLI:
 
 ```bash
-faberon create plan.json   # start a campaign from a given research plan
-faberon list               # list all campaigns with their live status
-faberon show <id>          # show the details of one particular campaign
-faberon events <id> -f     # stream the events of one particular campaign
-faberon cancel <id>        # cancell one particular campaign
+faberon create plan.json my_repo  # start a campaign with a given plan for a specific repo
+faberon list                      # list all campaigns with their live status
+faberon show <id>                 # show the details of one particular campaign
+faberon events <id> -f            # stream the events of one particular campaign
+faberon cancel <id>               # cancel one particular campaign
 ```
 
 Or do the same from a Pi chat session with the console extension loaded: ask it to list campaigns, inject an idea, draft a plan, etc.

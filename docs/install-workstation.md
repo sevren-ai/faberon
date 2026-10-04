@@ -30,6 +30,11 @@ Copy-paste the `create-faberon-db.sh` [script](https://github.com/sevren-ai/fabe
 bash scripts/db/create-faberon-db.sh   # creates faberon and faberon_test DBs
 ```
 
+The script should print `FABERON_DATABASE_URL` that needs to be set in your env, e.g.:
+```bash 
+export FABERON_DATABASE_URL=postgres:///faberon
+```
+
 ## 2. Set the environment
 
 Refer to [the env guide](prepare-env.md).
@@ -41,5 +46,5 @@ The console needs Node 22.19 or newer.
 E.g. on fedora:
 
 ```bash
-sudo dnf install nodejs22 npm
+sudo dnf install nodejs npm
 ```
