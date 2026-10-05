@@ -62,7 +62,7 @@ def test_experiment_on_slurm(dbos, tmp_path):
             campaign_id=campaign_id,
             command=command,
             submission_key=submission_key,
-            metric_name="val_bpb",
+            metric="val_bpb",
             repo_path=str(tmp_path),
             baseline=1.23,
             poll_interval_seconds=5.0,

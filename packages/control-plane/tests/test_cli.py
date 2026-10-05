@@ -19,7 +19,7 @@ CAMPAIGN_ID = str(uuid.uuid4())
 _PLAN = {
     "goal": "Beat val_bpb baseline.",
     "command": "echo hello",
-    "metric_name": "val_bpb",
+    "metric": "val_bpb",
     "baseline": 1.42,
     "budget_gpu_hours": 100.0,
     "max_experiments": 3,
@@ -246,7 +246,7 @@ def test_show_json(api_client):
     plan = campaign["plan"]
     assert campaign["campaign_id"] == CAMPAIGN_ID
     assert parsed["status"] == "active"
-    assert plan["metric_name"] == "val_bpb"
+    assert plan["metric"] == "val_bpb"
     assert plan["budget_gpu_hours"] == 100.0
     assert plan["max_experiments"] == 3
 

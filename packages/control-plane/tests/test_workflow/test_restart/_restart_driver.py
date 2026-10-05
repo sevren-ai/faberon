@@ -55,7 +55,7 @@ def _experiment_setup() -> ExperimentSetup:
         campaign_id=UUID(os.environ["FABERON_TEST_CAMPAIGN_ID"]),
         command="sleep 30",
         submission_key=os.environ["FABERON_TEST_WF_ID"],
-        metric_name="val_bpb",
+        metric="val_bpb",
         repo_path=os.environ["FABERON_TEST_RUN_DIR"],
         baseline=1.23,
         poll_interval_seconds=0.05,

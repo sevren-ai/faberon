@@ -24,7 +24,7 @@ const planSchema = Type.Object({
     description: "Training command each experiment runs.",
     minLength: 1,
   }),
-  metric_name: Type.String({
+  metric: Type.String({
     description:
       "Name of the metric under optimization, e.g. 'val_bpb'. The job log must " +
       "print a line naming it followed by a float, e.g. 'val_bpb: 1.10'.",

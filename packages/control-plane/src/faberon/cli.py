@@ -141,7 +141,7 @@ def list_campaigns(
                 f"{campaign['campaign_id']}  "
                 f"{created.strftime('%Y-%m-%d %H:%M')}  "
                 f"{info['status']:<6}  "
-                f"{campaign['plan']['metric_name']:<12}  "
+                f"{campaign['plan']['metric']:<12}  "
                 f"{campaign['repo_path']}"
             )
             echo(line)
@@ -165,7 +165,7 @@ def show_campaign(
         echo(f"created:  {created.strftime('%Y-%m-%d %H:%M')}")
         echo(f"repo:     {campaign['repo_path']}")
         echo(f"goal:     {campaign['plan']['goal']}")
-        echo(f"metric:   {campaign['plan']['metric_name']}")
+        echo(f"metric:   {campaign['plan']['metric']}")
         echo(f"budget:   {campaign['plan']['budget_gpu_hours']} gpu-hours")
         echo(f"max exp:  {campaign['plan']['max_experiments']}")
         echo(f"status:   {info['status']}")
