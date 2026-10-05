@@ -143,56 +143,6 @@ export class FaberonClient {
       .map((line) => JSON.parse(line) as FaberonEvent);
   }
 
-  /**
-   * GET /v0/campaigns/{id}/events: stream the campaign's ledger live over SSE.
-   * Parses `data:` lines into events; aborting the signal ends the stream.
-   */
-  async *streamEvents(
-    campaignId: string,
-    after = 0,
-    signal?: AbortSignal,
-  ): AsyncGenerator<FaberonEvent> {
-    const url = `${this.config.baseUrl}/v0/campaigns/${campaignId}/events?after=${after}`;
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        headers: { Authorization: `Bearer ${this.config.token}` },
-        signal: signal ?? null,
-      });
-    } catch (err) {
-      const cause = err instanceof Error ? err.message : String(err);
-      throw new Error(
-        `Cannot reach the brain at ${this.config.baseUrl}: ${cause}. ` +
-          "Is `faberon serve` running?",
-      );
-    }
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = (await res.json()) as ApiErrorBody;
-        if (body.detail) detail = body.detail;
-      } catch {
-        // Non-JSON error body; keep the status text.
-      }
-      throw new ApiError(res.status, detail);
-    }
-    if (!res.body) {
-      throw new Error("event stream has no body");
-    }
-    const decoder = new TextDecoder();
-    let buffer = "";
-    for await (const chunk of res.body) {
-      buffer += decoder.decode(chunk, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          yield JSON.parse(line.slice("data: ".length)) as FaberonEvent;
-        }
-      }
-    }
-  }
-
   private async requestText(path: string, init?: RequestInit): Promise<string> {
     const url = `${this.config.baseUrl}${path}`;
     let res: Response;
