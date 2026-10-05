@@ -3,6 +3,7 @@
 import re
 import shlex
 import subprocess
+from pathlib import Path
 
 from dbos import DBOS
 
@@ -27,10 +28,16 @@ class Runtime:
         self.config_name = config_name
 
     @DBOS.step()
-    def submit_step(self, command: str, submission_key: str, walltime: int) -> str:
+    def submit_step(
+        self, command: str, submission_key: str, walltime: int, repo_path: str
+    ) -> str:
         """Start the job on the cluster. Idempotent on submission_key."""
+        output_path = _job_log_path(repo_path, submission_key)
         request = SubmitRequest(
-            command=command, submission_key=submission_key, walltime=walltime
+            command=command,
+            submission_key=submission_key,
+            walltime=walltime,
+            output_path=str(output_path),
         )
         return self.executor.submit(request)
 
@@ -77,7 +84,9 @@ class Runtime:
     @DBOS.workflow()
     def run_experiment(self, setup: ExperimentSetup) -> ExperimentResult:
         """Run one experiment durably: submit, poll, parse, judge, record."""
-        job_id = self.submit_step(setup.command, setup.submission_key, setup.walltime)
+        job_id = self.submit_step(
+            setup.command, setup.submission_key, setup.walltime, setup.repo_path
+        )
 
         info = self.status_step(job_id)
         while not info.state.is_terminal:
@@ -133,6 +142,15 @@ class Runtime:
         return ExperimentResult(
             judgment=judgment, metric_value=metric_value, job_info=info
         )
+
+
+def _job_log_path(repo_path: str, submission_key: str) -> Path:
+    """The job's log file: ``{repo}/.faberon/{submission_key}.out``.
+
+    The metric command reads this file, so the path is stable and derived
+    from the target repo, not from global config.
+    """
+    return Path(repo_path) / ".faberon" / f"{submission_key}.out"
 
 
 # -XXX.YYe-Z

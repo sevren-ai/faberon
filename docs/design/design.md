@@ -23,20 +23,24 @@ Terminology:
 Three tiers connected by explicit contracts (typed JSON over HTTP/SSE). Any tier is replaceable without touching the others.
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│ Login node                                                               │
-│  ┌─────────────────┐  REST+SSE   ┌────────────────────────────────────┐  │
-│  │ Console         │◄─localhost─►│ Control plane: the only brain      │  │
-│  │ (Pi ext., TS;   │             │ Pydantic AI · DBOS · FastAPI       │  │
-│  │ hosts drafter)  │             │ · Postgres                         │  │
-│  └─────────────────┘             └──────┬───────────────▲─────────────┘  │
-│                                  submit ▼ local sbatch  │ sacct poll     │
-│  experiment repo (shared FS, visible to compute nodes)                   │
-└──────────────────────────────────────┬──────────────────┼────────────────┘
-                                       │                  │
-                              ┌────────▼──────────────────┴────────┐
-                              │ Slurm cluster (execution)          │
-                              └────────────────────────────────────┘
+     +-----------+   +-------------+
+     | Console   |   | CLI         |
+     | (Pi, TS)  |   | (Typer, Py) |
+     +-----------+   +-------------+
+        |                  |
+        +--------+---------+
+                 |  API
+        +--------+---------------------------+
+        | Brain: authority                   |
+        |    Pydantic AI, DBOS, FastAPI      |
+        |    Postgres (ledger)               |
+        +------------+-----------+-----------+
+              submit v           ^ status
+            +--------+-----------+-------------+
+            | Executors                        |
+            |  - Slurm cluster                 |
+            |  - local subprocess              |
+            +----------------------------------+
 ```
 
 - **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the console is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps console and brain independently replaceable.

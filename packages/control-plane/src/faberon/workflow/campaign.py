@@ -132,6 +132,7 @@ class CampaignRunner:
                     submission_key=f"{setup.campaign_id}:{exp_done}",
                     metric_command=plan.metric_command,
                     metric_name=plan.metric_name,
+                    repo_path=setup.repo_path,
                     baseline=best_metric if best_metric is not None else plan.baseline,
                     poll_interval_seconds=setup.poll_interval_seconds,
                     walltime=plan.walltime,

@@ -110,7 +110,8 @@ class LocalExecutor:
         return self._dir / f"{job_id}.json"
 
     def _spawn(self, job_id: str, request: SubmitRequest) -> dict[str, Any]:
-        stdout_path = self._dir / f"{job_id}.out"
+        stdout_path = Path(request.output_path)
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
         start = time.time()
         # Line buffering keeps the metric output file current for a metric
         # command that reads it while the job runs. Own process group so

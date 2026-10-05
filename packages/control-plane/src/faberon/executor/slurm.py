@@ -109,12 +109,10 @@ class SlurmExecutor:
         self,
         account: str,
         *,
-        output: str | None = None,
         gpus: int = 1,
         max_walltime: int | None = None,
     ) -> None:
         self._account = account
-        self._output = output
         self._gpus = gpus
         self._max_walltime = max_walltime
 
@@ -134,7 +132,7 @@ class SlurmExecutor:
                 job_name,
                 self._account,
                 request.argv,
-                output=self._output,
+                output=request.output_path,
                 gpus=self._gpus,
                 time_limit=self._effective_walltime(request),
             ),

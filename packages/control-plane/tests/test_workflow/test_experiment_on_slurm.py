@@ -49,7 +49,6 @@ def test_experiment_on_slurm(dbos, tmp_path):
     command = f"sh -c \"echo 'val_bpb: 1.10' > {shlex.quote(str(metric_file))}\""
     executor = SlurmExecutor(
         account=os.environ["FABERON_SLURM_ACCOUNT"],
-        output=str(tmp_path / "slurm-%j.out"),
         max_walltime=10,
     )
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
@@ -65,6 +64,7 @@ def test_experiment_on_slurm(dbos, tmp_path):
             submission_key=f"slurm-{uuid.uuid4().hex}",
             metric_command=f"cat {metric_file}",
             metric_name="val_bpb",
+            repo_path=str(tmp_path),
             baseline=1.23,
             poll_interval_seconds=5.0,
             walltime=10,

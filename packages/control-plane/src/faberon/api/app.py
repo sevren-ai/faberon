@@ -170,7 +170,6 @@ def create_app_slurm() -> FastAPI:
 
     Requires ``FABERON_DATABASE_URL``, ``FABERON_SLURM_ACCOUNT``,
     ``FABERON_API_TOKEN``, and ``FABERON_MODEL``.
-    Optional ``FABERON_SLURM_OUTPUT`` sets the Slurm ``--output`` path.
     Optional ``FABERON_SLURM_GPUS`` sets the GPU count per job (default 1).
     Optional ``FABERON_MAX_TIME`` sets a walltime cap (minutes).
     """
@@ -186,7 +185,6 @@ def create_app_slurm() -> FastAPI:
     gpus = int(os.environ.get("FABERON_SLURM_GPUS", "1"))
     executor = SlurmExecutor(
         account=account,
-        output=os.environ.get("FABERON_SLURM_OUTPUT"),
         gpus=gpus,
         max_walltime=_max_walltime_from_env(),
     )
@@ -204,8 +202,7 @@ def create_app_local() -> FastAPI:
 
     Requires ``FABERON_DATABASE_URL`` and ``FABERON_MODEL``.
     Optional ``FABERON_API_TOKEN`` guards the API (recommended)
-    Optional ``FABERON_STATE_DIR`` sets the job state directory (default
-    ``~/.local/share/faberon``).
+    Optional ``FABERON_STATE_DIR`` sets the job state directory.
     Optional ``FABERON_MAX_TIME`` sets a walltime cap (minutes).
     """
     token = os.environ.get("FABERON_API_TOKEN")

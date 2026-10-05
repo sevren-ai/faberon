@@ -45,11 +45,10 @@ When you're running Faberon, there are some optional settings you can set throug
 ### Slurm-specific options
 
 - `FABERON_SLURM_GPUS`: GPU count per job (default 1). Only used with the Slurm executor.
-- `FABERON_SLURM_OUTPUT`: Slurm `--output` path for job stdout/stderr. Only used with the Slurm executor.
 
 ### Local-executor-specific options
 
-- `FABERON_STATE_DIR`: job state directory for the local executor (default `~/.local/share/faberon`). Holds one pid record and one output file per job.
+- `FABERON_STATE_DIR`: the local executor's private state directory (default `~/.local/share/faberon`). Holds one pid record per job for restart recovery.
 
 ### Location of the brain
 
