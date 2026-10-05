@@ -3,6 +3,7 @@
 import contextlib
 import json
 import os
+import shutil
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -13,7 +14,7 @@ import typer
 import uvicorn
 from typer import Argument, FileText, Option, echo
 
-from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_slurm
+from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_local, create_app_slurm
 from .schema import Event
 
 _DEFAULT_HOST = "127.0.0.1"
@@ -65,14 +66,28 @@ def _check(response: httpx2.Response) -> httpx2.Response:
 def serve(
     host: str = Option(_DEFAULT_HOST, envvar="FABERON_HOST"),
     port: int = Option(_DEFAULT_PORT, envvar="FABERON_PORT"),
+    executor: str | None = Option(None, envvar="FABERON_EXECUTOR"),
 ) -> None:
-    """Start the Faberon server with the Slurm executor.
+    """Start the Faberon server, with the given executor or a default one.
 
-    Requires the same env vars as ``create_app_slurm``: FABERON_DATABASE_URL,
-    FABERON_SLURM_ACCOUNT, FABERON_API_TOKEN and FABERON_MODEL.
+    Requires FABERON_DATABASE_URL, FABERON_API_TOKEN and FABERON_MODEL.
+    The Slurm executor also requires FABERON_SLURM_ACCOUNT.
     """
+    factories = {"slurm": create_app_slurm, "local": create_app_local}
+    # validate given executor name
+    name = executor
+    if name is not None and name not in factories.keys():
+        echo(
+            f"unknown executor {name!r}: expected one of {sorted(factories)}",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    # default name if none was given: slurm if 'sbatch' is available
+    if name is None:
+        name = "slurm" if shutil.which("sbatch") else "local"
+    echo(f"executor: {name}")
     uvicorn.run(
-        create_app_slurm,
+        factories.get(name),
         host=host,
         port=port,
         factory=True,
