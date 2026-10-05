@@ -20,6 +20,7 @@ from starlette.types import ASGIApp
 
 from .. import __version__
 from ..executor import Executor
+from ..executor.local import LocalExecutor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
 from ..schema.campaign import Campaign, CampaignInfo
@@ -192,6 +193,22 @@ def create_app_slurm() -> FastAPI:
         gpus=gpus,
         max_walltime=max_walltime,
     )
+    return create_app(executor=executor, auth_token=token)
+
+
+def create_app_local() -> FastAPI:
+    """Uvicorn entrypoint: local executor from the environment.
+
+    Requires ``FABERON_DATABASE_URL`` and ``FABERON_MODEL``.
+    Optional ``FABERON_API_TOKEN`` guards the API (recommended)
+    Optional ``FABERON_STATE_DIR`` sets the job state directory (default
+    ``~/.local/share/faberon``).
+    """
+    token = os.environ.get("FABERON_API_TOKEN")
+    state_dir = os.environ.get("FABERON_STATE_DIR")
+    if state_dir is None:
+        state_dir = os.path.join(os.path.expanduser("~"), ".local", "share", "faberon")
+    executor = LocalExecutor(state_dir)
     return create_app(executor=executor, auth_token=token)
 
 
