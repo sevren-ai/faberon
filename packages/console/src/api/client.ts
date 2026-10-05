@@ -5,7 +5,14 @@
  * (`FABERON_API_URL`, `FABERON_API_TOKEN`), matching the Faberon CLI.
  */
 
-import type { ApiErrorBody, CampaignInfo } from "./types.js";
+import type {
+  ApiErrorBody,
+  CampaignCreate,
+  CampaignCreated,
+  CampaignInfo,
+  FaberonEvent,
+  StatusResponse,
+} from "./types.js";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8000";
 
@@ -85,5 +92,135 @@ export class FaberonClient {
   /** GET /v0/campaigns/{id}: one campaign's record and live status. */
   getCampaign(campaignId: string): Promise<CampaignInfo> {
     return this.request<CampaignInfo>(`/v0/campaigns/${campaignId}`);
+  }
+
+  /** POST /v0/campaigns: submit a new campaign from a research plan. */
+  createCampaign(body: CampaignCreate): Promise<CampaignCreated> {
+    return this.request<CampaignCreated>("/v0/campaigns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  /** POST /v0/campaigns/{id}/cancel: request cancellation of an active campaign. */
+  cancelCampaign(campaignId: string, reason: string): Promise<StatusResponse> {
+    return this.request<StatusResponse>(`/v0/campaigns/${campaignId}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  /** POST /v0/campaigns/{id}/ideas: inject an advisory idea into an active campaign. */
+  injectIdea(
+    campaignId: string,
+    text: string,
+    reason: string,
+  ): Promise<StatusResponse> {
+    return this.request<StatusResponse>(`/v0/campaigns/${campaignId}/ideas`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, reason }),
+    });
+  }
+
+  /** POST /v0/campaigns/{id}/resume: resume a pending campaign from its last checkpoint. */
+  resumeCampaign(campaignId: string): Promise<StatusResponse> {
+    return this.request<StatusResponse>(`/v0/campaigns/${campaignId}/resume`, {
+      method: "POST",
+    });
+  }
+
+  /** GET /v0/campaigns/{id}/events.jsonl: bounded snapshot of the campaign's ledger. */
+  async getEvents(campaignId: string, after = 0): Promise<FaberonEvent[]> {
+    const text = await this.requestText(
+      `/v0/campaigns/${campaignId}/events.jsonl?after=${after}`,
+    );
+    return text
+      .split("\n")
+      .filter((line) => line.length > 0)
+      .map((line) => JSON.parse(line) as FaberonEvent);
+  }
+
+  /**
+   * GET /v0/campaigns/{id}/events: stream the campaign's ledger live over SSE.
+   * Parses `data:` lines into events; aborting the signal ends the stream.
+   */
+  async *streamEvents(
+    campaignId: string,
+    after = 0,
+    signal?: AbortSignal,
+  ): AsyncGenerator<FaberonEvent> {
+    const url = `${this.config.baseUrl}/v0/campaigns/${campaignId}/events?after=${after}`;
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${this.config.token}` },
+        signal: signal ?? null,
+      });
+    } catch (err) {
+      const cause = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Cannot reach the brain at ${this.config.baseUrl}: ${cause}. ` +
+          "Is `faberon serve` running?",
+      );
+    }
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = (await res.json()) as ApiErrorBody;
+        if (body.detail) detail = body.detail;
+      } catch {
+        // Non-JSON error body; keep the status text.
+      }
+      throw new ApiError(res.status, detail);
+    }
+    if (!res.body) {
+      throw new Error("event stream has no body");
+    }
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for await (const chunk of res.body) {
+      buffer += decoder.decode(chunk, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          yield JSON.parse(line.slice("data: ".length)) as FaberonEvent;
+        }
+      }
+    }
+  }
+
+  private async requestText(path: string, init?: RequestInit): Promise<string> {
+    const url = `${this.config.baseUrl}${path}`;
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        ...init,
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+          ...init?.headers,
+        },
+      });
+    } catch (err) {
+      const cause = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Cannot reach the brain at ${this.config.baseUrl}: ${cause}. ` +
+          "Is `faberon serve` running?",
+      );
+    }
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = (await res.json()) as ApiErrorBody;
+        if (body.detail) detail = body.detail;
+      } catch {
+        // Non-JSON error body; keep the status text.
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.text();
   }
 }
