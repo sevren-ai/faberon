@@ -128,6 +128,52 @@ def test_serve_graceful_shutdown(monkeypatch: pytest.MonkeyPatch):
     assert captured["kwargs"]["timeout_graceful_shutdown"] == GRACEFUL_SHUTDOWN_TIMEOUT
 
 
+def _serve_factory(monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Capture the factory uvicorn is invoked with."""
+    captured = {}
+    monkeypatch.setattr(
+        uvicorn, "run", lambda *a, **kw: captured.update({"args": a, "kwargs": kw})
+    )
+    return captured
+
+
+def test_serve_defaults_to_slurm(monkeypatch: pytest.MonkeyPatch):
+    captured = _serve_factory(monkeypatch)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert captured["args"][0] is cli.create_app_slurm
+    assert "executor: slurm" in result.output
+
+
+def test_serve_defaults_to_local(monkeypatch: pytest.MonkeyPatch):
+    captured = _serve_factory(monkeypatch)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert captured["args"][0] is cli.create_app_local
+    assert "executor: local" in result.output
+
+
+def test_serve_executor_overrides(monkeypatch: pytest.MonkeyPatch):
+    captured = _serve_factory(monkeypatch)
+    # sbatch present, but the explicit choice wins.
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
+    monkeypatch.setenv("FABERON_EXECUTOR", "local")
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert captured["args"][0] is cli.create_app_local
+    assert "executor: local" in result.output
+
+
+def test_serve_unknown_executor(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    monkeypatch.setenv("FABERON_EXECUTOR", "kubernetes")
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 2
+    assert "unknown executor" in result.output
+
+
 def test_serve_host_port(monkeypatch: pytest.MonkeyPatch):
     """Flags beat env vars, which beat the defaults."""
     captured = {}
