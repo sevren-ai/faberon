@@ -1,8 +1,6 @@
 ## Faberon environment
 
-By default, `FABERON_API_URL` will be set to `http://127.0.0.1:8000`, but if you want to serve the brain elsewhere you can set this envvar.
-
-Next, generate a unique `<token>` that will secure the API on a shared host:
+First, generate a unique `<token>` that will secure the API on a shared host:
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
@@ -39,10 +37,19 @@ export FABERON_MODEL=openai:<model>
 
 When you're running Faberon, there are some optional settings you can set through envvars as well:
 
-- `FABERON_HOST`: address `faberon serve` binds to (default `127.0.0.1`).
-- `FABERON_PORT`: port `faberon serve` binds to (default `8000`).
 - `FABERON_SLURM_GPUS`: GPU count per job (default 1).
 - `FABERON_SLURM_MAX_TIME`: walltime cap in minutes; can only lower a plan's walltime, never raise it.
 - `FABERON_SLURM_OUTPUT`: Slurm `--output` path for job stdout/stderr.
 - `FABERON_PROPOSER_TIMEOUT`: timeout (in seconds) for one proposer LLM call (default 600).
 - `FABERON_NO_RECOVER`: serve the API without resuming pending workflows at startup. See [troubleshooting.md](troubleshooting.md#safe-restart-and-recovery).
+
+### Location of the brain
+
+If you change where the brain binds, tell the clients where to find it. The server reads its bind address; the clients read the brain's URL:
+
+Server-side (read by `faberon serve`):
+- `FABERON_HOST`: address `faberon serve` binds to (default `127.0.0.1`).
+- `FABERON_PORT`: port `faberon serve` binds to (default `8000`).
+
+Client-side (read by the `faberon` CLI and the console):
+- `FABERON_API_URL`: where clients reach the running brain (default `http://127.0.0.1:8000`). Must match `FABERON_HOST:FABERON_PORT` if you changed those.

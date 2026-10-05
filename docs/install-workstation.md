@@ -48,3 +48,5 @@ E.g. on fedora:
 ```bash
 sudo dnf install nodejs npm
 ```
+
+From here onwards, continue with the install/quickstart guide in the README.
