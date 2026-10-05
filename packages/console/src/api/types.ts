@@ -33,6 +33,37 @@ export interface CampaignInfo {
   stop_reason?: string | null;
 }
 
+/** POST /v0/campaigns body. */
+export interface CampaignCreate {
+  campaign_id: string;
+  plan: ResearchPlan;
+  repo_path: string;
+  poll_interval_seconds: number;
+}
+
+/** POST /v0/campaigns result: new campaign ID and DBOS workflow ID. */
+export interface CampaignCreated {
+  campaign_id: string;
+  workflow_id: string;
+}
+
+/** Status body returned by the write endpoints. */
+export interface StatusResponse {
+  campaign_id: string;
+  status: string;
+}
+
+/** Ledger event record, one line of the campaign's event log. */
+export interface FaberonEvent {
+  seq: number | null;
+  ts: string;
+  campaign_id: string;
+  actor: "agent" | "human";
+  type: string;
+  reason: string;
+  payload: Record<string, unknown>;
+}
+
 /** FastAPI error body shape. */
 export interface ApiErrorBody {
   detail?: string;
