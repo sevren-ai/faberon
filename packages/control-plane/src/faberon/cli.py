@@ -12,9 +12,8 @@ from uuid import UUID, uuid4
 import httpx2
 import typer
 import uvicorn
-from typer import Argument, FileText, Option, echo
-
 from pydantic import ValidationError
+from typer import Argument, FileText, Option, echo
 
 from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_local, create_app_slurm
 from .schema import Event, ResearchPlan
@@ -199,6 +198,9 @@ def show_campaign(
 def campaign_events(
     campaign_id: UUID,
     follow: bool = Option(False, "--follow", "-f", help="Stream new events live."),
+    after: int = Option(
+        0, "--after", min=0, help="Skip events with seq up to this one."
+    ),
     verbose: bool = Option(False, "--verbose", "-v", help="Show event details."),
     as_json: bool = Option(
         False, "--json", "-j", help="Emit raw events as JSONL, one per line."
@@ -211,11 +213,20 @@ def campaign_events(
 
     with _client() as client:
         if not follow:
-            response = _check(client.get(f"/v0/campaigns/{campaign_id}/events.jsonl"))
+            response = _check(
+                client.get(
+                    f"/v0/campaigns/{campaign_id}/events.jsonl",
+                    params={"after": after},
+                )
+            )
             for line in response.text.splitlines():
                 echo(_render(Event.model_validate_json(line)))
             return
-        with client.stream("GET", f"/v0/campaigns/{campaign_id}/events") as stream:
+        with client.stream(
+            "GET",
+            f"/v0/campaigns/{campaign_id}/events",
+            params={"after": after},
+        ) as stream:
             _check(stream)
             for line in stream.iter_lines():
                 if line.startswith("data: "):

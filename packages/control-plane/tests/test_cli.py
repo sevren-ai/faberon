@@ -274,6 +274,20 @@ def test_events_json(monkeypatch: pytest.MonkeyPatch):
     assert parsed["type"] == EventType.CAMPAIGN_CREATED.value
 
 
+def test_events_after(monkeypatch: pytest.MonkeyPatch):
+    """--after is forwarded to the API as the seq lower bound."""
+    captured = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        captured["after"] = request.url.params["after"]
+        return httpx2.Response(200, text=json.dumps(_EVENT) + "\n")
+
+    monkeypatch.setattr(cli, "_client", lambda: _make_client(handler))
+    result = runner.invoke(cli.app, ["events", CAMPAIGN_ID, "--after", "41"])
+    assert result.exit_code == 0
+    assert captured["after"] == "41"
+
+
 def test_cancel(api_client):
     api_client[("POST", f"/v0/campaigns/{CAMPAIGN_ID}/cancel")] = {
         "campaign_id": CAMPAIGN_ID,
