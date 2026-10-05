@@ -25,7 +25,7 @@ The console and the CLI propose, the brain decides, the ledger remembers.
         |    Postgres (ledger)               |
         +------------+-----------+-----------+
               submit v           ^ status
-            +--------+-----------+-----------+
+            +--------+-----------+-------------+
             | Executors                        |
             |  - Slurm cluster                 |
             |  - local subprocess              |
