@@ -14,8 +14,10 @@ import typer
 import uvicorn
 from typer import Argument, FileText, Option, echo
 
+from pydantic import ValidationError
+
 from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_local, create_app_slurm
-from .schema import Event
+from .schema import Event, ResearchPlan
 
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8000
@@ -57,8 +59,14 @@ def _check(response: httpx2.Response) -> httpx2.Response:
         detail = response.json().get("detail")
     except json.JSONDecodeError:
         detail = None
-    message = detail or response.text or "request failed"
-    echo(f"error {response.status_code}: {message}", err=True)
+    echo(f"error {response.status_code}:", err=True)
+    if isinstance(detail, list):
+        # FastAPI validation errors: one line per offending field.
+        for err in detail:
+            field = ".".join(str(loc) for loc in err.get("loc", []))
+            echo(f"  {field}: {err.get('msg', 'invalid')}", err=True)
+    else:
+        echo(f"  {detail or response.text or 'request failed'}", err=True)
     raise typer.Exit(code=1)
 
 
@@ -109,9 +117,23 @@ def create_campaign(
     poll: float = Option(30.0, "--poll", "-p", help="Poll interval in seconds."),
 ) -> None:
     """Submit a new campaign from a research plan."""
+    try:
+        data = json.load(plan)
+    except json.JSONDecodeError as exc:
+        echo(f"invalid JSON in {plan.name}: {exc}", err=True)
+        echo("hint: no comments, no trailing commas, double quotes only.", err=True)
+        raise typer.Exit(code=2) from None
+    try:
+        validated = ResearchPlan.model_validate(data)
+    except ValidationError as exc:
+        echo(f"invalid plan in {plan.name}:", err=True)
+        for err in exc.errors():
+            field = ".".join(str(loc) for loc in err["loc"])
+            echo(f"  {field}: {err['msg']}", err=True)
+        raise typer.Exit(code=2) from None
     payload = {
         "campaign_id": str(uuid4()),
-        "plan": json.load(plan),
+        "plan": validated.model_dump(mode="json"),
         "repo_path": str(repo),
         "poll_interval_seconds": poll,
     }
