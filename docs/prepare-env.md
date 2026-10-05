@@ -37,11 +37,19 @@ export FABERON_MODEL=openai:<model>
 
 When you're running Faberon, there are some optional settings you can set through envvars as well:
 
-- `FABERON_SLURM_GPUS`: GPU count per job (default 1).
-- `FABERON_SLURM_MAX_TIME`: walltime cap in minutes; can only lower a plan's walltime, never raise it.
-- `FABERON_SLURM_OUTPUT`: Slurm `--output` path for job stdout/stderr.
+- `FABERON_EXECUTOR`: which executor runs jobs, `slurm` or `local`. Default is `slurm` when `sbatch` is on `PATH`, otherwise `local`. Set it to override the detection.
+- `FABERON_MAX_TIME`: walltime cap in minutes; can only lower a plan's walltime, never raise it.
 - `FABERON_PROPOSER_TIMEOUT`: timeout (in seconds) for one proposer LLM call (default 600).
 - `FABERON_NO_RECOVER`: serve the API without resuming pending workflows at startup. See [troubleshooting.md](troubleshooting.md#safe-restart-and-recovery).
+
+### Slurm-specific options
+
+- `FABERON_SLURM_GPUS`: GPU count per job (default 1). Only used with the Slurm executor.
+- `FABERON_SLURM_OUTPUT`: Slurm `--output` path for job stdout/stderr. Only used with the Slurm executor.
+
+### Local-executor-specific options
+
+- `FABERON_STATE_DIR`: job state directory for the local executor (default `~/.local/share/faberon`). Holds one pid record and one output file per job.
 
 ### Location of the brain
 
