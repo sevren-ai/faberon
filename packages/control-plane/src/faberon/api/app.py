@@ -172,7 +172,7 @@ def create_app_slurm() -> FastAPI:
     ``FABERON_API_TOKEN``, and ``FABERON_MODEL``.
     Optional ``FABERON_SLURM_OUTPUT`` sets the Slurm ``--output`` path.
     Optional ``FABERON_SLURM_GPUS`` sets the GPU count per job (default 1).
-    Optional ``FABERON_SLURM_MAX_TIME`` sets a walltime cap (minutes)..
+    Optional ``FABERON_MAX_TIME`` sets a walltime cap (minutes).
     """
     account = os.environ.get("FABERON_SLURM_ACCOUNT")
     if not account:
@@ -184,16 +184,19 @@ def create_app_slurm() -> FastAPI:
             "localhost is reachable by other users; the API must be guarded."
         )
     gpus = int(os.environ.get("FABERON_SLURM_GPUS", "1"))
-    max_walltime = os.environ.get("FABERON_SLURM_MAX_TIME")
-    if max_walltime is not None:
-        max_walltime = int(max_walltime)
     executor = SlurmExecutor(
         account=account,
         output=os.environ.get("FABERON_SLURM_OUTPUT"),
         gpus=gpus,
-        max_walltime=max_walltime,
+        max_walltime=_max_walltime_from_env(),
     )
     return create_app(executor=executor, auth_token=token)
+
+
+def _max_walltime_from_env() -> int | None:
+    """The FABERON_MAX_TIME walltime cap in minutes, or None if unset."""
+    value = os.environ.get("FABERON_MAX_TIME")
+    return int(value) if value is not None else None
 
 
 def create_app_local() -> FastAPI:
@@ -203,12 +206,13 @@ def create_app_local() -> FastAPI:
     Optional ``FABERON_API_TOKEN`` guards the API (recommended)
     Optional ``FABERON_STATE_DIR`` sets the job state directory (default
     ``~/.local/share/faberon``).
+    Optional ``FABERON_MAX_TIME`` sets a walltime cap (minutes).
     """
     token = os.environ.get("FABERON_API_TOKEN")
     state_dir = os.environ.get("FABERON_STATE_DIR")
     if state_dir is None:
         state_dir = os.path.join(os.path.expanduser("~"), ".local", "share", "faberon")
-    executor = LocalExecutor(state_dir)
+    executor = LocalExecutor(state_dir, max_walltime=_max_walltime_from_env())
     return create_app(executor=executor, auth_token=token)
 
 

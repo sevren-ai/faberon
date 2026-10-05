@@ -52,9 +52,18 @@ def _read_record(path: Path) -> dict[str, Any] | None:
 class LocalExecutor:
     """Executor that runs each experiment as a local subprocess."""
 
-    def __init__(self, state_dir: str | Path) -> None:
+    def __init__(
+        self, state_dir: str | Path, *, max_walltime: int | None = None
+    ) -> None:
         self._dir = Path(state_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
+        self._max_walltime = max_walltime
+
+    def _effective_walltime(self, request: SubmitRequest) -> int:
+        """Clamp the request's walltime to the deployment-side cap, if set."""
+        if self._max_walltime is None:
+            return request.walltime
+        return min(request.walltime, self._max_walltime)
 
     def submit(self, request: SubmitRequest) -> str:
         """Start the job, or return the existing id for a duplicate key."""
@@ -121,7 +130,7 @@ class LocalExecutor:
             "submission_key": request.submission_key,
             "pid": proc.pid,
             "start_time": start,
-            "deadline": start + request.walltime * 60,
+            "deadline": start + self._effective_walltime(request) * 60,
             "exit_code": None,
             "cancelled": False,
         }

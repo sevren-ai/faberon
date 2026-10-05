@@ -87,7 +87,7 @@ def serve(
         name = "slurm" if shutil.which("sbatch") else "local"
     echo(f"executor: {name}")
     uvicorn.run(
-        factories.get(name),
+        factories[name],
         host=host,
         port=port,
         factory=True,
