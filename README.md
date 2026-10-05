@@ -12,24 +12,24 @@ Three tiers, one contract:
 
 The console and the CLI propose, the brain decides, the ledger remembers.
 ```
-     ┌───────────┐   ┌─────────────┐
-     │ Console   │   │ CLI         │
-     │ (Pi, TS)  │   │ (Typer, Py) │
-     └───────────┘   └─────────────┘
-        │                  │
-        └────────┬─────────┘
-                 │  API
-        ┌────────┴───────────────────────────┐
-        │ Brain: authority                   │
-        │    Pydantic AI, DBOS, FastAPI      │
-        │    Postgres (ledger)               │
-        └────────────┬───────────┬───────────┘
+     +-----------+   +-------------+
+     | Console   |   | CLI         |
+     | (Pi, TS)  |   | (Typer, Py) |
+     +-----------+   +-------------+
+        |                  |
+        +--------+---------+
+                 |  API
+        +--------+---------------------------+
+        | Brain: authority                   |
+        |    Pydantic AI, DBOS, FastAPI      |
+        |    Postgres (ledger)               |
+        +------------+-----------+-----------+
               submit v           ^ status
-            ┌────────┴───────────┴──────┐
-            │ Executors                 │
-            │  - Slurm cluster          │
-            │  - local subprocess       │
-            └───────────────────────────┘
+            +--------+-----------+-----------+
+            | Executors                        |
+            |  - Slurm cluster                 |
+            |  - local subprocess              |
+            +----------------------------------+
 ```
 
 ## Install
