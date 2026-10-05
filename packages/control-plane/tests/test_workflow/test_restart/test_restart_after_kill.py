@@ -58,10 +58,12 @@ def test_restart_after_kill(tmp_path):
     campaign_id = "88888888-4444-4444-4444-121212121212"
     env = _env(tmp_path, wf_id, campaign_id)
 
-    # Metric output the parse step will read. 1.10 < baseline 1.23 -> keep.
+    # Job log the parse step will read: {run_dir}/.faberon/{wf_id}.out.
+    # 1.10 < baseline 1.23 -> keep.
     run_dir = Path(env["FABERON_TEST_RUN_DIR"])
-    run_dir.mkdir()
-    (run_dir / "metric.txt").write_text("val_bpb: 1.10\n")
+    log_dir = run_dir / ".faberon"
+    log_dir.mkdir(parents=True)
+    (log_dir / f"{wf_id}.out").write_text("val_bpb: 1.10\n")
     Path(env["FABERON_TEST_EXECUTOR_DIR"]).mkdir()
 
     executor = FakeFileExecutor(env["FABERON_TEST_EXECUTOR_DIR"])

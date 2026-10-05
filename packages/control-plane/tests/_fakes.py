@@ -3,6 +3,7 @@
 import json
 import os
 import tempfile
+from pathlib import Path
 from uuid import UUID
 
 from faberon.executor import JobInfo, JobState, SubmitRequest
@@ -62,6 +63,11 @@ class FakeExecutor:
 
     def submit(self, request: SubmitRequest) -> str:
         self.submit_count += 1
+        # Create a dummy stdout/stderr file if a test didn't pre-write one.
+        out = Path(request.output_path)
+        if not out.exists():
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text("")
         return f"fake-{self.submit_count}"
 
     def status(self, job_id: str) -> JobInfo:

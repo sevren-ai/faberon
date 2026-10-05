@@ -15,7 +15,7 @@ Requirements:
 
 Terminology:
 * A **campaign** is one autonomous research run end-to-end, from intake to budget exhaustion or stop condition.
-* The **drafter** (console-side, no autonomous authority) interviews the human and drafts the **plan** (research plan: goal, metric command, scope, budget, stop conditions, judgment rules, approval policy)
+* The **drafter** (console-side, no autonomous authority) interviews the human and drafts the **plan** (research plan: goal, metric, scope, budget, stop conditions, judgment rules, approval policy)
 * The **loop** then runs experiments under the plan until the campaign ends.
 
 ## 2. Architecture

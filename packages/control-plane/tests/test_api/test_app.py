@@ -39,7 +39,6 @@ def _fake_proposer(monkeypatch: pytest.MonkeyPatch) -> None:
 class ApiFixture:
     client: TestClient
     executor: FakeExecutor
-    metric_path: str
     repo_path: str
 
 
@@ -56,8 +55,6 @@ def _reset_databases() -> None:
 def api(tmp_path, repo) -> Iterator[ApiFixture]:
     DBOS.destroy()
 
-    metric = tmp_path / "metric.txt"
-    metric.write_text("val_bpb: 1.10\n")
     executor = FakeExecutor(JobState.COMPLETED, exit_code=0)
 
     config_name = f"api-test-{uuid.uuid4().hex}"
@@ -70,16 +67,13 @@ def api(tmp_path, repo) -> Iterator[ApiFixture]:
         yield ApiFixture(
             client=client,
             executor=executor,
-            metric_path=str(metric),
             repo_path=str(repo),
         )
     DBOS.destroy()
 
 
-def _create_body(metric_path: str, campaign_id: str, repo_path: str) -> dict:
-    plan = make_plan(
-        metric_command=f"cat {metric_path}", budget_gpu_hours=1.0, max_experiments=3
-    )
+def _create_body(campaign_id: str, repo_path: str) -> dict:
+    plan = make_plan(budget_gpu_hours=1.0, max_experiments=3)
     return {
         "campaign_id": campaign_id,
         "plan": plan.model_dump(mode="json"),
@@ -91,7 +85,7 @@ def _create_body(metric_path: str, campaign_id: str, repo_path: str) -> dict:
 def test_create_campaign(api: ApiFixture):
     camp_id = str(uuid.uuid4())
     response = api.client.post(
-        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
     )
     assert response.status_code == 201
     body = response.json()
@@ -111,7 +105,7 @@ def test_create_campaign(api: ApiFixture):
 
 
 def test_get_campaign(api: ApiFixture):
-    body = _create_body(api.metric_path, str(uuid.uuid4()), api.repo_path)
+    body = _create_body(str(uuid.uuid4()), api.repo_path)
     response = api.client.post("/v0/campaigns", json=body)
     assert response.status_code == 201
     DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
@@ -132,7 +126,7 @@ def test_list_campaigns(api: ApiFixture):
     ids = [str(uuid.uuid4()) for _ in range(2)]
     for cid in ids:
         response = api.client.post(
-            "/v0/campaigns", json=_create_body(api.metric_path, cid, api.repo_path)
+            "/v0/campaigns", json=_create_body(cid, api.repo_path)
         )
         assert response.status_code == 201
         DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
@@ -158,7 +152,7 @@ def _inject_body(text: str = "try a cosine schedule") -> dict:
 def test_inject_idea(api: ApiFixture):
     camp_id = str(uuid.uuid4())
     created = api.client.post(
-        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
     )
     assert created.status_code == 201
 
@@ -189,7 +183,7 @@ def test_inject_idea_unknown_campaign(api: ApiFixture):
 def test_inject_idea_ended_campaign(api: ApiFixture):
     camp_id = str(uuid.uuid4())
     created = api.client.post(
-        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
     )
     assert created.status_code == 201
     DBOS.retrieve_workflow(created.json()["workflow_id"]).get_result()
@@ -205,7 +199,7 @@ def test_inject_idea_ended_campaign(api: ApiFixture):
 def test_inject_idea_requires_reason(api: ApiFixture):
     camp_id = str(uuid.uuid4())
     created = api.client.post(
-        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
     )
     assert created.status_code == 201
 
@@ -228,7 +222,7 @@ def test_events_jsonl(api: ApiFixture):
     other_id = str(uuid.uuid4())
     for cid in (camp_id, other_id):
         response = api.client.post(
-            "/v0/campaigns", json=_create_body(api.metric_path, cid, api.repo_path)
+            "/v0/campaigns", json=_create_body(cid, api.repo_path)
         )
         assert response.status_code == 201
         DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
@@ -260,8 +254,6 @@ def test_healthz(api: ApiFixture):
 def test_auth(tmp_path, repo):
     DBOS.destroy()
 
-    metric = tmp_path / "metric.txt"
-    metric.write_text("val_bpb: 1.10\n")
     executor = FakeExecutor(JobState.COMPLETED, exit_code=0)
     app = create_app(
         executor=executor,
@@ -270,7 +262,7 @@ def test_auth(tmp_path, repo):
     )
     _reset_databases()
     headers = {"Authorization": "Bearer my-secret-token"}
-    body = _create_body(str(metric), str(uuid.uuid4()), str(repo))
+    body = _create_body(str(uuid.uuid4()), str(repo))
     with TestClient(app) as client:
         # healthz is always open
         assert client.get("/healthz").status_code == 200
@@ -286,7 +278,7 @@ def test_auth(tmp_path, repo):
 
 def test_create_campaign_idempotent(api: ApiFixture):
     camp_id = str(uuid.uuid4())
-    body = _create_body(api.metric_path, camp_id, api.repo_path)
+    body = _create_body(camp_id, api.repo_path)
     first = api.client.post("/v0/campaigns", json=body)
     assert first.status_code == 201
     DBOS.retrieve_workflow(first.json()["workflow_id"]).get_result()
@@ -311,7 +303,7 @@ def test_resume_pending_campaign(api: ApiFixture):
     executor._state = JobState.RUNNING
     camp_id = str(uuid.uuid4())
     created = api.client.post(
-        "/v0/campaigns", json=_create_body(api.metric_path, camp_id, api.repo_path)
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
     )
     assert created.status_code == 201
     workflow_id = created.json()["workflow_id"]
@@ -331,8 +323,6 @@ def test_second_campaign_rejected(tmp_path, repo):
     """While one campaign is active on a repo, a second one is rejected."""
     DBOS.destroy()
 
-    metric = tmp_path / "metric.txt"
-    metric.write_text("val_bpb: 1.10\n")
     executor = FakeExecutor(JobState.RUNNING)
     app = create_app(
         executor=executor,
@@ -342,7 +332,7 @@ def test_second_campaign_rejected(tmp_path, repo):
     with TestClient(app) as client:
         first = client.post(
             "/v0/campaigns",
-            json=_create_body(str(metric), str(uuid.uuid4()), str(repo)),
+            json=_create_body(str(uuid.uuid4()), str(repo)),
         )
         assert first.status_code == 201
 
@@ -353,7 +343,7 @@ def test_second_campaign_rejected(tmp_path, repo):
 
         conflict = client.post(
             "/v0/campaigns",
-            json=_create_body(str(metric), str(uuid.uuid4()), str(repo)),
+            json=_create_body(str(uuid.uuid4()), str(repo)),
         )
         assert conflict.status_code == 409
         assert first.json()["campaign_id"] in conflict.json()["detail"]
@@ -362,7 +352,7 @@ def test_second_campaign_rejected(tmp_path, repo):
         other = tmp_path / "other-repo"
         accepted = client.post(
             "/v0/campaigns",
-            json=_create_body(str(metric), str(uuid.uuid4()), str(other)),
+            json=_create_body(str(uuid.uuid4()), str(other)),
         )
         assert accepted.status_code == 201
     DBOS.destroy()
@@ -372,7 +362,7 @@ def test_no_conflict_with_ended_campaigns(api: ApiFixture):
     """Once the campaign on a repo ends, a new one on the same repo is accepted."""
     first = api.client.post(
         "/v0/campaigns",
-        json=_create_body(api.metric_path, str(uuid.uuid4()), api.repo_path),
+        json=_create_body(str(uuid.uuid4()), api.repo_path),
     )
     assert first.status_code == 201
     first_id = first.json()["campaign_id"]
@@ -388,7 +378,7 @@ def test_no_conflict_with_ended_campaigns(api: ApiFixture):
     # Submit the second: should be no issue
     second = api.client.post(
         "/v0/campaigns",
-        json=_create_body(api.metric_path, str(uuid.uuid4()), api.repo_path),
+        json=_create_body(str(uuid.uuid4()), api.repo_path),
     )
     assert second.status_code == 201
 
@@ -396,7 +386,7 @@ def test_no_conflict_with_ended_campaigns(api: ApiFixture):
 def test_resume_ended_campaign_rejected(api: ApiFixture):
     response = api.client.post(
         "/v0/campaigns",
-        json=_create_body(api.metric_path, str(uuid.uuid4()), api.repo_path),
+        json=_create_body(str(uuid.uuid4()), api.repo_path),
     )
     assert response.status_code == 201
     campaign_id = response.json()["campaign_id"]
@@ -416,7 +406,6 @@ def test_resume_unknown_campaign(api: ApiFixture):
 class LiveServer:
     base_url: str
     executor: FakeExecutor
-    metric_path: str
     repo_path: str
     server: uvicorn.Server
     thread: threading.Thread
@@ -428,8 +417,6 @@ def live_server(tmp_path, repo) -> Iterator[LiveServer]:
     """Serve the app over real HTTP on 127.0.0.1."""
     DBOS.destroy()
 
-    metric = tmp_path / "metric.txt"
-    metric.write_text("val_bpb: 1.10\n")
     executor = FakeExecutor(JobState.COMPLETED, exit_code=0)
 
     app = create_app(
@@ -463,7 +450,6 @@ def live_server(tmp_path, repo) -> Iterator[LiveServer]:
     yield LiveServer(
         base_url=f"http://127.0.0.1:{port}",
         executor=executor,
-        metric_path=str(metric),
         repo_path=str(repo),
         server=server,
         thread=thread,
@@ -493,7 +479,7 @@ def test_events_stream_resume(live_server: LiveServer):
     with httpx2.Client(base_url=live_server.base_url, timeout=timeout) as client:
         response = client.post(
             "/v0/campaigns",
-            json=_create_body(live_server.metric_path, camp_id, live_server.repo_path),
+            json=_create_body(camp_id, live_server.repo_path),
         )
         assert response.status_code == 201
         campaign_id = response.json()["campaign_id"]
@@ -522,7 +508,7 @@ def test_shutdown_with_sse_stream(live_server: LiveServer):
     with httpx2.Client(base_url=live_server.base_url, timeout=10.0) as client:
         response = client.post(
             "/v0/campaigns",
-            json=_create_body(live_server.metric_path, camp_id, live_server.repo_path),
+            json=_create_body(camp_id, live_server.repo_path),
         )
         assert response.status_code == 201
         campaign_id = response.json()["campaign_id"]

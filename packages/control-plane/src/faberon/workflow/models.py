@@ -31,7 +31,6 @@ class ExperimentSetup(BaseModel):
     campaign_id: UUID
     command: str = Field(min_length=1)
     submission_key: str = Field(min_length=1)
-    metric_command: str = Field(min_length=1)
     metric_name: str = Field(min_length=1)
     repo_path: str = Field(min_length=1)
     baseline: float
