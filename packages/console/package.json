@@ -4,6 +4,9 @@
   "description": "Faberon console: a Pi extension for drafting plans and operating campaigns",
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "faberon-console": "bin/faberon-console.js"
+  },
   "keywords": [
     "pi-package"
   ],
