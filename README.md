@@ -10,26 +10,26 @@ Three tiers, one contract:
 - The **console** is a Pi extension for drafting plans and steering campaigns from a chat session
 - The **CLI** covers the same operations from a shell (no LLM)
 
-The console and the CLI propose, the brain decides, the ledger remembers. 
+The console and the CLI propose, the brain decides, the ledger remembers.
 ```
-     ┌───────────┐   ┌─────────────┐
-     │ Console   │   │ CLI         │
-     │ (Pi, TS)  │   │ (Typer, Py) │
-     └───────────┘   └─────────────┘
-        │                  │
-        └────────┬─────────┘
-                 │  API
-        ┌────────┴───────────────────────────┐
-        │ Brain: authority                   │
-        │    Pydantic AI, DBOS, FastAPI      │
-        │    Postgres (ledger)               │
-        └────────────┬───────────┬───────────┘
-              submit ▼           ▲ status
-            ┌────────┴───────────┴──────┐
-            │ Executors                 │
-            │  · Slurm cluster          │
-            │  · local subprocess       │
-            └───────────────────────────┘
+     +-----------+   +-------------+
+     | Console   |   | CLI         |
+     | (Pi, TS)  |   | (Typer, Py) |
+     +-----------+   +-------------+
+        |                  |
+        +--------+---------+
+                 |  API
+        +--------+---------------------------+
+        | Brain: authority                   |
+        |    Pydantic AI, DBOS, FastAPI      |
+        |    Postgres (ledger)               |
+        +------------+-----------+-----------+
+              submit v           ^ status
+            +--------+-----------+-------------+
+            | Executors                        |
+            |  - Slurm cluster                 |
+            |  - local subprocess              |
+            +----------------------------------+
 ```
 
 ## Install
