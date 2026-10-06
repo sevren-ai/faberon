@@ -50,13 +50,13 @@ When you're running Faberon, there are some optional settings you can set throug
 
 - `FABERON_STATE_DIR`: the local executor's private state directory (default `~/.local/share/faberon`). Holds one pid record per job for restart recovery.
 
-### Location of the brain
+### Location of the Faberon server
 
-If you change where the brain binds, tell the clients where to find it. The server reads its bind address; the clients read the brain's URL:
+If you change where the server binds, tell the clients where to find it. The server reads its bind address; the clients read its URL:
 
 Server-side (read by `faberon serve`):
 - `FABERON_HOST`: address `faberon serve` binds to (default `127.0.0.1`).
 - `FABERON_PORT`: port `faberon serve` binds to (default `8000`).
 
 Client-side (read by the `faberon` CLI and Faberon Chat):
-- `FABERON_API_URL`: where clients reach the running brain (default `http://127.0.0.1:8000`). Must match `FABERON_HOST:FABERON_PORT` if you changed those.
+- `FABERON_API_URL`: where clients reach the running Faberon server (default `http://127.0.0.1:8000`). Must match `FABERON_HOST:FABERON_PORT` if you changed those.

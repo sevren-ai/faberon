@@ -1,5 +1,5 @@
 /**
- * Thin typed HTTP client for the brain's v0 API.
+ * Thin typed HTTP client for the v0 API.
  *
  * Reads the base URL and bearer token from the environment
  * (`FABERON_API_URL`, `FABERON_API_TOKEN`), matching the Faberon CLI.
@@ -28,8 +28,8 @@ export function configFromEnv(
   const token = env.FABERON_API_TOKEN;
   if (!token) {
     throw new Error(
-      "FABERON_API_TOKEN is not set. Faberon Chat talks to the brain " +
-        "over an authenticated API; set the same token the brain uses.",
+      "FABERON_API_TOKEN is not set. Faberon Chat talks to the API " +
+        "over an authenticated channel; set the same token the server uses.",
     );
   }
   const baseUrl = (env.FABERON_API_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
@@ -67,7 +67,7 @@ export class FaberonClient {
     } catch (err) {
       const cause = err instanceof Error ? err.message : String(err);
       throw new Error(
-        `Cannot reach the brain at ${this.config.baseUrl}: ${cause}. ` +
+        `Cannot reach Faberon at ${this.config.baseUrl}: ${cause}. ` +
           "Is `faberon serve` running?",
       );
     }
@@ -157,7 +157,7 @@ export class FaberonClient {
     } catch (err) {
       const cause = err instanceof Error ? err.message : String(err);
       throw new Error(
-        `Cannot reach the brain at ${this.config.baseUrl}: ${cause}. ` +
+        `Cannot reach Faberon at ${this.config.baseUrl}: ${cause}. ` +
           "Is `faberon serve` running?",
       );
     }

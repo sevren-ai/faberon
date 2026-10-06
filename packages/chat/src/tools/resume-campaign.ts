@@ -12,7 +12,7 @@ export function resumeCampaignTool(client: FaberonClient) {
     label: "Resume a Faberon campaign",
     description:
       "Resume a pending Faberon campaign's workflow from its last " +
-      "checkpoint, for example after the brain was restarted with recovery " +
+      "checkpoint, for example after Faberon was restarted with recovery " +
       "disabled.",
     promptSnippet: "Resume a pending Faberon campaign",
     parameters: Type.Object({

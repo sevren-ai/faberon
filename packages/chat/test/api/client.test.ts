@@ -75,10 +75,10 @@ describe("FaberonClient", () => {
     expect((err as ApiError).message).toBe("campaign not found");
   });
 
-  it("raises a helpful error when the brain is unreachable", async () => {
+  it("raises a helpful error when Faberon is unreachable", async () => {
     fetchMock.mockRejectedValue(new Error("fetch failed: ECONNREFUSED"));
     await expect(client().listCampaigns()).rejects.toThrow(
-      /Cannot reach the brain/,
+      /Cannot reach Faberon/,
     );
   });
 

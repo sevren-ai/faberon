@@ -59,7 +59,7 @@ Design rule: **one brain**. The CLI/chat interface and the drafter propose; the 
 
 **Why not JSONL-only?** (1) Durability *is* Postgres: DBOS checkpoints every step, sleep, and signal there, and files would mean re-implementing durable execution. (2) The design needs atomicity (submission keys, queue-slot claims, exactly-once on retry), which files cannot provide, especially on the NFS home directories typical of login nodes. (3) The ledger is queried ("what worked, budget burned"), not just read.
 
-**Campaign bootstrap.** The drafter's intake produces the plan. Brain-side validation is the sole acceptance gate. Approval writes `campaign.created` and starts the loop. Amendments are events (`campaign.amended`), never edits: runs are judged against the rules in force at their time.
+**Campaign bootstrap.** The drafter's intake produces the plan. Validation in the brain is the sole acceptance gate. Approval writes `campaign.created` and starts the loop. Amendments are events (`campaign.amended`), never edits: runs are judged against the rules in force at their time.
 
 **Human steering.** `POST /campaigns/{id}/ideas` wraps `DBOS.send`: the idea lands in the ledger and the agent weighs it at its next decision boundary. Advisory is the default; an imperative mode that forces execution is a config flag, recorded per event. Approvals for gated actions use the same signal path. Human and agent actions are the same kind of event.
 
