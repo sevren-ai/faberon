@@ -2,35 +2,36 @@
 
 [Sevren](https://sevren.ai)'s autonomous ML research harness.
 
-Faberon runs LLM/ML research autonomously. Give it a research plan (goal, metric, budget, stop conditions) and it proposes experiments, submits training jobs, waits for results, judges them against your expectations, and decides what to try next. Every decision is recorded in an append-only ledger, and you can steer it mid-run.
+Faberon runs Machine Learning research autonomously. Give it a research plan and it proposes experiments, submits training jobs, waits for results, judges them against your expectations, and decides what to try next. Every decision is recorded in an append-only ledger, and you can steer it mid-run.
 
-Three tiers:
+> ⚠️ STATUS
+> 
+> This repo is currently in early beta. Expect rough edges and breaking changes. Nevertheless, enjoy tinkering with it ;-)
 
-- The **brain** is the main component with autonomous authority: a durable agent loop behind a small HTTP API. It is what `faberon serve` starts.
-- The **chat** interface ("Faberon Chat") is a Pi extension for drafting plans and steering campaigns from a chat session
-- The **CLI** covers the same operations from a shell (no LLM)
+**Features**:
 
-The chat interface and the CLI propose, the brain decides, the ledger remembers.
-```
-     +-----------+   +-------------+
-     | Chat      |   | CLI         |
-     | (Pi, TS)  |   | (Typer, Py) |
-     +-----------+   +-------------+
-        |                  |
-        +--------+---------+
-                 |  API
-        +--------+---------------------------+
-        | Brain: authority                   |
-        |    Pydantic AI, DBOS, FastAPI      |
-        |    Postgres (ledger), uvicorn      |
-        +------------+-----------+-----------+
-              submit v           ^ status
-            +--------+-----------+-------------+
-            | Executors                        |
-            |  - Slurm cluster                 |
-            |  - local subprocess              |
-            +----------------------------------+
-```
+- Runs ML research end to end: proposes an experiment, trains it, judges the result, and picks the next one. No babysitting.
+- Every decision and its rational is recorded in a database.
+- Every experiment is a git commit. Good ones stay, bad ones get reverted. Your repo ends up holding the best result.
+- Survives crashes and reboots: kill Faberon mid-campaign and it picks up exactly where it left off.
+- Built for Slurm clusters, but also runs on a single workstation or GPU box.
+- A human can steer campaigns while they're running: inject ideas, cancel, or resume.
+- To manage campaigns and watch progress live, both a chat interface and a comprehensive CLI are provided.
+- Works with any LLM, including local and open ones.
+- Proven end to end against Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) repo.
+
+**Design**:
+
+- The **brain** is a durable agent loop behind a small HTTP API (FastAPI)
+   - An LLM proposes the next experiment (Pydantic AI), DBOS checkpoints, a reboot resumes mid-campaign.
+- The **chat** interface ("Faberon Chat") is a Pi extension for requesting status and steering campaigns from a chat session.
+- The **CLI** (Typer) covers the same operations from a shell (no LLM required).
+- Two **executors** are currently implemented: a Slurm cluster or a local workstation.
+- The **ledger** is an append-only event log in Postgres. Every decision is recorded with its actor and reason.
+
+![Faberon architecture: the chat interface and the CLI propose through the API, the brain decides and records every decision in the ledger, and executors run the jobs](docs/assets/architecture.svg)
+
+For more details, see [design.md](docs/design/design.md).
 
 ## Install
 
@@ -61,7 +62,7 @@ npm --prefix packages/chat ci --legacy-peer-deps
 
 ## Quickstart
 
-> For a complete runbook using v0.3.0 on a local workstation, see https://github.com/sevren-ai/faberon/discussions/61
+> ⚠️ Faberon executes unsandboxed LLM-generated code, with your user's (or the Slurm job's) permissions, and it rewrites the target repo as it experiments. Only point it at repos and clusters where that is acceptable.
 
 Start the API inside `tmux` or `screen` so it survives your SSH session:
 
@@ -95,10 +96,18 @@ Do not run bare `npx pi` from the repo root: npx falls back to the unrelated `pi
 
 The chat interface and CLI speak to the same API; use whichever suits the moment.
 
+> See this [runbook](https://github.com/sevren-ai/faberon/discussions/61) for using v0.3.0 on a local workstation.
+
 ## Future work
 
-The following features are not implemented yet but are planned as future work in the very near future:
-- Editing multiple files, and not just Python
+The following features are [planned](docs/design/roadmap.md) for the very near future:
+
+- Running experiments in parallel (git worktrees and a job queue)
+- Editing multiple files per experiment, and supporting repos that are not Python
+- Sharper judgment: confidence measures, eval-suite regression checks, hard constraint gates
+- Follow-up campaigns that start from the best kept commit of a finished campaign
+- Security boundaries to guard against LLM-written code
+- Multi-user campaigns with per-user identity, budgets, and approvals
 
 ## Feedback and contributing
 
