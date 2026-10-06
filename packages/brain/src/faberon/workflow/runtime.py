@@ -113,6 +113,7 @@ class Runtime:
                     "job_id": job_id,
                     "index": setup.index,
                     "sha": setup.sha,
+                    "command": setup.command,
                     "state": info.state.value,
                     "exit_code": info.exit_code,
                     "elapsed_seconds": info.elapsed_seconds,
