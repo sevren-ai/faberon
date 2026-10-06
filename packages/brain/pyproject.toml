@@ -2,6 +2,7 @@
 name = "faberon"
 version = "0.3.0"
 description = "Faberon: Autonomous ML Research Harness"
+readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "MIT" }
 dependencies = [
@@ -18,6 +19,11 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.11.0,<0.12.0"]
 build-backend = "uv_build"
+
+[project.urls]
+Homepage = "https://github.com/sevren-ai/faberon"
+Repository = "https://github.com/sevren-ai/faberon"
+Issues = "https://github.com/sevren-ai/faberon/issues"
 
 [project.scripts]
 faberon = "faberon.cli:main"
