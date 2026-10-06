@@ -1,7 +1,7 @@
 """Local executor: run jobs as subprocesses on the machine hosting Faberon.
 
 The executor keeps a job registry: one JSON record per job (``{job_id}.json``).
-This lets the executor survive a control-plane restart.
+This lets the executor survive a brain restart.
 """
 
 import fcntl

@@ -4,7 +4,7 @@ Procedures for when a running Faberon misbehaves.
 
 ## Safe restart and recovery
 
-By default the brain resumes every pending campaign workflow at startup (DBOS recovery). If a recovered workflow is what destabilized the cluster, that becomes a crash loop: recover, resubmit, kill, repeat. To break it, start in no-recover mode so no workflow resumes at boot, then act on campaigns one by one:
+By default Faberon resumes every pending campaign workflow at startup (DBOS recovery). If a recovered workflow is what destabilized the cluster, that becomes a crash loop: recover, resubmit, kill, repeat. To break it, start in no-recover mode so no workflow resumes at boot, then act on campaigns one by one:
 
 ```bash
 FABERON_NO_RECOVER=1 faberon serve    # ensure the environment is correctly set up before running 'serve'
