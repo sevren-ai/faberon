@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from faberon.schema import MIN_PROSE_LENGTH, ResearchPlan
+from faberon.schema import MIN_PROSE_LENGTH, ResearchPlan, resolve_target_in_repo
 
 
 def _minimal_plan(**overrides) -> ResearchPlan:
@@ -68,3 +68,26 @@ def test_plan_target_file_must_be_python():
         _minimal_plan(target_file="train.sh")
     plan = _minimal_plan(target_file="src/train.py")
     assert plan.target_file == "src/train.py"
+
+
+def test_resolve_target_in_repo_accepts_nested(tmp_path):
+    """A relative path that stays inside the repo resolves under it."""
+    resolved = resolve_target_in_repo(str(tmp_path), "src/train.py")
+    assert resolved == (tmp_path / "src/train.py").resolve()
+
+
+def test_resolve_target_in_repo_rejects_absolute(tmp_path):
+    with pytest.raises(ValueError, match="relative path"):
+        resolve_target_in_repo(str(tmp_path), "/etc/passwd")
+
+
+def test_resolve_target_in_repo_rejects_traversal(tmp_path):
+    """``..`` that escapes the repo root is rejected."""
+    with pytest.raises(ValueError, match="inside the repo"):
+        resolve_target_in_repo(str(tmp_path), "../outside.py")
+
+
+def test_resolve_target_in_repo_allows_inner_dotdot(tmp_path):
+    """``..`` that stays inside the repo is fine."""
+    resolved = resolve_target_in_repo(str(tmp_path), "sub/../train.py")
+    assert resolved == (tmp_path / "train.py").resolve()

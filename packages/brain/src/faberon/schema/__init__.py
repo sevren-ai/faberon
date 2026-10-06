@@ -3,7 +3,7 @@
 from .campaign import Campaign, CampaignInfo, CampaignStatus
 from .constants import MIN_PROSE_LENGTH
 from .events import Actor, Event, EventType, StopReason
-from .plan import ResearchPlan
+from .plan import ResearchPlan, resolve_target_in_repo
 
 __all__ = [
     "MIN_PROSE_LENGTH",
@@ -15,4 +15,5 @@ __all__ = [
     "EventType",
     "ResearchPlan",
     "StopReason",
+    "resolve_target_in_repo",
 ]

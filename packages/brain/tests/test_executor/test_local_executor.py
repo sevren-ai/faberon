@@ -66,6 +66,20 @@ def test_failure(executor: LocalExecutor):
     assert info.exit_code != 0
 
 
+def test_log_file_is_owner_only(executor: LocalExecutor, tmp_path):
+    """The job log and its parent dir are not world-readable on a shared host."""
+    out = tmp_path / "logs" / "job.out"
+    request = SubmitRequest(
+        command="echo secret",
+        submission_key=_key(),
+        walltime=5,
+        output_path=str(out),
+    )
+    job_id = executor.submit(request)
+    _wait_terminal(executor, job_id)
+    assert out.stat().st_mode & 0o077 == 0, oct(out.stat().st_mode)
+
+
 def test_nonzero_exit(executor: LocalExecutor):
     job_id = executor.submit(_request("sh -c 'exit 3'", _key()))
     info = _wait_terminal(executor, job_id)

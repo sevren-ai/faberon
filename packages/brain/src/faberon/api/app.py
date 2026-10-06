@@ -25,6 +25,7 @@ from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
 from ..schema.campaign import Campaign, CampaignInfo
 from ..schema.events import Actor, Event, EventType
+from ..schema.plan import resolve_target_in_repo
 from ..workflow import (
     AgentProposer,
     CampaignRunner,
@@ -237,6 +238,12 @@ def _register_routes(app: FastAPI) -> None:
                             f"repo already has an active campaign: {other.campaign_id}"
                         ),
                     )
+
+        # Reject a target file that escapes the repo before starting anything.
+        try:
+            resolve_target_in_repo(body.repo_path, body.plan.target_file)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
 
         setup = CampaignSetup(
             campaign_id=campaign_id,

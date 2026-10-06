@@ -104,6 +104,23 @@ def test_create_campaign(api: ApiFixture):
     assert EventType.EXPERIMENT_JUDGED in types
 
 
+def test_create_rejects_target_outside_repo(api: ApiFixture):
+    """A plan whose target_file escapes the repo is rejected before starting."""
+    body = _create_body(str(uuid.uuid4()), api.repo_path)
+    body["plan"]["target_file"] = "../outside.py"
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 422
+    assert "inside the repo" in response.json()["detail"]
+
+
+def test_create_rejects_absolute_target(api: ApiFixture):
+    body = _create_body(str(uuid.uuid4()), api.repo_path)
+    body["plan"]["target_file"] = "/etc/cron.d/evil.py"
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 422
+    assert "relative path" in response.json()["detail"]
+
+
 def test_get_campaign(api: ApiFixture):
     body = _create_body(str(uuid.uuid4()), api.repo_path)
     response = api.client.post("/v0/campaigns", json=body)
