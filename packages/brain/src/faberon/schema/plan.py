@@ -6,7 +6,7 @@ from .constants import MIN_PROSE_LENGTH
 
 
 class ResearchPlan(BaseModel):
-    """Typed research plan accepted by the control plane."""
+    """Typed research plan accepted by the Faberon brain."""
 
     goal: str = Field(min_length=MIN_PROSE_LENGTH)
     command: str = Field(min_length=1)
