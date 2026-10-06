@@ -139,6 +139,7 @@ def _serve_factory(monkeypatch: pytest.MonkeyPatch) -> dict:
 
 def test_serve_defaults_to_slurm(monkeypatch: pytest.MonkeyPatch):
     captured = _serve_factory(monkeypatch)
+    monkeypatch.delenv("FABERON_EXECUTOR", raising=False)
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 0
@@ -148,6 +149,7 @@ def test_serve_defaults_to_slurm(monkeypatch: pytest.MonkeyPatch):
 
 def test_serve_defaults_to_local(monkeypatch: pytest.MonkeyPatch):
     captured = _serve_factory(monkeypatch)
+    monkeypatch.delenv("FABERON_EXECUTOR", raising=False)
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 0
