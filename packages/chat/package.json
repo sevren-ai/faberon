@@ -1,11 +1,11 @@
 {
-  "name": "@faberon/console",
+  "name": "@faberon/chat",
   "version": "0.1.0",
-  "description": "Faberon console: a Pi extension for drafting plans and operating campaigns",
+  "description": "Faberon Chat: a Pi extension for drafting plans and operating campaigns",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "faberon-console": "bin/faberon-console.js"
+    "faberon-chat": "bin/faberon-chat.js"
   },
   "keywords": [
     "pi-package"

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `faberon-console`: start the real Pi CLI (@earendil-works/pi-coding-agent)
+ * `faberon-chat`: start the Pi chat interface (@earendil-works/pi-coding-agent)
  * without going through npx. This exists because `npx pi` can silently
  * resolve to the unrelated `pi` package on npm (it prints digits of pi) when
  * no local `pi` binary is installed. Forwards every argument unchanged.
@@ -14,7 +14,7 @@ const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 
 function fail(lines) {
-  for (const line of lines) console.error(`faberon-console: ${line}`);
+  for (const line of lines) console.error(`faberon-chat: ${line}`);
   process.exit(1);
 }
 
@@ -28,7 +28,7 @@ try {
 } catch {
   fail([
     "the Pi CLI (@earendil-works/pi-coding-agent) is not installed next to this shim.",
-    "Fix: cd packages/console && npm ci --legacy-peer-deps",
+    "Fix: cd packages/chat && npm ci --legacy-peer-deps",
   ]);
 }
 
