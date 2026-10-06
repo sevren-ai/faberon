@@ -94,8 +94,16 @@ The chat interface and CLI speak to the same API; use whichever suits the moment
 
 ## Future work
 
-The following features are not implemented yet but are planned as future work in the very near future:
-- Editing multiple files, and not just Python
+The following features are [planned](docs/design/roadmap.md) for the very near future:
+
+- Running experiments in parallel (git worktrees and a job queue)
+- Editing multiple files per experiment, and supporting repos that are not Python
+- Sharper judgment: confidence measures, eval-suite regression checks, hard constraint gates
+- Follow-up campaigns that start from the best kept commit of a finished campaign
+- Security boundaries to guard against LLM-written code
+- Multi-user campaigns with per-user identity, budgets, and approvals
+
+See  for the full plan.
 
 ## Feedback and contributing
 
