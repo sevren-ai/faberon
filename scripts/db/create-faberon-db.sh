@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Create the Faberon databases inside an already-running Postgres: the main
-# database for the control plane and a test database for the test suite.
+# database for the brain and a test database for the test suite.
 # Postgres itself must already be installed and started (see README).
 
 set -euo pipefail

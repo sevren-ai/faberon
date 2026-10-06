@@ -11,7 +11,7 @@ We are not accepting pull requests for new features right now. Please do not ope
 
 ## Code Layout
 
-- `packages/control-plane/`: the brain (Python, `uv`-managed, import name `faberon`)
+- `packages/brain/`: the brain (Python, `uv`-managed, import name `faberon`)
 - `packages/chat/`: Faberon Chat (Pi extension, TypeScript, npm-managed)
 - `docs/design/`: [system design](docs/design/design.md), [roadmap](docs/design/roadmap.md), [future ideas](docs/design/future.md), one doc per release (shipped releases in [archive/](docs/design/archive/))
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) (this document): process rules for every contributor, human or agent
@@ -32,19 +32,19 @@ How to use them:
 - Update docs in the same commit/PR that changes a decision: `roadmap.md` for plan changes, `design.md` only when the stable architecture genuinely changes.
 - Speculative ideas belong in `docs/design/future.md`, not in the roadmap or in code comments.
 - The current WIP release doc stays editable until it ships. Never edit a `vX.Y.Z.md` after that version has shipped.
-- Bump the version right before a release is cut: `packages/control-plane/pyproject.toml` and `faberon.__version__` for the control plane, `packages/chat/package.json` for Faberon Chat.
+- Bump the version right before a release is cut: `packages/brain/pyproject.toml` and `faberon.__version__` for the brain, `packages/chat/package.json` for Faberon Chat.
 
 ### Releases and versioning
 
 The two packages version independently; the design makes them independently replaceable. What keeps them compatible is the API contract version (`v0` today), not a shared release number. The tag names are asymmetric on purpose:
 
-- **Control plane** (`packages/control-plane/`, the default artifact): tag `vX.Y.Z`, for example `v0.2.2`. Bare, no prefix, matching the tags that already exist.
-- **Faberon Chat** (`packages/chat/`): tag `chat-vX.Y.Z`, first release `chat-v0.1.0`. Prefixed so chat tags never collide with control-plane tags.
+- **Brain** (`packages/brain/`, the default artifact): tag `vX.Y.Z`, for example `v0.2.2`. Bare, no prefix, matching the tags that already exist.
+- **Faberon Chat** (`packages/chat/`): tag `chat-vX.Y.Z`, first release `chat-v0.1.0`. Prefixed so chat tags never collide with brain tags.
 
 Cut a release by merging to `main`, bumping that package's version, and pushing the package's tag:
 
 ```bash
-# control plane
+# brain
 git tag v0.3.0 && git push origin v0.3.0
 
 # chat
@@ -71,7 +71,7 @@ From the repo root:
 bash scripts/test/local.sh
 ```
 
-This runs `uv sync --locked` and `uv run pytest` in `packages/control-plane/`, mirroring `.github/workflows/test.yml`.
+This runs `uv sync --locked` and `uv run pytest` in `packages/brain/`, mirroring `.github/workflows/test.yml`.
 
 - Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
 - Keep tests small and focused. One behaviour per test when practical.
@@ -129,7 +129,7 @@ Ruff formats and lints the Python code. From the repo root:
 bash scripts/lint.sh
 ```
 
-This runs `uv sync --locked`, `ruff format`, `ruff check --fix`, and `ty check` in `packages/control-plane/`. It writes formatting and lint fixes back to the source. CI (`.github/workflows/lint.yml`) runs the check-only variants (`ruff format --check`, `ruff check`, `ty check`) and blocks the merge on a red run. Run `scripts/lint.sh` before pushing.
+This runs `uv sync --locked`, `ruff format`, `ruff check --fix`, and `ty check` in `packages/brain/`. It writes formatting and lint fixes back to the source. CI (`.github/workflows/lint.yml`) runs the check-only variants (`ruff format --check`, `ruff check`, `ty check`) and blocks the merge on a red run. Run `scripts/lint.sh` before pushing.
 
 ## Coding style
 

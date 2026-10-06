@@ -6,7 +6,7 @@ Faberon runs LLM/ML research autonomously. Give it a research plan (goal, metric
 
 Three tiers:
 
-- The **brain** is the main component with autonomous authority: a durable agent loop behind a small HTTP API
+- The **brain** is the main component with autonomous authority: a durable agent loop behind a small HTTP API. It is what `faberon serve` starts.
 - The **chat** interface ("Faberon Chat") is a Pi extension for drafting plans and steering campaigns from a chat session
 - The **CLI** covers the same operations from a shell (no LLM)
 
@@ -22,7 +22,7 @@ The chat interface and the CLI propose, the brain decides, the ledger remembers.
         +--------+---------------------------+
         | Brain: authority                   |
         |    Pydantic AI, DBOS, FastAPI      |
-        |    Postgres (ledger)               |
+        |    Postgres (ledger), uvicorn      |
         +------------+-----------+-----------+
               submit v           ^ status
             +--------+-----------+-------------+
@@ -40,7 +40,7 @@ Pick the guide for your machine:
 - [Install on a login node](docs/install-login-node.md): no sudo (e.g. cluster login node)
 
 
-### Brain & chat
+### Faberon brain and chat
 From PyPI and npm (once these are available):
 
 ```bash
@@ -55,7 +55,7 @@ or from source:
 ```bash
 git clone https://github.com/sevren-ai/faberon
 cd faberon
-uv tool install packages/control-plane
+uv tool install packages/brain
 npm --prefix packages/chat ci --legacy-peer-deps
 ```
 
@@ -69,7 +69,7 @@ Start the API inside `tmux` or `screen` so it survives your SSH session:
 faberon serve
 ```
 
-With the brain running, submit a campaign and watch it through the CLI:
+With Faberon running, submit a campaign and watch it through the CLI:
 
 ```bash
 faberon create plan.json my_repo  # start a campaign with a given plan for a specific repo

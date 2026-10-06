@@ -1,6 +1,6 @@
 """Kill-mid-run restart test.
 
-Starts the control plane in a subprocess, lets it submit a job and enter the
+Starts the brain in a subprocess, lets it submit a job and enter the
 durable poll loop, kills the process, restarts a fresh process, and verifies
 that the workflow restarts without resubmitting and judges/logs exactly once.
 
@@ -8,7 +8,7 @@ Requires a real Postgres (``FABERON_DATABASE_URL``) for the DBOS checkpoints
 and the ledger.
 
 This test uses a file-backed fake executor to stand in for the cluster, so it
-verifies the control-plane-side durability (DBOS recovery + exactly-once
+verifies the brain-side durability (DBOS recovery + exactly-once
 ledger) in CI.
 """
 
@@ -68,7 +68,7 @@ def test_restart_after_kill(tmp_path):
 
     executor = FakeFileExecutor(env["FABERON_TEST_EXECUTOR_DIR"])
 
-    # Phase 1: start the control plane, let it submit, then kill it mid-poll.
+    # Phase 1: start the brain, let it submit, then kill it mid-poll.
     proc = subprocess.Popen(
         [sys.executable, "-m", _DRIVER, "start"],
         env=env,

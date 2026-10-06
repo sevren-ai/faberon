@@ -149,7 +149,7 @@ def test_restart_recovers_running_job(tmp_path):
     first = _make_executor(state_dir)
     job_id = first.submit(_request("sleep 0.3", _key()))
 
-    # Simulate a control-plane restart: a fresh executor on the same dir.
+    # Simulate a brain restart: a fresh executor on the same dir.
     restarted = _make_executor(state_dir)
     assert restarted.status(job_id).state == JobState.RUNNING
     info = _wait_terminal(restarted, job_id)

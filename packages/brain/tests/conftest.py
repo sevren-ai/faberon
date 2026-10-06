@@ -1,4 +1,4 @@
-"""Shared pytest hooks and fixtures for the control-plane test suite."""
+"""Shared pytest hooks and fixtures for the brain test suite."""
 
 import os
 import subprocess
