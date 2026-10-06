@@ -18,9 +18,10 @@ Faberon runs Machine Learning research autonomously. Give it a research plan and
 
 **Design**:
 
-- The **brain** is a durable agent loop behind a small HTTP API: Pydantic AI proposes, DBOS checkpoints, a reboot resumes mid-campaign.
-- The **chat** interface ("Faberon Chat") is a Pi extension for drafting plans and steering campaigns from a chat session.
-- The **CLI** covers the same operations from a shell (no LLM).
+- The **brain** is a durable agent loop behind a small HTTP API (FastAPI)
+   - An LLM proposes the next experiment (Pydantic AI), DBOS checkpoints, a reboot resumes mid-campaign.
+- The **chat** interface ("Faberon Chat") is a Pi extension for requesting status and steering campaigns from a chat session.
+- The **CLI** (Typer) covers the same operations from a shell (no LLM required).
 - Two **executors** are currently implemented: a Slurm cluster or a local workstation.
 - The **ledger** is an append-only event log in Postgres. Every decision is recorded with its actor and reason.
 
