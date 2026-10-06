@@ -41,7 +41,7 @@ Refer to [the env guide](prepare-env.md).
 
 ## 3. Get node
 
-The console needs Node 22.19 or newer.
+Faberon Chat needs Node 22.19 or newer.
 
 E.g. on fedora:
 

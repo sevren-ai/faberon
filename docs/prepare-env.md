@@ -58,5 +58,5 @@ Server-side (read by `faberon serve`):
 - `FABERON_HOST`: address `faberon serve` binds to (default `127.0.0.1`).
 - `FABERON_PORT`: port `faberon serve` binds to (default `8000`).
 
-Client-side (read by the `faberon` CLI and the console):
+Client-side (read by the `faberon` CLI and Faberon Chat):
 - `FABERON_API_URL`: where clients reach the running brain (default `http://127.0.0.1:8000`). Must match `FABERON_HOST:FABERON_PORT` if you changed those.

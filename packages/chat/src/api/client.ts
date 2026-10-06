@@ -28,7 +28,7 @@ export function configFromEnv(
   const token = env.FABERON_API_TOKEN;
   if (!token) {
     throw new Error(
-      "FABERON_API_TOKEN is not set. The console talks to the brain " +
+      "FABERON_API_TOKEN is not set. Faberon Chat talks to the brain " +
         "over an authenticated API; set the same token the brain uses.",
     );
   }

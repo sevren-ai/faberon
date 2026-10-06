@@ -32,7 +32,7 @@ Refer to [the env guide](prepare-env.md).
 
 ## 3. Get Node
 
-The console needs Node 22.19 or newer, installed user-space since there is no sudo. 
+Faberon Chat needs Node 22.19 or newer, installed user-space since there is no sudo. 
 
 One way, a plain tarball:
 

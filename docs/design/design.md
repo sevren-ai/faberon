@@ -15,7 +15,7 @@ Requirements:
 
 Terminology:
 * A **campaign** is one autonomous research run end-to-end, from intake to budget exhaustion or stop condition.
-* The **drafter** (console-side, no autonomous authority) interviews the human and drafts the **plan** (research plan: goal, metric, scope, budget, stop conditions, judgment rules, approval policy)
+* The **drafter** (chat-side, no autonomous authority) interviews the human and drafts the **plan** (research plan: goal, metric, scope, budget, stop conditions, judgment rules, approval policy)
 * The **loop** then runs experiments under the plan until the campaign ends.
 
 ## 2. Architecture
@@ -24,7 +24,7 @@ Three tiers connected by explicit contracts (typed JSON over HTTP/SSE). Any tier
 
 ```
      +-----------+   +-------------+
-     | Console   |   | CLI         |
+     | Chat      |   | CLI         |
      | (Pi, TS)  |   | (Typer, Py) |
      +-----------+   +-------------+
         |                  |
@@ -43,13 +43,13 @@ Three tiers connected by explicit contracts (typed JSON over HTTP/SSE). Any tier
             +----------------------------------+
 ```
 
-- **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the console is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps console and brain independently replaceable.
-- **Console**: a Pi extension. It exposes the v0 operations as Pi tools and slash commands, and hosts the drafter, live status, idea injection, and approvals on top. It reasons conversationally, but every write is a human-initiated API call. Default: runs on the login node next to the brain. Distributed as a Pi package, pinned to Pi `^1.0.0`.
+- **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the chat interface is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps chat and brain independently replaceable.
+- **Chat** ("Faberon Chat"): a Pi extension. It exposes the v0 operations as Pi tools and slash commands, and hosts the drafter, live status, idea injection, and approvals on top. It reasons conversationally, but every write is a human-initiated API call. Default: runs on the login node next to the brain. Distributed as a Pi package, pinned to Pi `^1.0.0`.
 - **Execution**: the Slurm cluster. The experiment repo (for example `autoresearch`) lives on the cluster filesystem so compute nodes and the brain see the same tree.
 
-Design rule: **one brain**. The console and the drafter propose; the brain decides; the ledger remembers.
+Design rule: **one brain**. The CLI/chat interface and the drafter propose; the brain decides; the ledger remembers.
 
-**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, console (when present), and the experiment checkout. All state (Postgres, notes, artifacts) lives there; there is no central Faberon server. The control plane runs as a single process: uvicorn serves the FastAPI app, and the app lifespan brings DBOS up and down with it. FastAPI binds to localhost. A bearer token (`FABERON_API_TOKEN`) guards the API: on a shared login node, the token is mandatory. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote console, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
+**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, chat interface (when present), and the experiment checkout. All state (Postgres, notes, artifacts) lives there; there is no central Faberon server. The control plane runs as a single process: uvicorn serves the FastAPI app, and the app lifespan brings DBOS up and down with it. FastAPI binds to localhost. A bearer token (`FABERON_API_TOKEN`) guards the API: on a shared login node, the token is mandatory. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote chat interface, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
 
 ## 3. Key Mechanisms
 
@@ -81,7 +81,7 @@ Design rule: **one brain**. The console and the drafter propose; the brain decid
 * `GET /campaigns/{id}/runs`
 * `GET /runs/{id}`
 
-Contracts are **skeleton-first**: shapes live as Pydantic models in one quarantined module from day one and are frozen into versioned artifacts (JSON Schema / OpenAPI goldens) after the first release. This contract keeps console and brain independently replaceable.
+Contracts are **skeleton-first**: shapes live as Pydantic models in one quarantined module from day one and are frozen into versioned artifacts (JSON Schema / OpenAPI goldens) after the first release. This contract keeps chat and brain independently replaceable.
 
 ## 5. Technology Choices
 
@@ -90,6 +90,6 @@ Contracts are **skeleton-first**: shapes live as Pydantic models in one quaranti
 | Core language | Python 3.14, `uv` | ML stack, experiment code, and eval tooling are Python; the chosen agent chassis is Python-only.                                                                                    |
 | Agent chassis | Pydantic AI | Typed tools, boundary validation, durable-execution integrations.                                                                                                                   |
 | Durability | DBOS Transact (MIT) | Durable sleep, signals, SQL state, flow-controlled queues, step audit, with only Postgres to operate. Youngest dependency, mitigated by the tier boundaries and operator-owned state. |
-| Console | Pi extension (TS) | Open-source (MIT), European, extensible; npm-distributed. Replaceable through the API contract.                                                                                     |
+| Chat | Pi extension (TS) | Open-source (MIT), European, extensible; npm-distributed. Replaceable through the API contract.                                                                                     |
 | Models | Provider-agnostic env config (`FABERON_MODEL`) | Local/open models first-class. Tests use `TestModel`.                                                                                                     |
 | Database | Postgres via `FABERON_DATABASE_URL` | Native install on dev machines; scripted no-sudo install on login nodes. |

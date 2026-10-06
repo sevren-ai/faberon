@@ -11,11 +11,11 @@ Slurm is the primary path. The executor interface (`submit` / `status` / `cancel
 - **Cloud batch**: adapters for cloud job APIs (for example AWS Batch, GCP Batch).
 - **Kubernetes**: Jobs/CronJobs as the execution tier.
 
-## Console topology
+## Chat topology
 
 Default is Pi on the login node next to the brain (see [design.md](design.md)).
 
-- **Remote console**: Pi on a laptop (or other machine) talking to the control plane over the network. Needs the API reachable off-host and the optional bearer token.
+- **Remote chat interface**: Pi on a laptop (or other machine) talking to the control plane over the network. Needs the API reachable off-host and the optional bearer token.
 
 ## CLI configuration
 

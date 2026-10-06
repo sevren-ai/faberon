@@ -14,7 +14,7 @@ htmlcov/
 dist/
 *.egg-info/
 
-# Node (console)
+# Node (Faberon chat)
 node_modules/
 
 # IDE / OS
