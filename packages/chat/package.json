@@ -3,10 +3,21 @@
   "version": "0.1.0",
   "description": "Faberon Chat: a Pi extension for drafting plans and operating campaigns",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sevren-ai/faberon.git",
+    "directory": "packages/chat"
+  },
+  "homepage": "https://github.com/sevren-ai/faberon",
+  "bugs": "https://github.com/sevren-ai/faberon/issues",
   "type": "module",
   "bin": {
     "faberon-chat": "bin/faberon-chat.js"
   },
+  "files": [
+    "bin",
+    "src"
+  ],
   "keywords": [
     "pi-package"
   ],
