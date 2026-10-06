@@ -4,6 +4,10 @@
 
 Faberon runs Machine Learning research autonomously. Give it a research plan and it proposes experiments, submits training jobs, waits for results, judges them against your expectations, and decides what to try next. Every decision is recorded in an append-only ledger, and you can steer it mid-run.
 
+> ⚠️ STATUS
+> 
+> This repo is currently in early beta. Expect rough edges and breaking changes. Nevertheless, enjoy tinkering with it ;-)
+
 **Features**:
 
 - Runs ML research end to end: proposes an experiment, trains it, judges the result, and picks the next one. No babysitting.
@@ -58,7 +62,7 @@ npm --prefix packages/chat ci --legacy-peer-deps
 
 ## Quickstart
 
-> For a complete runbook using v0.3.0 on a local workstation, see https://github.com/sevren-ai/faberon/discussions/61
+> ⚠️ Faberon executes unsandboxed LLM-generated code, with your user's (or the Slurm job's) permissions, and it rewrites the target repo as it experiments. Only point it at repos and clusters where that is acceptable.
 
 Start the API inside `tmux` or `screen` so it survives your SSH session:
 
@@ -92,6 +96,8 @@ Do not run bare `npx pi` from the repo root: npx falls back to the unrelated `pi
 
 The chat interface and CLI speak to the same API; use whichever suits the moment.
 
+> See this [runbook](https://github.com/sevren-ai/faberon/discussions/61) for using v0.3.0 on a local workstation.
+
 ## Future work
 
 The following features are [planned](docs/design/roadmap.md) for the very near future:
@@ -102,8 +108,6 @@ The following features are [planned](docs/design/roadmap.md) for the very near f
 - Follow-up campaigns that start from the best kept commit of a finished campaign
 - Security boundaries to guard against LLM-written code
 - Multi-user campaigns with per-user identity, budgets, and approvals
-
-See  for the full plan.
 
 ## Feedback and contributing
 
