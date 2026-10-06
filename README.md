@@ -4,9 +4,9 @@
 
 Faberon runs LLM/ML research autonomously. Give it a research plan (goal, metric, budget, stop conditions) and it proposes experiments, submits training jobs, waits for results, judges them against your expectations, and decides what to try next. Every decision is recorded in an append-only ledger, and you can steer it mid-run.
 
-Three tiers, one contract:
+Three tiers:
 
-- The **brain** is the only component with autonomous authority: a durable agent loop behind a small HTTP API
+- The **brain** is the main component with autonomous authority: a durable agent loop behind a small HTTP API
 - The **console** is a Pi extension for drafting plans and steering campaigns from a chat session
 - The **CLI** covers the same operations from a shell (no LLM)
 
@@ -61,6 +61,8 @@ npm --prefix packages/console ci --legacy-peer-deps
 
 ## Quickstart
 
+> For a complete runbook using v0.3.0 on a local workstation, see https://github.com/sevren-ai/faberon/discussions/61
+
 Start the API inside `tmux` or `screen` so it survives your SSH session:
 
 ```bash
@@ -93,10 +95,15 @@ Do not run bare `npx pi` from the repo root: npx falls back to the unrelated `pi
 
 The console and CLI speak to the same API; use whichever suits the moment.
 
+## Future work
+
+The following features are not implemented yet but are planned as future work in the very near future:
+- Editing multiple files, and not just Python
+
 ## Feedback and contributing
 
 - Found a bug? File an [issue](https://github.com/sevren-ai/faberon/issues).
-- Have a feature idea? Post a new thread in the [discussion forum](https://github.com/sevren-ai/faberon/discussions/categories/feature-requests). For now we are not accepting feature pull requests.
+- Have a feature idea (that is not yet planned for)? Post a new thread in the [discussion forum](https://github.com/sevren-ai/faberon/discussions/categories/feature-requests). For now we are not accepting feature pull requests.
 - Ran Faberon and got some cool results? [Tell us](https://github.com/sevren-ai/faberon/discussions/categories/show-and-tell) all about it!
 - Have a question or ran into a problem not covered by our [troubleshooting guide](docs/troubleshooting.md)? Ask it [here](https://github.com/sevren-ai/faberon/discussions/categories/q-a)!
 
