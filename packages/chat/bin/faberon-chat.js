@@ -11,6 +11,7 @@
 "use strict";
 
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
 const path = require("node:path");
 
 function fail(lines) {
@@ -32,6 +33,16 @@ try {
   ]);
 }
 
+// Load the extension from this repo when invoked through a git checkout's
+// npm bin shims (`npm --prefix packages/chat ...`). From an installed Pi
+// package, Pi already loads the extension listed in package.json, so `-e`
+// would load it twice.
+const extension = path.resolve(__dirname, "..", "src", "index.ts");
+const fromCheckout = fs.existsSync(
+  path.resolve(__dirname, "..", "..", "..", "AGENTS.md"),
+);
+const passthrough = fromCheckout ? ["-e", extension] : [];
+
 let entry;
 try {
   const pkg = require(path.join(piPkgDir, "package.json"));
@@ -42,9 +53,11 @@ try {
   fail([`could not locate the Pi CLI entry point: ${err.message}`]);
 }
 
-const result = spawnSync(process.execPath, [entry, ...process.argv.slice(2)], {
-  stdio: "inherit",
-});
+const result = spawnSync(
+  process.execPath,
+  [entry, ...passthrough, ...process.argv.slice(2)],
+  { stdio: "inherit" },
+);
 
 if (result.error) {
   fail([`failed to launch the Pi CLI: ${result.error.message}`]);

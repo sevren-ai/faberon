@@ -22,6 +22,17 @@ _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8000
 _DEFAULT_API_URL = f"http://{_DEFAULT_HOST}:{_DEFAULT_PORT}"
 
+
+def _chat_install_guidance() -> None:
+    """Explain how to install the chat interface, then exit."""
+    echo("the chat interface is not available from this install", err=True)
+    echo("install it into Pi with one of:", err=True)
+    echo("  pi install npm:@faberon/chat            (published)", err=True)
+    echo("  pi install /path/to/faberon/packages/chat  (from source)", err=True)
+    echo("or install the standalone shim: npm install -g @faberon/chat", err=True)
+    raise typer.Exit(code=2)
+
+
 app = typer.Typer(
     help="Faberon: run autonomous ML research campaigns.",
     no_args_is_help=True,
@@ -272,6 +283,28 @@ def resume_campaign(campaign_id: UUID) -> None:
     with _client() as client:
         response = _check(client.post(f"/v0/campaigns/{campaign_id}/resume"))
         echo(response.json()["status"])
+
+
+@app.command(
+    "chat",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def chat(ctx: typer.Context) -> None:
+    """Start the Faberon Chat interface (a Pi session with the extension loaded).
+
+    Extra arguments are passed through to Pi.
+    """
+    # Hand over to the installed chat interface. `pi install` (npm or a local
+    # source path) registers the extension so plain `pi` auto-loads it; the
+    # `faberon-chat` npm shim is the standalone alternative. Neither is set up
+    # by this command.
+    pi = shutil.which("pi")
+    if pi is not None:
+        os.execvp(pi, [pi, *ctx.args])
+    shim = shutil.which("faberon-chat")
+    if shim is not None:
+        os.execvp(shim, [shim, *ctx.args])
+    _chat_install_guidance()
 
 
 def main() -> None:

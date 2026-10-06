@@ -49,4 +49,12 @@ E.g. on fedora:
 sudo dnf install nodejs npm
 ```
 
+## 4. Install Pi
+
+Faberon Chat is a Pi extension, so install the Pi CLI. A system-wide Node has its global npm prefix outside your home, so this uses sudo:
+
+```bash
+sudo npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+```
+
 From here onwards, continue with the install/quickstart guide in the README.
