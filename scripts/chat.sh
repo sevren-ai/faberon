@@ -25,11 +25,7 @@ if [ "$node_major" -lt 22 ]; then
   fail "node $(node --version) is too old; Faberon Chat requires Node.js >= 22.19."
 fi
 
-if [ ! -x "$pi_bin" ]; then
-  echo ">> chat dependencies missing; running npm ci"
-  (cd "$chat" && npm ci --legacy-peer-deps --no-audit --no-fund)
-fi
-
-[ -x "$pi_bin" ] || fail "npm ci did not produce $pi_bin. See the output above."
+# This script never installs anything. Dependencies must be set up first.
+[ -x "$pi_bin" ] || fail "chat dependencies missing. Set up first: npm --prefix packages/chat ci --legacy-peer-deps"
 
 exec "$pi_bin" -e "$chat/src/index.ts" "$@"

@@ -4,6 +4,8 @@ import contextlib
 import json
 import os
 import shutil
+import subprocess
+import sys
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +23,9 @@ from .schema import Event, ResearchPlan
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8000
 _DEFAULT_API_URL = f"http://{_DEFAULT_HOST}:{_DEFAULT_PORT}"
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_CHAT_SCRIPT = _REPO_ROOT / "scripts" / "chat.sh"
 
 app = typer.Typer(
     help="Faberon: run autonomous ML research campaigns.",
@@ -272,6 +277,38 @@ def resume_campaign(campaign_id: UUID) -> None:
     with _client() as client:
         response = _check(client.post(f"/v0/campaigns/{campaign_id}/resume"))
         echo(response.json()["status"])
+
+
+@app.command(
+    "chat",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def chat(ctx: typer.Context) -> None:
+    """Start the Faberon Chat interface (a Pi session with the extension loaded).
+
+    Extra arguments are passed through to Pi.
+    """
+    script = _CHAT_SCRIPT
+    if not script.is_file():
+        # Outside a checkout, hand over to an installed chat interface
+        pi = shutil.which("pi")
+        if pi is not None:
+            os.execvp(pi, [pi, *ctx.args])
+        shim = shutil.which("faberon-chat")
+        if shim is not None:
+            os.execvp(shim, [shim, *ctx.args])
+        echo("the chat interface is not available from this install", err=True)
+        echo("install it with: pi install git:github.com/sevren-ai/faberon", err=True)
+        echo("           or: npm install -g @faberon/chat", err=True)
+        echo("from a code checkout, run: scripts/chat.sh", err=True)
+        raise typer.Exit(code=2)
+    try:
+        subprocess.run(["bash", str(script), *ctx.args], check=True)
+    except subprocess.CalledProcessError as exc:
+        raise typer.Exit(code=exc.returncode) from None
+    except KeyboardInterrupt:
+        # Pi handles Ctrl-C itself; a stray one during startup exits quietly.
+        sys.exit(130)
 
 
 def main() -> None:

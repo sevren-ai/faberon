@@ -83,16 +83,8 @@ faberon cancel <id>               # cancel one particular campaign
 Or do the same from a Pi chat session with the Faberon Chat extension loaded: ask it to list campaigns, inject an idea, draft a plan, etc.
 
 ```bash
-pi
+faberon chat
 ```
-
-or (from source)
-
-```bash
-bash scripts/chat.sh
-```
-
-Do not run bare `npx pi` from the repo root: npx falls back to the unrelated `pi` package on npm.
 
 The chat interface and CLI speak to the same API; use whichever suits the moment.
 
