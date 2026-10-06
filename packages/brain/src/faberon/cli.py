@@ -4,8 +4,6 @@ import contextlib
 import json
 import os
 import shutil
-import subprocess
-import sys
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -24,8 +22,16 @@ _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8000
 _DEFAULT_API_URL = f"http://{_DEFAULT_HOST}:{_DEFAULT_PORT}"
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_CHAT_SCRIPT = _REPO_ROOT / "scripts" / "chat.sh"
+
+def _chat_install_guidance() -> None:
+    """Explain how to install the chat interface, then exit."""
+    echo("the chat interface is not available from this install", err=True)
+    echo("install it into Pi with one of:", err=True)
+    echo("  pi install npm:@faberon/chat            (published)", err=True)
+    echo("  pi install /path/to/faberon/packages/chat  (from source)", err=True)
+    echo("or install the standalone shim: npm install -g @faberon/chat", err=True)
+    raise typer.Exit(code=2)
+
 
 app = typer.Typer(
     help="Faberon: run autonomous ML research campaigns.",
@@ -288,27 +294,17 @@ def chat(ctx: typer.Context) -> None:
 
     Extra arguments are passed through to Pi.
     """
-    script = _CHAT_SCRIPT
-    if not script.is_file():
-        # Outside a checkout, hand over to an installed chat interface
-        pi = shutil.which("pi")
-        if pi is not None:
-            os.execvp(pi, [pi, *ctx.args])
-        shim = shutil.which("faberon-chat")
-        if shim is not None:
-            os.execvp(shim, [shim, *ctx.args])
-        echo("the chat interface is not available from this install", err=True)
-        echo("install it with: pi install git:github.com/sevren-ai/faberon", err=True)
-        echo("           or: npm install -g @faberon/chat", err=True)
-        echo("from a code checkout, run: scripts/chat.sh", err=True)
-        raise typer.Exit(code=2)
-    try:
-        subprocess.run(["bash", str(script), *ctx.args], check=True)
-    except subprocess.CalledProcessError as exc:
-        raise typer.Exit(code=exc.returncode) from None
-    except KeyboardInterrupt:
-        # Pi handles Ctrl-C itself; a stray one during startup exits quietly.
-        sys.exit(130)
+    # Hand over to the installed chat interface. `pi install` (npm or a local
+    # source path) registers the extension so plain `pi` auto-loads it; the
+    # `faberon-chat` npm shim is the standalone alternative. Neither is set up
+    # by this command.
+    pi = shutil.which("pi")
+    if pi is not None:
+        os.execvp(pi, [pi, *ctx.args])
+    shim = shutil.which("faberon-chat")
+    if shim is not None:
+        os.execvp(shim, [shim, *ctx.args])
+    _chat_install_guidance()
 
 
 def main() -> None:

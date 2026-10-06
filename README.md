@@ -57,7 +57,8 @@ or from source:
 git clone https://github.com/sevren-ai/faberon
 cd faberon
 uv tool install packages/brain
-npm --prefix packages/chat ci --legacy-peer-deps
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+pi install ./packages/chat
 ```
 
 ## Quickstart

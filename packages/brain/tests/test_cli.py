@@ -1,7 +1,6 @@
 """Tests for the Faberon CLI."""
 
 import json
-import subprocess
 import uuid
 
 import httpx2
@@ -348,37 +347,8 @@ def test_create(api_client, tmp_path):
     assert "workflow" in result.output
 
 
-def test_chat_delegates_to_script(monkeypatch: pytest.MonkeyPatch):
-    """In the repo, `faberon chat` runs scripts/chat.sh and forwards args."""
-    captured = {}
-
-    def fake_run(cmd, check):
-        captured["cmd"] = cmd
-        return subprocess.CompletedProcess(cmd, 0)
-
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
-    result = runner.invoke(cli.app, ["chat", "--", "--help"])
-    assert result.exit_code == 0
-    assert captured["cmd"][0] == "bash"
-    assert captured["cmd"][1].endswith("scripts/chat.sh")
-    # Typer strips the "--" separator; extra args arrive bare.
-    assert captured["cmd"][2:] == ["--help"]
-
-
-def test_chat_propagates_script_exit_code(monkeypatch: pytest.MonkeyPatch):
-    """A failing chat.sh passes its exit code through."""
-
-    def fake_run(cmd, check):
-        raise subprocess.CalledProcessError(7, cmd)
-
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
-    result = runner.invoke(cli.app, ["chat"])
-    assert result.exit_code == 7
-
-
-def test_chat_outside_checkout_uses_pi(monkeypatch: pytest.MonkeyPatch, tmp_path):
-    """With Pi installed (`pi install`), `faberon chat` execs plain `pi`."""
-    monkeypatch.setattr(cli, "_CHAT_SCRIPT", tmp_path / "scripts" / "chat.sh")
+def test_chat_uses_pi(monkeypatch: pytest.MonkeyPatch):
+    """With the extension installed into Pi, `faberon chat` execs plain `pi`."""
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
     captured = {}
 
@@ -387,14 +357,14 @@ def test_chat_outside_checkout_uses_pi(monkeypatch: pytest.MonkeyPatch, tmp_path
         raise cli.typer.Exit(0)  # exec replaces the process; stop here
 
     monkeypatch.setattr(cli.os, "execvp", fake_execvp)
-    result = runner.invoke(cli.app, ["chat", "--version"])
+    result = runner.invoke(cli.app, ["chat", "--", "--help"])
     assert result.exit_code == 0
-    assert captured["args"] == ["/usr/bin/pi", "--version"]
+    # Typer strips the "--" separator; extra args arrive bare.
+    assert captured["args"] == ["/usr/bin/pi", "--help"]
 
 
-def test_chat_outside_checkout_uses_shim(monkeypatch: pytest.MonkeyPatch, tmp_path):
+def test_chat_falls_back_to_shim(monkeypatch: pytest.MonkeyPatch):
     """Without `pi` on PATH, `faberon chat` falls back to the npm shim."""
-    monkeypatch.setattr(cli, "_CHAT_SCRIPT", tmp_path / "scripts" / "chat.sh")
     paths = {"faberon-chat": "/usr/bin/faberon-chat"}
     monkeypatch.setattr(cli.shutil, "which", paths.get)
     captured = {}
@@ -409,12 +379,12 @@ def test_chat_outside_checkout_uses_shim(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert captured["args"] == ["/usr/bin/faberon-chat", "--version"]
 
 
-def test_chat_outside_checkout_without_chat(monkeypatch: pytest.MonkeyPatch, tmp_path):
-    """No checkout script, no `pi`, no shim: guidance, not a traceback."""
-    monkeypatch.setattr(cli, "_CHAT_SCRIPT", tmp_path / "scripts" / "chat.sh")
+def test_chat_without_chat_installed(monkeypatch: pytest.MonkeyPatch):
+    """No `pi` and no shim: install guidance, not a traceback."""
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
     result = runner.invoke(cli.app, ["chat"])
     assert result.exit_code == 2
-    assert "pi install" in result.output
+    assert "pi install npm:@faberon/chat" in result.output
+    assert "packages/chat" in result.output
     assert "npm install -g @faberon/chat" in result.output
     assert "Traceback" not in result.output
