@@ -1,5 +1,6 @@
 """Durable experiment workflow: submit, poll, parse, judge, record."""
 
+import os
 import re
 from pathlib import Path
 
@@ -31,6 +32,7 @@ class Runtime:
     ) -> str:
         """Start the job on the cluster. Idempotent on submission_key."""
         output_path = _job_log_path(repo_path, submission_key)
+        _private_dir(output_path.parent)
         request = SubmitRequest(
             command=command,
             submission_key=submission_key,
@@ -152,6 +154,12 @@ def _job_log_path(repo_path: str, submission_key: str) -> Path:
     from the target repo, not from global config.
     """
     return Path(repo_path) / ".faberon" / f"{submission_key}.out"
+
+
+def _private_dir(path: Path) -> None:
+    """Create a directory readable only by its owner."""
+    path.mkdir(parents=True, exist_ok=True)
+    os.chmod(path, 0o700)
 
 
 # -XXX.YYe-Z

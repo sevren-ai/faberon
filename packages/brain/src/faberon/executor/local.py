@@ -118,6 +118,7 @@ class LocalExecutor:
         # cancel/timeout can signal the whole tree.
         env = {**os.environ, "PYTHONUNBUFFERED": "1"}
         with open(stdout_path, "wb") as stdout:
+            os.chmod(stdout_path, 0o600)
             proc = subprocess.Popen(
                 request.argv,
                 stdout=stdout,
