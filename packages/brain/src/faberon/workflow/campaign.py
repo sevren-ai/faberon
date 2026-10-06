@@ -12,6 +12,7 @@ from pydantic_ai.exceptions import AgentRunError
 
 from ..executor import JobInfo
 from ..schema.events import Actor, Event, EventType, StopReason
+from ..schema.plan import resolve_target_in_repo
 from .models import CampaignSetup, ExperimentSetup, Proposal
 from .proposer import ExperimentProposer
 from .runtime import Runtime
@@ -67,8 +68,13 @@ class CampaignRunner:
 
     @DBOS.step()
     def write_target_step(self, repo: Path, target_file: str, content: str) -> None:
-        """Write the proposed content to the target file."""
-        (repo / target_file).write_text(content)
+        """Write the proposed content to the target file.
+
+        The target must stay inside the repo; the API checks this at
+        campaign creation, and the step re-checks as defense in depth.
+        """
+        resolved = resolve_target_in_repo(str(repo), target_file)
+        resolved.write_text(content)
 
     @DBOS.transaction()
     def record_event(self, event: Event) -> None:
