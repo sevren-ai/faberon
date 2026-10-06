@@ -97,6 +97,7 @@ def make_plan(**overrides) -> ResearchPlan:
     data = {
         "goal": "Beat val_bpb baseline.",
         "command": "echo hello",
+        "target_file": "train.py",
         "metric": "val_bpb",
         "baseline": 1.23,
         "budget_gpu_hours": 100.0,

@@ -1,6 +1,6 @@
 """Research plan: the typed rulebook a campaign is governed by (external model)"""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .constants import MIN_PROSE_LENGTH
 
@@ -10,6 +10,7 @@ class ResearchPlan(BaseModel):
 
     goal: str = Field(min_length=MIN_PROSE_LENGTH)
     command: str = Field(min_length=1)
+    target_file: str = Field(min_length=1)
     metric: str = Field(min_length=1)
     baseline: float
     budget_gpu_hours: float = Field(gt=0)
@@ -17,3 +18,11 @@ class ResearchPlan(BaseModel):
     max_concurrency: int = Field(default=1, ge=1)
     walltime: int = Field(gt=0)  # in minutes
     stop_conditions: list[str] = Field(min_length=1)
+
+    @field_validator("target_file")
+    @classmethod
+    def _target_is_python(cls, value: str) -> str:
+        """The proposer's output is parsed as Python, so the target must be one."""
+        if not value.lower().endswith(".py"):
+            raise ValueError("target_file must be a Python file (.py)")
+        return value

@@ -49,7 +49,7 @@ Three tiers connected by explicit contracts (typed JSON over HTTP/SSE). Any tier
 
 Design rule: **one brain**. The console and the drafter propose; the brain decides; the ledger remembers.
 
-**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, console (when present), and the experiment checkout. All state (Postgres, notes, artifacts) lives there; there is no central Faberon server. FastAPI binds to localhost. A bearer token (`FABERON_API_TOKEN`) guards the API: on a shared login node, the token is mandatory. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote console, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
+**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, console (when present), and the experiment checkout. All state (Postgres, notes, artifacts) lives there; there is no central Faberon server. The control plane runs as a single process: uvicorn serves the FastAPI app, and the app lifespan brings DBOS up and down with it. FastAPI binds to localhost. A bearer token (`FABERON_API_TOKEN`) guards the API: on a shared login node, the token is mandatory. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote console, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
 
 ## 3. Key Mechanisms
 

@@ -6,6 +6,7 @@
 export interface ResearchPlan {
   goal: string;
   command: string;
+  target_file: string;
   metric: string;
   baseline: number;
   budget_gpu_hours: number;

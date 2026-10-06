@@ -10,6 +10,7 @@ def _minimal_plan(**overrides) -> ResearchPlan:
     data = {
         "goal": "Beat the measured val_bpb baseline on autoresearch.",
         "command": "uv run train.py",
+        "target_file": "train.py",
         "metric": "val_bpb",
         "baseline": 1.23,
         "budget_gpu_hours": 10.0,
@@ -49,3 +50,21 @@ def test_plan_rejects_non_positive_budget():
 def test_plan_rejects_non_positive_max_experiments():
     with pytest.raises(ValidationError):
         _minimal_plan(max_experiments=0)
+
+
+def test_plan_requires_target_file():
+    """The plan names the file the proposer edits; there is no hidden default."""
+    data = _minimal_plan().model_dump(mode="json")
+    del data["target_file"]
+    with pytest.raises(ValidationError):
+        ResearchPlan.model_validate(data)
+    with pytest.raises(ValidationError):
+        _minimal_plan(target_file="")
+
+
+def test_plan_target_file_must_be_python():
+    """The proposer's output is parsed as Python, so non-.py targets are rejected."""
+    with pytest.raises(ValidationError):
+        _minimal_plan(target_file="train.sh")
+    plan = _minimal_plan(target_file="src/train.py")
+    assert plan.target_file == "src/train.py"

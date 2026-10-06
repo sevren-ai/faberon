@@ -104,7 +104,7 @@ class CampaignRunner:
                     self._end(setup, StopReason.MAX_EXPERIMENTS, exp_done, gpu_h)
                     return StopReason.MAX_EXPERIMENTS.value
 
-                current = self.read_target_step(repo, setup.target_file)
+                current = self.read_target_step(repo, plan.target_file)
                 self._record_designing(setup)
                 try:
                     proposal = self.propose_step(setup, current)
@@ -121,9 +121,9 @@ class CampaignRunner:
                 # From here on, we know the propose step succeeded
                 prop_fails = 0
                 exp_done += 1
-                self.write_target_step(repo, setup.target_file, proposal.content)
+                self.write_target_step(repo, plan.target_file, proposal.content)
                 commit_msg = f"exp {exp_done}: {proposal.title}"
-                result = self.commit_step(repo, setup.target_file, commit_msg)
+                result = self.commit_step(repo, plan.target_file, commit_msg)
                 self._record_proposal(setup, exp_done, result, proposal)
 
                 exp = ExperimentSetup(
