@@ -44,4 +44,12 @@ export PATH="$HOME/.local/node/bin:$PATH"   # add to your shell profile
 
 A version manager such as `nvm` or `mise` works too.
 
+## 4. Install Pi
+
+Faberon Chat is a Pi extension, so install the Pi CLI. The user-space Node above has its global npm prefix inside your home, so no sudo is needed:
+
+```bash
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+```
+
 From here onwards, continue with the install/quickstart guide in the README.

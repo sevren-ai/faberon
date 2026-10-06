@@ -345,3 +345,46 @@ def test_create(api_client, tmp_path):
     assert result.exit_code == 0
     assert CAMPAIGN_ID in result.output
     assert "workflow" in result.output
+
+
+def test_chat_uses_pi(monkeypatch: pytest.MonkeyPatch):
+    """With the extension installed into Pi, `faberon chat` execs plain `pi`."""
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
+    captured = {}
+
+    def fake_execvp(file, args):
+        captured["args"] = args
+        raise cli.typer.Exit(0)  # exec replaces the process; stop here
+
+    monkeypatch.setattr(cli.os, "execvp", fake_execvp)
+    result = runner.invoke(cli.app, ["chat", "--", "--help"])
+    assert result.exit_code == 0
+    # Typer strips the "--" separator; extra args arrive bare.
+    assert captured["args"] == ["/usr/bin/pi", "--help"]
+
+
+def test_chat_falls_back_to_shim(monkeypatch: pytest.MonkeyPatch):
+    """Without `pi` on PATH, `faberon chat` falls back to the npm shim."""
+    paths = {"faberon-chat": "/usr/bin/faberon-chat"}
+    monkeypatch.setattr(cli.shutil, "which", paths.get)
+    captured = {}
+
+    def fake_execvp(file, args):
+        captured["args"] = args
+        raise cli.typer.Exit(0)  # exec replaces the process; stop here
+
+    monkeypatch.setattr(cli.os, "execvp", fake_execvp)
+    result = runner.invoke(cli.app, ["chat", "--version"])
+    assert result.exit_code == 0
+    assert captured["args"] == ["/usr/bin/faberon-chat", "--version"]
+
+
+def test_chat_without_chat_installed(monkeypatch: pytest.MonkeyPatch):
+    """No `pi` and no shim: install guidance, not a traceback."""
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    result = runner.invoke(cli.app, ["chat"])
+    assert result.exit_code == 2
+    assert "pi install npm:@faberon/chat" in result.output
+    assert "packages/chat" in result.output
+    assert "npm install -g @faberon/chat" in result.output
+    assert "Traceback" not in result.output
