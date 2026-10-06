@@ -10,7 +10,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 brain="$repo_root/packages/control-plane"
-console="$repo_root/packages/console"
+chat="$repo_root/packages/chat"
 
 cd "$brain"
 
@@ -20,7 +20,7 @@ uv sync --locked
 echo ">> pytest"
 uv run pytest -rs
 
-cd "$console"
+cd "$chat"
 
 echo ">> npm ci --legacy-peer-deps"
 npm ci --legacy-peer-deps --no-audit --no-fund

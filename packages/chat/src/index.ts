@@ -1,10 +1,10 @@
 /**
- * Faberon console: a Pi extension for drafting plans and steering campaigns.
+ * Faberon Chat: a Pi extension for drafting plans and steering campaigns.
  *
  * The extension exposes each v0 control-plane operation as a Pi tool (for the
  * model to call in conversation) plus a matching slash command (for the human
  * to invoke directly). `faberon serve` stays CLI-only: it starts the server
- * the console talks to.
+ * the chat interface talks to.
  */
 
 import { readFile } from "node:fs/promises";
@@ -56,7 +56,7 @@ async function promptNonEmpty(
   }
 }
 
-export default function faberonConsole(pi: ExtensionAPI): void {
+export default function faberonChat(pi: ExtensionAPI): void {
   const client = FaberonClient.fromEnv();
 
   pi.registerTool(listCampaignsTool(client));

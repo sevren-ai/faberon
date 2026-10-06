@@ -12,7 +12,7 @@ We are not accepting pull requests for new features right now. Please do not ope
 ## Code Layout
 
 - `packages/control-plane/`: the brain (Python, `uv`-managed, import name `faberon`)
-- `packages/console/`: the console (Pi extension, TypeScript, npm-managed)
+- `packages/chat/`: Faberon Chat (Pi extension, TypeScript, npm-managed)
 - `docs/design/`: [system design](docs/design/design.md), [roadmap](docs/design/roadmap.md), [future ideas](docs/design/future.md), one doc per release (shipped releases in [archive/](docs/design/archive/))
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) (this document): process rules for every contributor, human or agent
 - [`AGENTS.md`](../AGENTS.md): agent-specific rules, read first by any coding agent
@@ -32,14 +32,14 @@ How to use them:
 - Update docs in the same commit/PR that changes a decision: `roadmap.md` for plan changes, `design.md` only when the stable architecture genuinely changes.
 - Speculative ideas belong in `docs/design/future.md`, not in the roadmap or in code comments.
 - The current WIP release doc stays editable until it ships. Never edit a `vX.Y.Z.md` after that version has shipped.
-- Bump the version right before a release is cut: `packages/control-plane/pyproject.toml` and `faberon.__version__` for the control plane, `packages/console/package.json` for the console.
+- Bump the version right before a release is cut: `packages/control-plane/pyproject.toml` and `faberon.__version__` for the control plane, `packages/chat/package.json` for Faberon Chat.
 
 ### Releases and versioning
 
 The two packages version independently; the design makes them independently replaceable. What keeps them compatible is the API contract version (`v0` today), not a shared release number. The tag names are asymmetric on purpose:
 
 - **Control plane** (`packages/control-plane/`, the default artifact): tag `vX.Y.Z`, for example `v0.2.2`. Bare, no prefix, matching the tags that already exist.
-- **Console** (`packages/console/`): tag `console-vX.Y.Z`, first release `console-v0.1.0`. Prefixed so console tags never collide with control-plane tags.
+- **Faberon Chat** (`packages/chat/`): tag `chat-vX.Y.Z`, first release `chat-v0.1.0`. Prefixed so chat tags never collide with control-plane tags.
 
 Cut a release by merging to `main`, bumping that package's version, and pushing the package's tag:
 
@@ -47,11 +47,11 @@ Cut a release by merging to `main`, bumping that package's version, and pushing 
 # control plane
 git tag v0.3.0 && git push origin v0.3.0
 
-# console
-git tag console-v0.1.0 && git push origin console-v0.1.0
+# chat
+git tag chat-v0.1.0 && git push origin chat-v0.1.0
 ```
 
-GitHub Releases keys off the tag you push; each release notes which contract version it speaks. Both packages are also published to their registries: the brain to PyPI as `faberon` (`uv publish`, built from a worktree at the tag, never from a feature branch) and the console to npm as `@faberon/console` (`npm publish --access public`).
+GitHub Releases keys off the tag you push; each release notes which contract version it speaks. Both packages are also published to their registries: the brain to PyPI as `faberon` (`uv publish`, built from a worktree at the tag, never from a feature branch) and the chat interface to npm as `@faberon/chat` (`npm publish --access public`).
 
 ## Git and pull requests
 
@@ -112,7 +112,7 @@ bash scripts/test/prod.sh
 
 Run the Slurm and LLM integration tests together.
 
-### Console tests
+### Chat tests
 
 ```bash
 npm ci --legacy-peer-deps   # npm 10's peer resolver mis-handles Pi's tree

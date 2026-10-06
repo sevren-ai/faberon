@@ -7,13 +7,13 @@ Faberon runs LLM/ML research autonomously. Give it a research plan (goal, metric
 Three tiers:
 
 - The **brain** is the main component with autonomous authority: a durable agent loop behind a small HTTP API
-- The **console** is a Pi extension for drafting plans and steering campaigns from a chat session
+- The **chat** interface ("Faberon Chat") is a Pi extension for drafting plans and steering campaigns from a chat session
 - The **CLI** covers the same operations from a shell (no LLM)
 
-The console and the CLI propose, the brain decides, the ledger remembers.
+The chat interface and the CLI propose, the brain decides, the ledger remembers.
 ```
      +-----------+   +-------------+
-     | Console   |   | CLI         |
+     | Chat      |   | CLI         |
      | (Pi, TS)  |   | (Typer, Py) |
      +-----------+   +-------------+
         |                  |
@@ -40,15 +40,15 @@ Pick the guide for your machine:
 - [Install on a login node](docs/install-login-node.md): no sudo (e.g. cluster login node)
 
 
-### Brain & console
-From Pypi and npm (once these are available):
+### Brain & chat
+From PyPI and npm (once these are available):
 
 ```bash
 uv venv
 uv pip install faberon
 
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-pi install npm:@faberon/console
+pi install npm:@faberon/chat
 ```
 
 or from source:
@@ -56,7 +56,7 @@ or from source:
 git clone https://github.com/sevren-ai/faberon
 cd faberon
 uv tool install packages/control-plane
-npm --prefix packages/console ci --legacy-peer-deps
+npm --prefix packages/chat ci --legacy-peer-deps
 ```
 
 ## Quickstart
@@ -79,7 +79,7 @@ faberon events <id> -f            # stream the events of one particular campaign
 faberon cancel <id>               # cancel one particular campaign
 ```
 
-Or do the same from a Pi chat session with the console extension loaded: ask it to list campaigns, inject an idea, draft a plan, etc.
+Or do the same from a Pi chat session with the Faberon Chat extension loaded: ask it to list campaigns, inject an idea, draft a plan, etc.
 
 ```bash
 pi
@@ -88,12 +88,12 @@ pi
 or (from source)
 
 ```bash
-bash scripts/console.sh
+bash scripts/chat.sh
 ```
 
 Do not run bare `npx pi` from the repo root: npx falls back to the unrelated `pi` package on npm.
 
-The console and CLI speak to the same API; use whichever suits the moment.
+The chat interface and CLI speak to the same API; use whichever suits the moment.
 
 ## Future work
 
