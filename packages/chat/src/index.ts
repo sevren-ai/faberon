@@ -1,7 +1,7 @@
 /**
  * Faberon Chat: a Pi extension for drafting plans and steering campaigns.
  *
- * The extension exposes each v0 control-plane operation as a Pi tool (for the
+ * The extension exposes each v0 brain operation as a Pi tool (for the
  * model to call in conversation) plus a matching slash command (for the human
  * to invoke directly). `faberon serve` stays CLI-only: it starts the server
  * the chat interface talks to.

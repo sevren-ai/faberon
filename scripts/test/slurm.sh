@@ -15,7 +15,7 @@ fi
 # Resolve the repo root from the script location so it works from any cwd.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
-pkg="$repo_root/packages/control-plane"
+pkg="$repo_root/packages/brain"
 
 cd "$pkg"
 
