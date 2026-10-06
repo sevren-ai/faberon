@@ -11,26 +11,7 @@ Three tiers:
 - The **CLI** covers the same operations from a shell (no LLM)
 
 The chat interface and the CLI propose, the brain decides, the ledger remembers.
-```
-     +-----------+   +-------------+
-     | Chat      |   | CLI         |
-     | (Pi, TS)  |   | (Typer, Py) |
-     +-----------+   +-------------+
-        |                  |
-        +--------+---------+
-                 |  API
-        +--------+---------------------------+
-        | Brain: authority                   |
-        |    Pydantic AI, DBOS, FastAPI      |
-        |    Postgres (ledger), uvicorn      |
-        +------------+-----------+-----------+
-              submit v           ^ status
-            +--------+-----------+-------------+
-            | Executors                        |
-            |  - Slurm cluster                 |
-            |  - local subprocess              |
-            +----------------------------------+
-```
+![Faberon architecture: the chat interface and the CLI propose through the API, the brain decides and records every decision in the ledger, and executors run the jobs](docs/assets/architecture.svg)
 
 ## Install
 

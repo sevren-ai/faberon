@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="fab-title fab-desc">
+  <title id="fab-title">Faberon architecture</title>
+  <desc id="fab-desc">The chat interface and the CLI query status and steer campaigns through the API. The brain proposes experiments, submits jobs, judges results, and decides what to try next. The executor runs the jobs on a Slurm cluster or as a local subprocess.</desc>
+
+  <defs>
+    <radialGradient id="brain-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F5B94A" stop-opacity="0.13"/>
+      <stop offset="100%" stop-color="#F5B94A" stop-opacity="0"/>
+    </radialGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#64789B"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="959" height="539" rx="16" fill="#0B1220" stroke="#263450"/>
+  <ellipse cx="480" cy="278" rx="340" ry="150" fill="url(#brain-glow)"/>
+
+  <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif">
+    <!-- Chat -->
+    <g>
+      <rect x="180" y="40" width="280" height="100" rx="12" fill="#131C2E" stroke="#2A3B5C"/>
+      <text x="208" y="72" font-size="19" font-weight="650" fill="#7DD3FC">Chat</text>
+      <text x="208" y="96" font-size="12.5" fill="#8CA0BE">Pi extension (TS)</text>
+      <text x="208" y="118" font-size="12" fill="#64789B">query status - steer campaigns</text>
+    </g>
+
+    <!-- CLI -->
+    <g>
+      <rect x="500" y="40" width="280" height="100" rx="12" fill="#131C2E" stroke="#2A3B5C"/>
+      <text x="528" y="72" font-size="19" font-weight="650" fill="#7DD3FC">CLI</text>
+      <text x="528" y="96" font-size="12.5" fill="#8CA0BE">Typer (Python)</text>
+      <text x="528" y="118" font-size="12" fill="#64789B">query status - steer campaigns</text>
+    </g>
+
+    <!-- Connectors into the brain -->
+    <g stroke="#64789B" stroke-width="2" fill="none" stroke-linecap="round">
+      <path d="M320 140 V186"/>
+      <path d="M640 140 V186"/>
+      <path d="M320 186 H640"/>
+      <path d="M480 186 V213" marker-end="url(#arrow)"/>
+    </g>
+    <g>
+      <rect x="452" y="162" width="56" height="22" rx="11" fill="#16233B" stroke="#33456B"/>
+      <text x="480" y="177" font-size="11" letter-spacing="1.5" text-anchor="middle" fill="#9DB2D0"
+            font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">API</text>
+    </g>
+
+    <!-- Brain -->
+    <g>
+      <rect x="120" y="216" width="720" height="124" rx="12" fill="#131C2E" stroke="#2A3B5C"/>
+      <text x="148" y="254" font-size="20" font-weight="650" fill="#F5B94A">Brain</text>
+      <text x="148" y="282" font-size="13" fill="#8CA0BE">Proposes experiments, submits jobs, judges results, decides what to try next</text>
+      <text x="148" y="314" font-size="12.5" fill="#A9BBDD"
+            font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">Pydantic AI - DBOS - FastAPI - uvicorn - Postgres (ledger)</text>
+    </g>
+
+    <!-- submit / status -->
+    <g stroke="#64789B" stroke-width="2" fill="none" stroke-linecap="round">
+      <path d="M430 342 V400" marker-end="url(#arrow)"/>
+      <path d="M530 402 V344" marker-end="url(#arrow)"/>
+    </g>
+    <g font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="12" fill="#9DB2D0">
+      <text x="414" y="376" text-anchor="end">submit</text>
+      <text x="546" y="376">status</text>
+    </g>
+
+    <!-- Executor: one contract, two implementations -->
+    <g>
+      <rect x="120" y="404" width="720" height="96" rx="12" fill="#131C2E" stroke="#2A3B5C"/>
+      <text x="148" y="457" font-size="19" font-weight="650" fill="#6EE7B7">Executor</text>
+      <rect x="300" y="428" width="240" height="48" rx="10" fill="#16233B" stroke="#33456B"/>
+      <text x="420" y="458" font-size="13.5" font-weight="600" text-anchor="middle" fill="#D7E1F2">Slurm cluster</text>
+      <rect x="568" y="428" width="240" height="48" rx="10" fill="#16233B" stroke="#33456B"/>
+      <text x="688" y="458" font-size="13.5" font-weight="600" text-anchor="middle" fill="#D7E1F2">Local subprocess</text>
+    </g>
+  </g>
+</svg>
