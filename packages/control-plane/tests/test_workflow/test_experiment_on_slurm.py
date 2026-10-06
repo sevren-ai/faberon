@@ -10,7 +10,6 @@ to completion, metric parse, judgment, and ledger recording.
 """
 
 import os
-import shlex
 import uuid
 from collections.abc import Iterator
 
@@ -44,12 +43,12 @@ def dbos() -> Iterator[None]:
 
 
 def test_experiment_on_slurm(dbos, tmp_path):
-    metric_file = tmp_path / "metric.txt"
-    # The sbatch job writes the metric file; the workflow reads it back locally.
-    command = f"sh -c \"echo 'val_bpb: 1.10' > {shlex.quote(str(metric_file))}\""
+    # The job prints the metric to stdout, which lands in the job log at
+    # {repo}/.faberon/{submission_key}.out; the workflow parses it from there.
+    command = "echo 'val_bpb: 1.10'"
+    submission_key = f"slurm-{uuid.uuid4().hex}"
     executor = SlurmExecutor(
         account=os.environ["FABERON_SLURM_ACCOUNT"],
-        output=str(tmp_path / "slurm-%j.out"),
         max_walltime=10,
     )
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
@@ -62,9 +61,9 @@ def test_experiment_on_slurm(dbos, tmp_path):
         ExperimentSetup(
             campaign_id=campaign_id,
             command=command,
-            submission_key=f"slurm-{uuid.uuid4().hex}",
-            metric_command=f"cat {metric_file}",
-            metric_name="val_bpb",
+            submission_key=submission_key,
+            metric="val_bpb",
+            repo_path=str(tmp_path),
             baseline=1.23,
             poll_interval_seconds=5.0,
             walltime=10,

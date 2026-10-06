@@ -97,10 +97,13 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
 
 def test_campaign_commit_msg(dbos, repo, tmp_path):
     """Experiment commits are titled ``exp N: <proposal title>``."""
-    # One metric file per job id, each better than the last, so both
+    # One job log per experiment, each better than the last, so both
     # experiments keep and their commits stay on the branch.
-    (tmp_path / "metric-fake-1.txt").write_text("val_bpb: 1.10\n")
-    (tmp_path / "metric-fake-2.txt").write_text("val_bpb: 1.00\n")
+    campaign_id = uuid.uuid4()
+    log_dir = repo / ".faberon"
+    log_dir.mkdir()
+    (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.10\n")
+    (log_dir / f"{campaign_id}:2.out").write_text("val_bpb: 1.00\n")
     runtime = Runtime(
         FakeExecutor(),
         Ledger(os.environ["FABERON_DATABASE_URL"]),
@@ -112,11 +115,8 @@ def test_campaign_commit_msg(dbos, repo, tmp_path):
         proposer=FakeProposer(),
     )
     setup = CampaignSetup(
-        campaign_id=uuid.uuid4(),
-        plan=make_plan(
-            metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
-            max_experiments=2,
-        ),
+        campaign_id=campaign_id,
+        plan=make_plan(max_experiments=2),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",
@@ -146,8 +146,11 @@ def test_proposal_title_max_length():
 
 def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
     """A failed propose step is recorded and skipped, not fatal and not counted."""
-    (tmp_path / "metric-fake-1.txt").write_text("val_bpb: 1.10\n")
-    (tmp_path / "metric-fake-2.txt").write_text("val_bpb: 1.00\n")
+    campaign_id = uuid.uuid4()
+    log_dir = repo / ".faberon"
+    log_dir.mkdir()
+    (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.10\n")
+    (log_dir / f"{campaign_id}:2.out").write_text("val_bpb: 1.00\n")
 
     class FlakyProposer(FakeProposer):
         def __init__(self) -> None:
@@ -178,11 +181,8 @@ def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
     proposer = FlakyProposer()
     runner = CampaignRunner(runtime, proposer=proposer)
     setup = CampaignSetup(
-        campaign_id=uuid.uuid4(),
-        plan=make_plan(
-            metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
-            max_experiments=2,
-        ),
+        campaign_id=campaign_id,
+        plan=make_plan(max_experiments=2),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",
@@ -332,10 +332,13 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
     assert ended.payload["experiments_done"] == 4
 
 
-def test_campaign_metric_command_renders_job_id(dbos, repo, tmp_path):
-    # The metric file is named after the executor's job id: only a rendered
-    # {job_id} placeholder finds it.
-    (tmp_path / "metric-fake-1.txt").write_text("val_bpb: 1.10\n")
+def test_campaign_reads_metric_from_job_log(dbos, repo, tmp_path):
+    # The metric is parsed from the job log the executor writes:
+    # {repo}/.faberon/{submission_key}.out.
+    campaign_id = uuid.uuid4()
+    log_dir = repo / ".faberon"
+    log_dir.mkdir()
+    (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.10\n")
     runtime = Runtime(
         FakeExecutor(),
         Ledger(os.environ["FABERON_DATABASE_URL"]),
@@ -347,11 +350,8 @@ def test_campaign_metric_command_renders_job_id(dbos, repo, tmp_path):
         proposer=FakeProposer(),
     )
     setup = CampaignSetup(
-        campaign_id=uuid.uuid4(),
-        plan=make_plan(
-            metric_command=f"cat {tmp_path}/metric-{{job_id}}.txt",
-            max_experiments=1,
-        ),
+        campaign_id=campaign_id,
+        plan=make_plan(max_experiments=1),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         target_file="train.py",

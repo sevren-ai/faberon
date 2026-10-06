@@ -10,8 +10,7 @@ export function samplePlan(
   return {
     goal: "Lower val_bpb on the baseline task",
     command: "python train.py",
-    metric_name: "val_bpb",
-    metric_command: "python eval.py",
+    metric: "val_bpb",
     baseline: 1.23,
     budget_gpu_hours: 10,
     max_experiments: 5,

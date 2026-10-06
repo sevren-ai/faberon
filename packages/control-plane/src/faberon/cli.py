@@ -3,6 +3,7 @@
 import contextlib
 import json
 import os
+import shutil
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -11,10 +12,11 @@ from uuid import UUID, uuid4
 import httpx2
 import typer
 import uvicorn
+from pydantic import ValidationError
 from typer import Argument, FileText, Option, echo
 
-from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_slurm
-from .schema import Event
+from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_local, create_app_slurm
+from .schema import Event, ResearchPlan
 
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8000
@@ -56,8 +58,14 @@ def _check(response: httpx2.Response) -> httpx2.Response:
         detail = response.json().get("detail")
     except json.JSONDecodeError:
         detail = None
-    message = detail or response.text or "request failed"
-    echo(f"error {response.status_code}: {message}", err=True)
+    echo(f"error {response.status_code}:", err=True)
+    if isinstance(detail, list):
+        # FastAPI validation errors: one line per offending field.
+        for err in detail:
+            field = ".".join(str(loc) for loc in err.get("loc", []))
+            echo(f"  {field}: {err.get('msg', 'invalid')}", err=True)
+    else:
+        echo(f"  {detail or response.text or 'request failed'}", err=True)
     raise typer.Exit(code=1)
 
 
@@ -65,14 +73,28 @@ def _check(response: httpx2.Response) -> httpx2.Response:
 def serve(
     host: str = Option(_DEFAULT_HOST, envvar="FABERON_HOST"),
     port: int = Option(_DEFAULT_PORT, envvar="FABERON_PORT"),
+    executor: str | None = Option(None, envvar="FABERON_EXECUTOR"),
 ) -> None:
-    """Start the Faberon server with the Slurm executor.
+    """Start the Faberon server, with the given executor or a default one.
 
-    Requires the same env vars as ``create_app_slurm``: FABERON_DATABASE_URL,
-    FABERON_SLURM_ACCOUNT, FABERON_API_TOKEN and FABERON_MODEL.
+    Requires FABERON_DATABASE_URL, FABERON_API_TOKEN and FABERON_MODEL.
+    The Slurm executor also requires FABERON_SLURM_ACCOUNT.
     """
+    factories = {"slurm": create_app_slurm, "local": create_app_local}
+    # validate given executor name
+    name = executor
+    if name is not None and name not in factories.keys():
+        echo(
+            f"unknown executor {name!r}: expected one of {sorted(factories)}",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    # default name if none was given: slurm if 'sbatch' is available
+    if name is None:
+        name = "slurm" if shutil.which("sbatch") else "local"
+    echo(f"executor: {name}")
     uvicorn.run(
-        create_app_slurm,
+        factories[name],
         host=host,
         port=port,
         factory=True,
@@ -94,9 +116,23 @@ def create_campaign(
     poll: float = Option(30.0, "--poll", "-p", help="Poll interval in seconds."),
 ) -> None:
     """Submit a new campaign from a research plan."""
+    try:
+        data = json.load(plan)
+    except json.JSONDecodeError as exc:
+        echo(f"invalid JSON in {plan.name}: {exc}", err=True)
+        echo("hint: no comments, no trailing commas, double quotes only.", err=True)
+        raise typer.Exit(code=2) from None
+    try:
+        validated = ResearchPlan.model_validate(data)
+    except ValidationError as exc:
+        echo(f"invalid plan in {plan.name}:", err=True)
+        for err in exc.errors():
+            field = ".".join(str(loc) for loc in err["loc"])
+            echo(f"  {field}: {err['msg']}", err=True)
+        raise typer.Exit(code=2) from None
     payload = {
         "campaign_id": str(uuid4()),
-        "plan": json.load(plan),
+        "plan": validated.model_dump(mode="json"),
         "repo_path": str(repo),
         "poll_interval_seconds": poll,
     }
@@ -126,7 +162,7 @@ def list_campaigns(
                 f"{campaign['campaign_id']}  "
                 f"{created.strftime('%Y-%m-%d %H:%M')}  "
                 f"{info['status']:<6}  "
-                f"{campaign['plan']['metric_name']:<12}  "
+                f"{campaign['plan']['metric']:<12}  "
                 f"{campaign['repo_path']}"
             )
             echo(line)
@@ -150,7 +186,7 @@ def show_campaign(
         echo(f"created:  {created.strftime('%Y-%m-%d %H:%M')}")
         echo(f"repo:     {campaign['repo_path']}")
         echo(f"goal:     {campaign['plan']['goal']}")
-        echo(f"metric:   {campaign['plan']['metric_name']}")
+        echo(f"metric:   {campaign['plan']['metric']}")
         echo(f"budget:   {campaign['plan']['budget_gpu_hours']} gpu-hours")
         echo(f"max exp:  {campaign['plan']['max_experiments']}")
         echo(f"status:   {info['status']}")
@@ -162,6 +198,9 @@ def show_campaign(
 def campaign_events(
     campaign_id: UUID,
     follow: bool = Option(False, "--follow", "-f", help="Stream new events live."),
+    after: int = Option(
+        0, "--after", min=0, help="Skip events with seq up to this one."
+    ),
     verbose: bool = Option(False, "--verbose", "-v", help="Show event details."),
     as_json: bool = Option(
         False, "--json", "-j", help="Emit raw events as JSONL, one per line."
@@ -174,11 +213,20 @@ def campaign_events(
 
     with _client() as client:
         if not follow:
-            response = _check(client.get(f"/v0/campaigns/{campaign_id}/events.jsonl"))
+            response = _check(
+                client.get(
+                    f"/v0/campaigns/{campaign_id}/events.jsonl",
+                    params={"after": after},
+                )
+            )
             for line in response.text.splitlines():
                 echo(_render(Event.model_validate_json(line)))
             return
-        with client.stream("GET", f"/v0/campaigns/{campaign_id}/events") as stream:
+        with client.stream(
+            "GET",
+            f"/v0/campaigns/{campaign_id}/events",
+            params={"after": after},
+        ) as stream:
             _check(stream)
             for line in stream.iter_lines():
                 if line.startswith("data: "):

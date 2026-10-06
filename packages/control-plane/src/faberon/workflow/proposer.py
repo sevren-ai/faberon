@@ -126,7 +126,7 @@ class AgentProposer:
         """
         prompt = (
             f"Goal: {plan.goal}\n"
-            f"Metric: {plan.metric_name} (lower is better)\n"
+            f"Metric: {plan.metric} (lower is better)\n"
             "Current train.py:\n"
             "<target_file>\n"
             f"{current_content}\n"

@@ -19,7 +19,7 @@ export function formatCampaigns(infos: CampaignInfo[]): string {
   const lines = infos.map((info) => {
     const c = info.campaign;
     const created = c.created_at.slice(0, 16).replace("T", " ");
-    return `${c.campaign_id}  ${created}  ${pad(info.status, 6)}  ${pad(c.plan.metric_name, 12)}  ${c.repo_path}`;
+    return `${c.campaign_id}  ${created}  ${pad(info.status, 6)}  ${pad(c.plan.metric, 12)}  ${c.repo_path}`;
   });
   return [header, ...lines].join("\n");
 }

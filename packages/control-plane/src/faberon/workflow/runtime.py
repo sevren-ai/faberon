@@ -1,8 +1,7 @@
 """Durable experiment workflow: submit, poll, parse, judge, record."""
 
 import re
-import shlex
-import subprocess
+from pathlib import Path
 
 from dbos import DBOS
 
@@ -27,10 +26,16 @@ class Runtime:
         self.config_name = config_name
 
     @DBOS.step()
-    def submit_step(self, command: str, submission_key: str, walltime: int) -> str:
+    def submit_step(
+        self, command: str, submission_key: str, walltime: int, repo_path: str
+    ) -> str:
         """Start the job on the cluster. Idempotent on submission_key."""
+        output_path = _job_log_path(repo_path, submission_key)
         request = SubmitRequest(
-            command=command, submission_key=submission_key, walltime=walltime
+            command=command,
+            submission_key=submission_key,
+            walltime=walltime,
+            output_path=str(output_path),
         )
         return self.executor.submit(request)
 
@@ -40,19 +45,21 @@ class Runtime:
         return self.executor.status(job_id)
 
     @DBOS.step()
-    def parse_metric_step(self, metric_command: str, metric_name: str) -> float | None:
-        """Run the metric command locally and parse the metric value.
+    def parse_metric_step(
+        self, repo_path: str, submission_key: str, metric_name: str
+    ) -> float | None:
+        """Read the job's log and parse the metric value.
 
-        Returns None if the metric command fails or no float could be
-        parsed. The command is expected to print a line containing the
-        metric name followed by a float, for example `val_bpb: 1.10`.
+        Returns None if the log is missing or no float could be parsed. The
+        log is expected to print a line containing the metric name followed
+        by a float, for example `val_bpb: 1.10`.
         """
-        result = subprocess.run(
-            shlex.split(metric_command), capture_output=True, text=True
-        )
-        if result.returncode != 0:
+        log = _job_log_path(repo_path, submission_key)
+        try:
+            stdout = log.read_text()
+        except OSError:
             return None
-        return _parse_metric(result.stdout, metric_name)
+        return _parse_metric(stdout, metric_name)
 
     @DBOS.step()
     def judge_step(
@@ -77,7 +84,9 @@ class Runtime:
     @DBOS.workflow()
     def run_experiment(self, setup: ExperimentSetup) -> ExperimentResult:
         """Run one experiment durably: submit, poll, parse, judge, record."""
-        job_id = self.submit_step(setup.command, setup.submission_key, setup.walltime)
+        job_id = self.submit_step(
+            setup.command, setup.submission_key, setup.walltime, setup.repo_path
+        )
 
         info = self.status_step(job_id)
         while not info.state.is_terminal:
@@ -87,7 +96,7 @@ class Runtime:
         metric_value: float | None = None
         if info.state == JobState.COMPLETED and info.exit_code == 0:
             metric_value = self.parse_metric_step(
-                setup.metric_command.replace("{job_id}", job_id), setup.metric_name
+                setup.repo_path, setup.submission_key, setup.metric
             )
 
         judgment, reason = self.judge_step(metric_value, setup.baseline, info)
@@ -133,6 +142,15 @@ class Runtime:
         return ExperimentResult(
             judgment=judgment, metric_value=metric_value, job_info=info
         )
+
+
+def _job_log_path(repo_path: str, submission_key: str) -> Path:
+    """The job's log file: ``{repo}/.faberon/{submission_key}.out``.
+
+    The metric command reads this file, so the path is stable and derived
+    from the target repo, not from global config.
+    """
+    return Path(repo_path) / ".faberon" / f"{submission_key}.out"
 
 
 # -XXX.YYe-Z

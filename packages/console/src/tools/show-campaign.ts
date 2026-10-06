@@ -18,7 +18,7 @@ export function formatCampaign(info: CampaignInfo): string {
     `created:  ${created}`,
     `repo:     ${campaign.repo_path}`,
     `goal:     ${campaign.plan.goal}`,
-    `metric:   ${campaign.plan.metric_name}`,
+    `metric:   ${campaign.plan.metric}`,
     `budget:   ${campaign.plan.budget_gpu_hours} gpu-hours`,
     `max exp:  ${campaign.plan.max_experiments}`,
     `status:   ${info.status}`,

@@ -19,8 +19,7 @@ CAMPAIGN_ID = str(uuid.uuid4())
 _PLAN = {
     "goal": "Beat val_bpb baseline.",
     "command": "echo hello",
-    "metric_name": "val_bpb",
-    "metric_command": "cat metric.txt",
+    "metric": "val_bpb",
     "baseline": 1.42,
     "budget_gpu_hours": 100.0,
     "max_experiments": 3,
@@ -128,6 +127,52 @@ def test_serve_graceful_shutdown(monkeypatch: pytest.MonkeyPatch):
     assert captured["kwargs"]["timeout_graceful_shutdown"] == GRACEFUL_SHUTDOWN_TIMEOUT
 
 
+def _serve_factory(monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Capture the factory uvicorn is invoked with."""
+    captured = {}
+    monkeypatch.setattr(
+        uvicorn, "run", lambda *a, **kw: captured.update({"args": a, "kwargs": kw})
+    )
+    return captured
+
+
+def test_serve_defaults_to_slurm(monkeypatch: pytest.MonkeyPatch):
+    captured = _serve_factory(monkeypatch)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert captured["args"][0] is cli.create_app_slurm
+    assert "executor: slurm" in result.output
+
+
+def test_serve_defaults_to_local(monkeypatch: pytest.MonkeyPatch):
+    captured = _serve_factory(monkeypatch)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert captured["args"][0] is cli.create_app_local
+    assert "executor: local" in result.output
+
+
+def test_serve_executor_overrides(monkeypatch: pytest.MonkeyPatch):
+    captured = _serve_factory(monkeypatch)
+    # sbatch present, but the explicit choice wins.
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
+    monkeypatch.setenv("FABERON_EXECUTOR", "local")
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert captured["args"][0] is cli.create_app_local
+    assert "executor: local" in result.output
+
+
+def test_serve_unknown_executor(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    monkeypatch.setenv("FABERON_EXECUTOR", "kubernetes")
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 2
+    assert "unknown executor" in result.output
+
+
 def test_serve_host_port(monkeypatch: pytest.MonkeyPatch):
     """Flags beat env vars, which beat the defaults."""
     captured = {}
@@ -201,7 +246,7 @@ def test_show_json(api_client):
     plan = campaign["plan"]
     assert campaign["campaign_id"] == CAMPAIGN_ID
     assert parsed["status"] == "active"
-    assert plan["metric_name"] == "val_bpb"
+    assert plan["metric"] == "val_bpb"
     assert plan["budget_gpu_hours"] == 100.0
     assert plan["max_experiments"] == 3
 
@@ -227,6 +272,20 @@ def test_events_json(monkeypatch: pytest.MonkeyPatch):
     assert result.exit_code == 0
     parsed = json.loads(result.output.strip())
     assert parsed["type"] == EventType.CAMPAIGN_CREATED.value
+
+
+def test_events_after(monkeypatch: pytest.MonkeyPatch):
+    """--after is forwarded to the API as the seq lower bound."""
+    captured = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        captured["after"] = request.url.params["after"]
+        return httpx2.Response(200, text=json.dumps(_EVENT) + "\n")
+
+    monkeypatch.setattr(cli, "_client", lambda: _make_client(handler))
+    result = runner.invoke(cli.app, ["events", CAMPAIGN_ID, "--after", "41"])
+    assert result.exit_code == 0
+    assert captured["after"] == "41"
 
 
 def test_cancel(api_client):

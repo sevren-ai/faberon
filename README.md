@@ -56,7 +56,7 @@ or from source:
 git clone https://github.com/sevren-ai/faberon
 cd faberon
 uv tool install packages/control-plane
-npx pi -e packages/console/src/index.ts
+npm --prefix packages/console ci --legacy-peer-deps
 ```
 
 ## Quickstart
@@ -86,8 +86,10 @@ pi
 or (from source)
 
 ```bash
-pi -e packages/console/src/index.ts
+bash scripts/console.sh
 ```
+
+Do not run bare `npx pi` from the repo root: npx falls back to the unrelated `pi` package on npm.
 
 The console and CLI speak to the same API; use whichever suits the moment.
 
