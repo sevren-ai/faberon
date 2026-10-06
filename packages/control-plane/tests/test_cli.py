@@ -19,6 +19,7 @@ CAMPAIGN_ID = str(uuid.uuid4())
 _PLAN = {
     "goal": "Beat val_bpb baseline.",
     "command": "echo hello",
+    "target_file": "train.py",
     "metric": "val_bpb",
     "baseline": 1.42,
     "budget_gpu_hours": 100.0,

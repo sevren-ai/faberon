@@ -24,6 +24,12 @@ const planSchema = Type.Object({
     description: "Training command each experiment runs.",
     minLength: 1,
   }),
+  target_file: Type.String({
+    description:
+      "Path of the file the proposer edits, relative to the repo root, " +
+      "e.g. 'train.py'.",
+    minLength: 1,
+  }),
   metric: Type.String({
     description:
       "Name of the metric under optimization, e.g. 'val_bpb'. The job log must " +

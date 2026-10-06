@@ -62,7 +62,6 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
         plan=plan,
         poll_interval_seconds=0.05,
         repo_path=str(repo),
-        target_file="train.py",
     )
     DBOS.launch()
 
@@ -119,7 +118,6 @@ def test_campaign_commit_msg(dbos, repo, tmp_path):
         plan=make_plan(max_experiments=2),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
-        target_file="train.py",
     )
     DBOS.launch()
 
@@ -185,7 +183,6 @@ def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
         plan=make_plan(max_experiments=2),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
-        target_file="train.py",
     )
     DBOS.launch()
 
@@ -237,7 +234,6 @@ def test_campaign_ends_max_propose_failure(dbos, repo, tmp_path):
         plan=make_plan(),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
-        target_file="train.py",
     )
     DBOS.launch()
 
@@ -282,7 +278,6 @@ def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
         plan=make_plan(max_experiments=1),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
-        target_file="train.py",
     )
     DBOS.launch()
 
@@ -315,7 +310,6 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
         plan=make_plan(budget_gpu_hours=7.0, max_experiments=10),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
-        target_file="train.py",
     )
     DBOS.launch()
 
@@ -354,7 +348,6 @@ def test_campaign_reads_metric_from_job_log(dbos, repo, tmp_path):
         plan=make_plan(max_experiments=1),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
-        target_file="train.py",
     )
     DBOS.launch()
 
@@ -388,7 +381,6 @@ def test_campaign_ends_on_cancel(dbos, repo):
         plan=make_plan(),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
-        target_file="train.py",
     )
     DBOS.launch()
 

@@ -10,6 +10,7 @@ class ResearchPlan(BaseModel):
 
     goal: str = Field(min_length=MIN_PROSE_LENGTH)
     command: str = Field(min_length=1)
+    target_file: str = Field(min_length=1)
     metric: str = Field(min_length=1)
     baseline: float
     budget_gpu_hours: float = Field(gt=0)
