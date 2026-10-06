@@ -4,7 +4,12 @@ version = "0.3.0"
 description = "Faberon: Autonomous ML Research Harness"
 readme = "README.md"
 requires-python = ">=3.14"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3.14",
+]
 dependencies = [
     "dbos>=2.31.0,<3",
     "fastapi>=0.141.1,<1",
