@@ -60,3 +60,11 @@ def test_plan_requires_target_file():
         ResearchPlan.model_validate(data)
     with pytest.raises(ValidationError):
         _minimal_plan(target_file="")
+
+
+def test_plan_target_file_must_be_python():
+    """The proposer's output is parsed as Python, so non-.py targets are rejected."""
+    with pytest.raises(ValidationError):
+        _minimal_plan(target_file="train.sh")
+    plan = _minimal_plan(target_file="src/train.py")
+    assert plan.target_file == "src/train.py"
