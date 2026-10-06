@@ -77,8 +77,8 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     assert types.count(EventType.EXPERIMENT_DESIGNING) == plan.max_experiments
     assert types.count(EventType.CAMPAIGN_ENDED) == 1
     proposed = next(e for e in events if e.type == EventType.EXPERIMENT_PROPOSED)
-    assert proposed.reason == "rationale for test proposal 1"
-    assert proposed.payload["title"] == "test proposal 1"
+    assert proposed.reason == "test proposal 1"
+    assert proposed.payload["rationale"] == "rationale for test proposal 1"
     # completed/judged carry the same index and sha as their proposal.
     proposed_by_index = {
         e.payload["index"]: e.payload["sha"]

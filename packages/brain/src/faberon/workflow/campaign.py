@@ -213,9 +213,9 @@ class CampaignRunner:
                 campaign_id=setup.campaign_id,
                 actor=Actor.AGENT,
                 type=EventType.EXPERIMENT_PROPOSED,
-                reason=proposal.rationale,
+                reason=proposal.title,
                 payload={
-                    "title": proposal.title,
+                    "rationale": proposal.rationale,
                     "sha": result.sha,
                     "parent_sha": result.parent_sha,
                     "index": index,
