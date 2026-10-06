@@ -22,7 +22,7 @@ The chat interface and the CLI propose, the brain decides, the ledger remembers.
         +--------+---------------------------+
         | Brain: authority                   |
         |    Pydantic AI, DBOS, FastAPI      |
-        |    Postgres (ledger)               |
+        |    Postgres (ledger), uvicorn      |
         +------------+-----------+-----------+
               submit v           ^ status
             +--------+-----------+-------------+
@@ -55,7 +55,7 @@ or from source:
 ```bash
 git clone https://github.com/sevren-ai/faberon
 cd faberon
-uv tool install packages/control-plane
+uv tool install packages/brain
 npm --prefix packages/chat ci --legacy-peer-deps
 ```
 

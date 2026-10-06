@@ -33,7 +33,7 @@ Three tiers connected by explicit contracts (typed JSON over HTTP/SSE). Any tier
         +--------+---------------------------+
         | Brain: authority                   |
         |    Pydantic AI, DBOS, FastAPI      |
-        |    Postgres (ledger)               |
+        |    Postgres (ledger), uvicorn      |
         +------------+-----------+-----------+
               submit v           ^ status
             +--------+-----------+-------------+
@@ -43,13 +43,13 @@ Three tiers connected by explicit contracts (typed JSON over HTTP/SSE). Any tier
             +----------------------------------+
 ```
 
-- **Control plane**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the chat interface is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps chat and brain independently replaceable.
+- **Brain**: the only component with autonomous authority. A Pydantic AI agent (typed tools, schema validation) wrapped in DBOS Transact (durable execution: step checkpoints, replay-on-restart, durable sleep, `send`/`recv`, queues) behind a FastAPI app. Postgres is the only infrastructure. Runs on the login node, so Slurm calls are local subprocesses with no SSH transport. FastAPI stays even when everything is co-located: the chat interface is TypeScript (Pi), signals into DBOS arrive from outside the workflow process, and the HTTP contract keeps chat and brain independently replaceable.
 - **Chat** ("Faberon Chat"): a Pi extension. It exposes the v0 operations as Pi tools and slash commands, and hosts the drafter, live status, idea injection, and approvals on top. It reasons conversationally, but every write is a human-initiated API call. Default: runs on the login node next to the brain. Distributed as a Pi package, pinned to Pi `^1.0.0`.
 - **Execution**: the Slurm cluster. The experiment repo (for example `autoresearch`) lives on the cluster filesystem so compute nodes and the brain see the same tree.
 
 Design rule: **one brain**. The CLI/chat interface and the drafter propose; the brain decides; the ledger remembers.
 
-**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: control plane, Postgres, chat interface (when present), and the experiment checkout. All state (Postgres, notes, artifacts) lives there; there is no central Faberon server. The control plane runs as a single process: uvicorn serves the FastAPI app, and the app lifespan brings DBOS up and down with it. FastAPI binds to localhost. A bearer token (`FABERON_API_TOKEN`) guards the API: on a shared login node, the token is mandatory. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote chat interface, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
+**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: the brain, Postgres, chat interface (when present), and the experiment checkout. All state (Postgres, notes, artifacts) lives there; there is no central Faberon server. The brain runs as a single process: uvicorn serves the FastAPI app, and the app lifespan brings DBOS up and down with it. FastAPI binds to localhost. A bearer token (`FABERON_API_TOKEN`) guards the API: on a shared login node, the token is mandatory. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote chat interface, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
 
 ## 3. Key Mechanisms
 
@@ -59,7 +59,7 @@ Design rule: **one brain**. The CLI/chat interface and the drafter propose; the 
 
 **Why not JSONL-only?** (1) Durability *is* Postgres: DBOS checkpoints every step, sleep, and signal there, and files would mean re-implementing durable execution. (2) The design needs atomicity (submission keys, queue-slot claims, exactly-once on retry), which files cannot provide, especially on the NFS home directories typical of login nodes. (3) The ledger is queried ("what worked, budget burned"), not just read.
 
-**Campaign bootstrap.** The drafter's intake produces the plan. Control-plane validation is the sole acceptance gate. Approval writes `campaign.created` and starts the loop. Amendments are events (`campaign.amended`), never edits: runs are judged against the rules in force at their time.
+**Campaign bootstrap.** The drafter's intake produces the plan. Brain-side validation is the sole acceptance gate. Approval writes `campaign.created` and starts the loop. Amendments are events (`campaign.amended`), never edits: runs are judged against the rules in force at their time.
 
 **Human steering.** `POST /campaigns/{id}/ideas` wraps `DBOS.send`: the idea lands in the ledger and the agent weighs it at its next decision boundary. Advisory is the default; an imperative mode that forces execution is a config flag, recorded per event. Approvals for gated actions use the same signal path. Human and agent actions are the same kind of event.
 

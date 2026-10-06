@@ -19,7 +19,7 @@ Before any contribution, load context in this order:
 
 Applies to everything you produce: design docs, READMEs, code comments, commit messages, and chat replies.
 
-- Never use em-dashes (—) or en-dashes (–) as punctuation. Use a colon, a period, a comma, or parentheses instead. Hyphens in compound words (control-plane, keep/discard) are fine.
+- Never use em-dashes (—) or en-dashes (–) as punctuation. Use a colon, a period, a comma, or parentheses instead. Hyphens in compound words (keep/discard) are fine.
 - Keep sentences short and declarative. One idea per sentence.
 - Avoid typical LLM-generated phrasing:
   - Filler openers: "It's worth noting", "Moreover", "Furthermore", "Interestingly".
@@ -32,8 +32,8 @@ Applies to everything you produce: design docs, READMEs, code comments, commit m
 
 Examples:
 
-Bad: "The control plane — the only component that decides — seamlessly orchestrates experiments."
-Good: "The control plane is the only component that decides. It runs the experiments."
+Bad: "The brain — the only component that decides — seamlessly orchestrates experiments."
+Good: "The brain is the only component that decides. It runs the experiments."
 
 Bad: "Moreover, it's worth noting that the ledger is append-only."
 Good: "The ledger is append-only."
