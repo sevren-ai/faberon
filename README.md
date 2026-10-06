@@ -36,19 +36,20 @@ For more details, see [design.md](docs/design/design.md).
 ## Install
 
 ### Prerequisites
-Pick the guide for your machine:
+Pick the guide for your machine. Each installs Postgres, Node, and the Pi CLI:
 - [Install on a workstation](docs/install-workstation.md): you have sudo
 - [Install on a login node](docs/install-login-node.md): no sudo (e.g. cluster login node)
 
 
 ### Faberon brain and chat
+With the prerequisites in place, install the Faberon brain and register the chat interface with Pi.
+
 From PyPI and npm (once these are available):
 
 ```bash
 uv venv
-uv pip install faberon
 
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+uv pip install faberon
 pi install npm:@faberon/chat
 ```
 
@@ -56,8 +57,8 @@ or from source:
 ```bash
 git clone https://github.com/sevren-ai/faberon
 cd faberon
+
 uv tool install packages/brain
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi install ./packages/chat
 ```
 
