@@ -362,7 +362,7 @@ def test_campaign_reads_metric_from_job_log(dbos, repo, tmp_path):
     assert judged.payload["metric_value"] == 1.10
     assert judged.payload["index"] == 1
 
-    # Assert that the ledger records the exact command that ran,
+    # Assert that the ledger records the exact command that ran
     completed = next(e for e in events if e.type == EventType.EXPERIMENT_COMPLETED)
     assert completed.payload["command"] == setup.plan.command
 
