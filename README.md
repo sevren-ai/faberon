@@ -2,16 +2,31 @@
 
 [Sevren](https://sevren.ai)'s autonomous ML research harness.
 
-Faberon runs LLM/ML research autonomously. Give it a research plan (goal, metric, budget, stop conditions) and it proposes experiments, submits training jobs, waits for results, judges them against your expectations, and decides what to try next. Every decision is recorded in an append-only ledger, and you can steer it mid-run.
+Faberon runs Machine Learning research autonomously. Give it a research plan and it proposes experiments, submits training jobs, waits for results, judges them against your expectations, and decides what to try next. Every decision is recorded in an append-only ledger, and you can steer it mid-run.
 
-Three tiers:
+**Features**:
 
-- The **brain** is the main component with autonomous authority: a durable agent loop behind a small HTTP API. It is what `faberon serve` starts.
-- The **chat** interface ("Faberon Chat") is a Pi extension for drafting plans and steering campaigns from a chat session
-- The **CLI** covers the same operations from a shell (no LLM)
+- Runs ML research end to end: proposes an experiment, trains it, judges the result, and picks the next one. No babysitting.
+- Every decision and its rational is recorded in a database.
+- Every experiment is a git commit. Good ones stay, bad ones get reverted. Your repo ends up holding the best result.
+- Survives crashes and reboots: kill Faberon mid-campaign and it picks up exactly where it left off.
+- Built for Slurm clusters, but also runs on a single workstation or GPU box.
+- A human can steer campaigns while they're running: inject ideas, cancel, or resume.
+- To manage campaigns and watch progress live, both a chat interface and a comprehensive CLI are provided.
+- Works with any LLM, including local and open ones.
+- Proven end to end against Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) repo.
 
-The chat interface and the CLI propose, the brain decides, the ledger remembers.
+**Design**:
+
+- The **brain** is a durable agent loop behind a small HTTP API: Pydantic AI proposes, DBOS checkpoints, a reboot resumes mid-campaign.
+- The **chat** interface ("Faberon Chat") is a Pi extension for drafting plans and steering campaigns from a chat session.
+- The **CLI** covers the same operations from a shell (no LLM).
+- Two **executors** are currently implemented: a Slurm cluster or a local workstation.
+- The **ledger** is an append-only event log in Postgres. Every decision is recorded with its actor and reason.
+
 ![Faberon architecture: the chat interface and the CLI propose through the API, the brain decides and records every decision in the ledger, and executors run the jobs](docs/assets/architecture.svg)
+
+For more details, see [design.md](docs/design/design.md).
 
 ## Install
 
