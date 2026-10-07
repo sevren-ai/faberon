@@ -89,6 +89,20 @@ class Runtime:
         job_id = self.submit_step(
             setup.command, setup.submission_key, setup.walltime, setup.repo_path
         )
+        self.record_event_step(
+            Event(
+                campaign_id=setup.campaign_id,
+                actor=Actor.AGENT,
+                type=EventType.EXPERIMENT_SUBMITTED,
+                reason=f"job {job_id} submitted",
+                payload={
+                    "job_id": job_id,
+                    "index": setup.index,
+                    "sha": setup.sha,
+                    "command": setup.command,
+                },
+            )
+        )
 
         info = self.status_step(job_id)
         while not info.state.is_terminal:
