@@ -406,13 +406,17 @@ def test_died_campaign_status(api: ApiFixture):
     # Park the campaign mid-poll: the job stays RUNNING, the workflow PENDING.
     executor._state = JobState.RUNNING
     camp_id = str(uuid.uuid4())
-    created = api.client.post("/v0/campaigns", json=_create_body(camp_id, api.repo_path))
+    created = api.client.post(
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
+    )
     assert created.status_code == 201
     workflow_id = created.json()["workflow_id"]
 
     # The workflow dies (without recording campaign.ended)
     ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    sql_stat = "UPDATE dbos.workflow_status SET status = 'ERROR' WHERE workflow_uuid = %s"
+    sql_stat = (
+        "UPDATE dbos.workflow_status SET status = 'ERROR' WHERE workflow_uuid = %s"
+    )
     ledger._conn.execute(sql_stat, (workflow_id,))
     ledger.close()
 
@@ -421,7 +425,9 @@ def test_died_campaign_status(api: ApiFixture):
     assert info["status"] == "died"
 
     # The campaign can't be canceled anymore (it's not active)
-    cancel = api.client.post(f"/v0/campaigns/{camp_id}/cancel", json={"reason": "too late"})
+    cancel = api.client.post(
+        f"/v0/campaigns/{camp_id}/cancel", json={"reason": "too late"}
+    )
     assert cancel.status_code == 409
 
 
