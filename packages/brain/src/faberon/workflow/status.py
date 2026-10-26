@@ -8,9 +8,9 @@ from ..schema.events import EventType
 
 # DBOS workflow states in which the campaign will never write again. A
 # PENDING workflow may still be resumed, so it does count as "dead".
-_DEAD = {
-    WorkflowStatusString.ERROR,
-    WorkflowStatusString.MAX_RECOVERY_ATTEMPTS_EXCEEDED,
+_DEAD: set[str] = {
+    WorkflowStatusString.ERROR.value,
+    WorkflowStatusString.MAX_RECOVERY_ATTEMPTS_EXCEEDED.value,
 }
 
 
