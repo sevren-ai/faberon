@@ -32,18 +32,20 @@ def test_render_sbatch():
         "faberon:exp-1",
         "minerva",
         ["uv", "run", "train.py"],
+        cwd="/home/u/repo",
         time_limit=240,
     )
     assert args[0] == "sbatch"
-    assert args[1:7] == [
+    assert args[1:8] == [
         "--parsable",
         "--account=minerva",
         "--job-name=faberon:exp-1",
         "--gres=gpu:1",
         "--time=240",
+        "--chdir=/home/u/repo",
         "--wrap",
     ]
-    assert args[7] == _render_script(["uv", "run", "train.py"])
+    assert args[8] == _render_script(["uv", "run", "train.py"])
 
 
 @pytest.mark.parametrize(
@@ -59,7 +61,11 @@ def test_render_sbatch():
 def test_effective_walltime(walltime, max_walltime, expected):
     executor = SlurmExecutor("minerva", max_walltime=max_walltime)
     request = SubmitRequest(
-        command="echo hello", submission_key="k", walltime=walltime, output_path="/o"
+        command="echo hello",
+        submission_key="k",
+        walltime=walltime,
+        output_path="/o",
+        cwd="/r",
     )
     assert executor._effective_walltime(request) == expected
 
@@ -67,7 +73,11 @@ def test_effective_walltime(walltime, max_walltime, expected):
 def test_effective_walltime_no_cap():
     executor = SlurmExecutor("minerva")
     request = SubmitRequest(
-        command="echo hello", submission_key="k", walltime=90, output_path="/o"
+        command="echo hello",
+        submission_key="k",
+        walltime=90,
+        output_path="/o",
+        cwd="/r",
     )
     assert executor._effective_walltime(request) == 90
 

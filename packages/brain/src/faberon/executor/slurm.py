@@ -43,6 +43,7 @@ def _render_sbatch(
     account: str,
     command: Sequence[str],
     *,
+    cwd: str,
     output: str | None = None,
     gpus: int = 1,
     time_limit: int,
@@ -54,6 +55,7 @@ def _render_sbatch(
         f"--job-name={job_name}",
         f"--gres=gpu:{gpus}",
         f"--time={time_limit}",
+        f"--chdir={cwd}",
     ]
     if output is not None:
         args.append(f"--output={output}")
@@ -132,6 +134,7 @@ class SlurmExecutor:
                 job_name,
                 self._account,
                 request.argv,
+                cwd=request.cwd,
                 output=request.output_path,
                 gpus=self._gpus,
                 time_limit=self._effective_walltime(request),

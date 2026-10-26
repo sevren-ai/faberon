@@ -126,6 +126,7 @@ class LocalExecutor:
                 stdin=subprocess.DEVNULL,
                 start_new_session=True,
                 env=env,
+                cwd=request.cwd,
             )
         return {
             "job_id": job_id,

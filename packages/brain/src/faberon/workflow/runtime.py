@@ -38,6 +38,7 @@ class Runtime:
             submission_key=submission_key,
             walltime=walltime,
             output_path=str(output_path),
+            cwd=repo_path,
         )
         return self.executor.submit(request)
 

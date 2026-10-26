@@ -35,6 +35,7 @@ def _request(command: str, key: str, *, walltime: int = 5) -> SubmitRequest:
         submission_key=key,
         walltime=walltime,
         output_path=f"/tmp/faberon-test-{key}.out",
+        cwd="/tmp",
     )
 
 
@@ -74,6 +75,7 @@ def test_log_file_is_owner_only(executor: LocalExecutor, tmp_path):
         submission_key=_key(),
         walltime=5,
         output_path=str(out),
+        cwd=str(tmp_path),
     )
     job_id = executor.submit(request)
     _wait_terminal(executor, job_id)
@@ -103,11 +105,30 @@ def test_output_file(executor: LocalExecutor, tmp_path):
         submission_key=key,
         walltime=5,
         output_path=str(out),
+        cwd=str(tmp_path),
     )
     job_id = executor.submit(request)
     assert job_id == key
     _wait_terminal(executor, job_id)
     assert "val_bpb: 1.10" in out.read_text()
+
+
+def test_runs_in_cwd(executor: LocalExecutor, tmp_path):
+    """The job runs in the request's working directory, not the brain's."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "train.py").write_text("print('val_bpb: 1.0')\n")
+    out = tmp_path / "job.out"
+    request = SubmitRequest(
+        command="python3 train.py",
+        submission_key=_key(),
+        walltime=5,
+        output_path=str(out),
+        cwd=str(repo),
+    )
+    info = _wait_terminal(executor, executor.submit(request))
+    assert info.state == JobState.COMPLETED
+    assert "val_bpb: 1.0" in out.read_text()
 
 
 def test_cancel(executor: LocalExecutor):
