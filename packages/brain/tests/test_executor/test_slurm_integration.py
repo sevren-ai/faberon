@@ -71,6 +71,8 @@ def _request(command: str, key: str) -> SubmitRequest:
             "walltime": 10,
             # %j expands to the Slurm job id.
             "output_path": "/tmp/faberon-it-%j.out",
+            # /tmp exists on every node, so --chdir succeeds anywhere.
+            "cwd": "/tmp",
         }
     )
 
