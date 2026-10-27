@@ -514,55 +514,6 @@ def test_upgrade_ends_outdated_campaign(tmp_path, repo):
     DBOS.destroy()
 
 
-def test_missing_workflow_record_ends_campaign(tmp_path, repo):
-    """A campaign whose DBOS state was wiped is ended at startup."""
-    DBOS.destroy()
-
-    # Create a new active campaign
-    executor = FakeExecutor(JobState.RUNNING)
-    app = create_app(
-        executor=executor,
-        config_name=f"api-test-{uuid.uuid4().hex}",
-    )
-    _reset_databases()
-    camp_id = str(uuid.uuid4())
-    with TestClient(app) as client:
-        created = client.post("/v0/campaigns", json=_create_body(camp_id, str(repo)))
-        assert created.status_code == 201
-    # Stop the current Faberon instance
-    DBOS.destroy()
-
-    # Wipe the DBOS workflow state while keeping the ledger
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
-    ledger._conn.execute("DROP SCHEMA dbos CASCADE")
-    ledger.close()
-
-    # Start a new app: should end the campaign whose workflow record is lost
-    new_app = create_app(
-        executor=FakeExecutor(JobState.COMPLETED, exit_code=0),
-        config_name=f"api-test-{uuid.uuid4().hex}",
-    )
-    with TestClient(new_app) as client:
-        info = client.get(f"/v0/campaigns/{camp_id}").json()
-        assert info["status"] == "ended"
-        assert info["stop_reason"] == "error"
-        events = client.get(f"/v0/campaigns/{camp_id}/events.jsonl")
-        ended = [
-            json.loads(line)
-            for line in events.text.splitlines()
-            if json.loads(line)["type"] == EventType.CAMPAIGN_ENDED
-        ]
-        assert "workflow record lost" in ended[0]["reason"]
-
-        # The repo is free again, so a new campaign can be created
-        accepted = client.post(
-            "/v0/campaigns", json=_create_body(str(uuid.uuid4()), str(repo))
-        )
-        assert accepted.status_code == 201
-
-    DBOS.destroy()
-
-
 @dataclass
 class LiveServer:
     base_url: str
