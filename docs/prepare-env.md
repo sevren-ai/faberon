@@ -2,7 +2,7 @@
 
 First, generate a unique `<token>` that will secure the API on a shared host:
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 then use this token:
