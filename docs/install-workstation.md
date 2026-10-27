@@ -2,8 +2,6 @@
 
 Install Faberon's prerequisites on a machine you administer: a workstation, a provisioned GPU box, a Mac, any host where you can install system packages. For a shared login node without sudo, see [install-login-node.md](install-login-node.md) instead.
 
-On macOS, packages come from [Homebrew](https://brew.sh) and need no sudo. macOS has no Slurm, so Faberon runs jobs with the local executor.
-
 ## 1. Install and run Postgres
 
 On Fedora:
@@ -23,6 +21,8 @@ sudo -u postgres createuser --superuser "$USER"
 ```
 
 On macOS:
+
+Packages come from [Homebrew](https://brew.sh) and need no sudo. macOS has no Slurm, so Faberon runs jobs with the local executor.
 
 ```bash
 brew install postgresql@17
