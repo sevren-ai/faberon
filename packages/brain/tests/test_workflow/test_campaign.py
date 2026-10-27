@@ -73,6 +73,7 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     ledger.close()
     types = [e.type for e in events]
     assert types.count(EventType.EXPERIMENT_PROPOSED) == plan.max_experiments
+    assert types.count(EventType.EXPERIMENT_SUBMITTED) == plan.max_experiments
     assert types.count(EventType.EXPERIMENT_JUDGED) == plan.max_experiments
     assert types.count(EventType.EXPERIMENT_DESIGNING) == plan.max_experiments
     assert types.count(EventType.CAMPAIGN_ENDED) == 1
