@@ -28,6 +28,7 @@ class SubmitRequest(BaseModel):
     submission_key: str = Field(min_length=1)
     walltime: int = Field(gt=0)  # in minutes
     output_path: str = Field(min_length=1)
+    cwd: str = Field(min_length=1)
 
     @property
     def argv(self) -> list[str]:

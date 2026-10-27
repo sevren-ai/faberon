@@ -76,4 +76,8 @@ def test_experiment_on_slurm(dbos, tmp_path):
     events = list(ledger.tail(campaign_id))
     ledger.close()
     types = [e.type for e in events]
-    assert types == [EventType.EXPERIMENT_COMPLETED, EventType.EXPERIMENT_JUDGED]
+    assert types == [
+        EventType.EXPERIMENT_SUBMITTED,
+        EventType.EXPERIMENT_COMPLETED,
+        EventType.EXPERIMENT_JUDGED,
+    ]

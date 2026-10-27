@@ -26,10 +26,14 @@ pkg="$repo_root/packages/brain"
 
 cd "$pkg"
 
+# Compute nodes cannot see the login node's /tmp, so use the shared home.
+# pytest wipes this directory on each run.
+basetemp="${XDG_CACHE_HOME:-$HOME/.cache}/faberon-pytest"
+
 echo ">> uv sync --locked"
 uv sync --locked
 
 echo ">> pytest -m 'slurm or llm'"
-FABERON_SLURM_INTEGRATION=1 uv run pytest -rs -m "slurm or llm"
+FABERON_SLURM_INTEGRATION=1 uv run pytest -rs -m "slurm or llm" --basetemp="$basetemp"
 
 echo "Integration tests passed."
