@@ -19,10 +19,15 @@ pkg="$repo_root/packages/brain"
 
 cd "$pkg"
 
+# Slurm jobs run on compute nodes, which do not see the login node's /tmp.
+# Keep pytest's temp dirs (test repos, job logs) on the shared home instead.
+# pytest wipes this directory at the start of each run.
+basetemp="${XDG_CACHE_HOME:-$HOME/.cache}/faberon-pytest"
+
 echo ">> uv sync --locked"
 uv sync --locked
 
 echo ">> pytest -m slurm"
-FABERON_SLURM_INTEGRATION=1 uv run pytest -rs -m slurm
+FABERON_SLURM_INTEGRATION=1 uv run pytest -rs -m slurm --basetemp="$basetemp"
 
 echo "Slurm integration tests passed."
