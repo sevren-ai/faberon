@@ -22,7 +22,7 @@ sudo -u postgres createuser --superuser "$USER"
 
 On macOS:
 
-Packages come from [Homebrew](https://brew.sh) and need no sudo. macOS has no Slurm, so Faberon runs jobs with the local executor.
+Packages come from [Homebrew](https://brew.sh) and need no sudo.
 
 ```bash
 brew install postgresql@17
@@ -70,9 +70,7 @@ brew install node
 Faberon Chat is a Pi extension, so install the Pi CLI. A system-wide Node has its global npm prefix outside your home, so this uses sudo:
 
 ```bash
-sudo npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+sudo npm install -g --ignore-scripts @earendil-works/pi-coding-agent # drop `sudo` on macOS
 ```
-
-On macOS, Homebrew's npm prefix is owned by your user, so drop the `sudo`.
 
 From here onwards, continue with the install/quickstart guide in the README.
