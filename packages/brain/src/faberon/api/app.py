@@ -31,6 +31,7 @@ from ..workflow import (
     CampaignRunner,
     CampaignSetup,
     Runtime,
+    end_outdated_campaigns,
     get_campaign_info,
 )
 from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
@@ -131,6 +132,15 @@ def create_app(
         DBOS.register_instance(runtime)
         DBOS.register_instance(runner)
         DBOS.launch()
+        # Campaigns from before an update can't be recovered, so they should be
+        # ended gracefully.
+        outdated = await asyncio.to_thread(end_outdated_campaigns, ledger)
+        if outdated:
+            logging.getLogger(__name__).warning(
+                "Ended %d campaign(s) with an unrecoverable workflow: %s",
+                len(outdated),
+                ", ".join(str(campaign_id) for campaign_id in outdated),
+            )
         # The SSE stream polls the (sync) ledger off the event loop. Own pool:
         # DBOS hands its executor to asyncio.to_thread as the loop default and
         # a stream worker must not outlive DBOS.destroy() at interpreter exit.

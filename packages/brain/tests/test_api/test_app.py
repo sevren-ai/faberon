@@ -450,6 +450,70 @@ def test_resume_unknown_campaign(api: ApiFixture):
     assert api.client.post(f"/v0/campaigns/{unknown}/resume").status_code == 404
 
 
+def test_upgrade_ends_outdated_campaign(tmp_path, repo):
+    """A Faberon upgrade ends an old campaign as we won't be able to restart it."""
+    DBOS.destroy()
+
+    # Create a new active campaign
+    executor = FakeExecutor(JobState.RUNNING)
+    app = create_app(
+        executor=executor,
+        config_name=f"api-test-{uuid.uuid4().hex}",
+    )
+    _reset_databases()
+    camp_id = str(uuid.uuid4())
+    with TestClient(app) as client:
+        created = client.post("/v0/campaigns", json=_create_body(camp_id, str(repo)))
+        assert created.status_code == 201
+        workflow_id = created.json()["workflow_id"]
+        # While this campaign is active, it blocks a second campaign on the repo.
+        conflict = client.post(
+            "/v0/campaigns", json=_create_body(str(uuid.uuid4()), str(repo))
+        )
+        assert conflict.status_code == 409
+    DBOS.destroy()
+
+    # Set the campaign's application version to "fake_old"
+    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger._conn.execute(
+        "UPDATE dbos.workflow_status "
+        "SET application_version = 'fake_old' "
+        "WHERE workflow_uuid = %s",
+        (workflow_id,),
+    )
+    ledger.close()
+
+    # Start a new Faberon: should end the outdated campaign with "fake_old" app version
+    new_app = create_app(
+        executor=FakeExecutor(JobState.COMPLETED, exit_code=0),
+        config_name=f"api-test-{uuid.uuid4().hex}",
+    )
+    with TestClient(new_app) as client:
+        info = client.get(f"/v0/campaigns/{camp_id}").json()
+        assert info["status"] == "ended"
+        assert info["stop_reason"] == "error"
+        events = client.get(f"/v0/campaigns/{camp_id}/events.jsonl")
+        ended = [
+            json.loads(line)
+            for line in events.text.splitlines()
+            if json.loads(line)["type"] == EventType.CAMPAIGN_ENDED
+        ]
+        assert "upgrade" in ended[0]["reason"]
+
+        # The outdated workflow is cancelled
+        status = DBOS.get_workflow_status(workflow_id)
+        assert status is not None
+        assert status.status == "CANCELLED"
+
+        # The repo is free again, so a new campaign can be created
+        accepted = client.post(
+            "/v0/campaigns", json=_create_body(str(uuid.uuid4()), str(repo))
+        )
+        assert accepted.status_code == 201
+
+    DBOS.destroy()
+
+
 @dataclass
 class LiveServer:
     base_url: str
