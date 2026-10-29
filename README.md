@@ -37,7 +37,7 @@ For more details, see [design.md](docs/design/design.md).
 
 ### Prerequisites
 Pick the guide for your machine. Each installs Postgres, Node, and the Pi CLI:
-- [Install on a workstation](docs/install-workstation.md): you have sudo
+- [Install on a workstation](docs/install-workstation.md): you have sudo, or you are on macOS
 - [Install on a login node](docs/install-login-node.md): no sudo (e.g. cluster login node)
 
 
