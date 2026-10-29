@@ -9,7 +9,7 @@ export function samplePlan(
 ): ResearchPlan {
   return {
     goal: "Lower val_bpb on the baseline task",
-    command: "python train.py",
+    command: "python3 train.py",
     target_file: "train.py",
     metric: "val_bpb",
     baseline: 1.23,
