@@ -43,6 +43,15 @@ def _key() -> str:
     return f"test-{uuid.uuid4().hex[:8]}"
 
 
+def _expire_deadline(state_dir, job_id: str) -> None:
+    """Move the stored deadline to just about now, then let it pass."""
+    record_path = state_dir / f"{job_id}.json"
+    record = json.loads(record_path.read_text())
+    record["deadline"] = time.time() + 0.1
+    record_path.write_text(json.dumps(record))
+    time.sleep(0.15)
+
+
 def _wait_terminal(executor: LocalExecutor, job_id: str):
     deadline = time.monotonic() + _POLL_DEADLINE_S
     while time.monotonic() < deadline:
@@ -146,9 +155,8 @@ def test_walltime_enforcement(executor: LocalExecutor, tmp_path):
     # Simulate a nearly-expired deadline so the test does not sleep for minutes.
     record_path = tmp_path / "state" / f"{job_id}.json"
     record = json.loads(record_path.read_text())
-    record["deadline"] = time.time() + 0.1
-    record_path.write_text(json.dumps(record))
-    time.sleep(0.15)
+    assert 0 < record["deadline"] - time.time() <= 5 * 60
+    _expire_deadline(tmp_path / "state", job_id)
     info = executor.status(job_id)
     assert info.state == JobState.FAILED
     assert info.exit_code is not None and info.exit_code != 0
