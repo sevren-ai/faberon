@@ -146,7 +146,7 @@ def test_walltime_enforcement(executor: LocalExecutor, tmp_path):
     # Simulate a nearly-expired deadline so the test does not sleep for minutes.
     record_path = tmp_path / "state" / f"{job_id}.json"
     record = json.loads(record_path.read_text())
-    record["deadline"] = time.monotonic() + 0.1
+    record["deadline"] = time.time() + 0.1
     record_path.write_text(json.dumps(record))
     time.sleep(0.15)
     info = executor.status(job_id)
