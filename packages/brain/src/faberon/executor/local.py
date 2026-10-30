@@ -107,7 +107,7 @@ class LocalExecutor:
         pid = record.get("pid")
         if record.get("exit_code") is None and pid is not None:
             if _pid_alive(pid):
-                os.kill(pid, signal.SIGTERM)
+                _signal_tree(pid, signal.SIGTERM)
                 record = self._settle(record, cancelled=True)
         if record.get("exit_code") is not None:
             return
