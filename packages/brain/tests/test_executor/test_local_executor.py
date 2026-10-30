@@ -14,7 +14,7 @@ import uuid
 import pytest
 
 from faberon.executor import JobState, SubmitRequest
-from faberon.executor.local import LocalExecutor
+from faberon.executor.local import LocalExecutor, _pid_alive
 
 _POLL_DEADLINE_S = 10
 _POLL_INTERVAL_S = 0.05
@@ -43,6 +43,15 @@ def _key() -> str:
     return f"test-{uuid.uuid4().hex[:8]}"
 
 
+def _expire_deadline(state_dir, job_id: str) -> None:
+    """Move the stored deadline to just about now, then let it pass."""
+    record_path = state_dir / f"{job_id}.json"
+    record = json.loads(record_path.read_text())
+    record["deadline"] = time.time() + 0.1
+    record_path.write_text(json.dumps(record))
+    time.sleep(0.15)
+
+
 def _wait_terminal(executor: LocalExecutor, job_id: str):
     deadline = time.monotonic() + _POLL_DEADLINE_S
     while time.monotonic() < deadline:
@@ -51,6 +60,37 @@ def _wait_terminal(executor: LocalExecutor, job_id: str):
             return info
         time.sleep(_POLL_INTERVAL_S)
     raise AssertionError(f"job {job_id} did not finish within {_POLL_DEADLINE_S}s")
+
+
+def _wait_for_death(pid: int) -> bool:
+    """Poll until the pid is gone; False if it survives the deadline."""
+    deadline = time.monotonic() + _POLL_DEADLINE_S
+    while time.monotonic() < deadline:
+        if not _pid_alive(pid):
+            return True
+        time.sleep(_POLL_INTERVAL_S)
+    return False
+
+
+def _wait_for_pidfile(path) -> int:
+    """Poll until the wrapper writes its child's pid, then return it."""
+    deadline = time.monotonic() + _POLL_DEADLINE_S
+    while time.monotonic() < deadline:
+        if path.exists() and path.read_text().strip():
+            return int(path.read_text())
+        time.sleep(_POLL_INTERVAL_S)
+    raise AssertionError(f"pidfile {path} was not written within {_POLL_DEADLINE_S}s")
+
+
+def _submit_orphaning_wrapper(executor: LocalExecutor, tmp_path) -> tuple[str, int]:
+    """Submit a shell wrapper with a background child; return job id and child pid."""
+    pidfile = tmp_path / "child.pid"
+    job_id = executor.submit(
+        _request(f"sh -c 'sleep 30 & echo $! > {pidfile}; wait'", _key())
+    )
+    child_pid = _wait_for_pidfile(pidfile)
+    assert _pid_alive(child_pid)
+    return job_id, child_pid
 
 
 def test_success(executor: LocalExecutor):
@@ -146,12 +186,27 @@ def test_walltime_enforcement(executor: LocalExecutor, tmp_path):
     # Simulate a nearly-expired deadline so the test does not sleep for minutes.
     record_path = tmp_path / "state" / f"{job_id}.json"
     record = json.loads(record_path.read_text())
-    record["deadline"] = time.monotonic() + 0.1
-    record_path.write_text(json.dumps(record))
-    time.sleep(0.15)
+    assert 0 < record["deadline"] - time.time() <= 5 * 60
+    _expire_deadline(tmp_path / "state", job_id)
     info = executor.status(job_id)
     assert info.state == JobState.FAILED
     assert info.exit_code is not None and info.exit_code != 0
+
+
+def test_walltime_kills_group(executor: LocalExecutor, tmp_path):
+    """A walltime kill signals the whole group."""
+    job_id, child_pid = _submit_orphaning_wrapper(executor, tmp_path)
+    _expire_deadline(tmp_path / "state", job_id)
+    assert executor.status(job_id).state == JobState.FAILED
+    assert _wait_for_death(child_pid)
+
+
+def test_cancel_reaches_group(executor: LocalExecutor, tmp_path):
+    """A cancel signals the whole group."""
+    job_id, child_pid = _submit_orphaning_wrapper(executor, tmp_path)
+    executor.cancel(job_id)
+    assert executor.status(job_id).state == JobState.CANCELLED
+    assert _wait_for_death(child_pid)
 
 
 def test_same_key_returns_same_id(executor: LocalExecutor):
