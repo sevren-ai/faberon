@@ -73,4 +73,14 @@ Faberon Chat is a Pi extension, so install the Pi CLI. A system-wide Node has it
 sudo npm install -g --ignore-scripts @earendil-works/pi-coding-agent # drop `sudo` on macOS
 ```
 
+## 5. Get uv
+
+The brain is installed with `uv`. On macOS: `brew install uv`. On Linux, use the installer (no sudo):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh   # installs into ~/.local/bin
+```
+
+The brain requires Python 3.14; uv installs a managed one on first use if the system Python is older.
+
 From here onwards, continue with the install/quickstart guide in the README.
