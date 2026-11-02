@@ -44,7 +44,7 @@ Pick the guide for your machine. Each installs Postgres, Node, and the Pi CLI:
 ### Faberon brain and chat
 With the prerequisites in place, install the Faberon brain and register the chat interface with Pi.
 
-From PyPI and npm (once these are available):
+From PyPI and npm:
 
 ```bash
 uv venv
