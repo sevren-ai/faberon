@@ -75,7 +75,15 @@ sudo npm install -g --ignore-scripts @earendil-works/pi-coding-agent # drop `sud
 
 ## 5. Get uv
 
-The brain is installed with `uv`. On macOS: `brew install uv`. On Linux, use the installer (no sudo):
+The brain is installed with `uv`. If you don't have it installed:
+
+On macOS:
+
+```bash
+brew install uv
+```
+
+On Linux, use the installer (no sudo):
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh   # installs into ~/.local/bin
