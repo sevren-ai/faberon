@@ -14,4 +14,15 @@ fi
 
 # shellcheck disable=SC1090
 source "$env_file"
-pg_ctl -D "$FABERON_PGDATA" -l "$FABERON_PGDATA/../log/pg.log" start
+
+log_file="$FABERON_PGDATA/../log/pg.log"
+if ! pg_ctl -D "$FABERON_PGDATA" -l "$log_file" start; then
+    echo "error: postgres failed to start; the real error is in the server log:" >&2
+    echo "    tail -20 $log_file" >&2
+    if [ -f "$log_file" ] && tail -20 "$log_file" | grep -qi "address already in use"; then
+        echo "hint: port $PGPORT is already taken, possibly by another user's Postgres on a" >&2
+        echo "shared node (see https://github.com/sevren-ai/faberon/issues/74)." >&2
+        echo "check with: ss -tln | grep $PGPORT" >&2
+    fi
+    exit 1
+fi
