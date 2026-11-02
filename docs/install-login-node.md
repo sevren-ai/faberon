@@ -61,6 +61,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh   # installs into ~/.local/bin
 export PATH="$HOME/.local/bin:$PATH"              # add to your shell profile
 ```
 
-The brain requires Python 3.14. uv installs a managed 3.14 under your home on first use (`uv python install 3.14`), so an old system Python is fine.
+The brain requires Python 3.14; uv installs a managed one on first use if the system Python is older.
 
 From here onwards, continue with the install/quickstart guide in the README.
