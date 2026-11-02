@@ -12,6 +12,9 @@ bash scripts/db/install-postgres-no-sudo.sh   # binaries + initdb + env file
 
 The installer writes an env file to `~/.config/faberon/postgres.env` (or `$XDG_CONFIG_HOME/faberon/postgres.env`) recording the install paths and connection settings.
 
+- The TCP port is derived from your username and probed free at install time, so two users on one node do not collide on one fixed port. Set `FABERON_PG_PORT` to choose your own.
+
+
 Now, also copy over the `start-postgres.sh` [script](https://github.com/sevren-ai/faberon/blob/main/scripts/db/start-postgres.sh), the `stop-postgres.sh` [script](https://github.com/sevren-ai/faberon/blob/main/scripts/db/stop-postgres.sh) and the `create-faberon-db` [script](https://github.com/sevren-ai/faberon/blob/main/scripts/db/create-faberon-db.sh).
 Start Postgres (each session, from the repo root), then create the databases once:
 
