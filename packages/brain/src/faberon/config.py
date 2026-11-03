@@ -88,8 +88,10 @@ def state_dir() -> str:
 @overload
 def api_token(raise_on_none: Literal[True]) -> str: ...
 
+
 @overload
 def api_token(raise_on_none: bool = False) -> str | None: ...
+
 
 def api_token(raise_on_none: bool = False) -> str | None:
     """The bearer token guarding the API; None leaves a local server unguarded."""
@@ -104,8 +106,10 @@ def executor() -> str | None:
 @overload
 def slurm_account(raise_on_none: Literal[True]) -> str: ...
 
+
 @overload
 def slurm_account(raise_on_none: bool = False) -> str | None: ...
+
 
 def slurm_account(raise_on_none: bool = False) -> str | None:
     """The Slurm account to bill jobs to, or None for the local executor."""
@@ -115,8 +119,10 @@ def slurm_account(raise_on_none: bool = False) -> str | None:
 @overload
 def slurm_gpus(raise_on_none: Literal[True]) -> int: ...
 
+
 @overload
 def slurm_gpus(raise_on_none: bool = False) -> int | None: ...
+
 
 def slurm_gpus(raise_on_none: bool = False) -> int | None:
     """GPU count per Slurm job, or None for the local executor."""

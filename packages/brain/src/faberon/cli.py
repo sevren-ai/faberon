@@ -276,7 +276,7 @@ def init() -> None:
     else:
         provider = "model"
         if ":" in model:
-            provider = model.split(':')[0]
+            provider = model.split(":")[0]
         echo(
             f"note: add the credentials needed for {provider!r} "
             "to the [env] section in the config file"
