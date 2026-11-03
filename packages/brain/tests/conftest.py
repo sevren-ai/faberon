@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 import psycopg
@@ -9,16 +10,14 @@ import pytest
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
+from faberon import config
 from faberon.schema import ResearchPlan
 
 TEST_DB_NAME = "faberon_test"
 
 
-def _test_db_url() -> str:
-    """FABERON_DATABASE_URL with the database part swapped for the test database."""
-    base = os.environ.get("FABERON_DATABASE_URL", "")
-    if not base:
-        return ""
+def _test_db_url(base: str) -> str:
+    """The base database URL with the database part swapped for the test database."""
     try:
         url = make_url(base)
     except ArgumentError:
@@ -26,11 +25,57 @@ def _test_db_url() -> str:
     return url.set(database=TEST_DB_NAME).render_as_string(hide_password=False)
 
 
+def _ensure_test_db(test_url: str) -> str:
+    """Create the test database if needed; '' on success, else the reason."""
+    maintenance = (
+        make_url(test_url)
+        .set(database="postgres")
+        .render_as_string(hide_password=False)
+    )
+    try:
+        with psycopg.connect(maintenance, connect_timeout=2, autocommit=True) as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB_NAME,)
+            ).fetchone()
+            if not exists:
+                conn.execute(f'CREATE DATABASE "{TEST_DB_NAME}"')
+    except psycopg.OperationalError:
+        return f"no Postgres at {maintenance}: start it first"
+    except psycopg.Error as exc:
+        return f"could not create the {TEST_DB_NAME} database: {exc}"
+    return ""
+
+
+# Why postgres-marked tests skip this run; empty when the test DB is ready.
+_postgres_note = ""
+# The generated config's database URL, kept for the skip logic. Tests that
+# open a Ledger or DBOS directly read it via config.database_url().
+_test_url = ""
+
+
 def pytest_configure() -> None:
-    """Redirect FABERON_DATABASE_URL to the test database for the whole run."""
-    url = _test_db_url()
-    if url:
-        os.environ["FABERON_DATABASE_URL"] = url
+    """Point the whole run at a generated config file using the test database."""
+    global _postgres_note, _test_url
+    real = config.load()
+    test_url = _test_db_url(real.get("database_url", "postgres:///faberon"))
+    values = {key: real[key] for key in ("model", "slurm_account") if real.get(key)}
+    if test_url:
+        values["database_url"] = test_url
+    # The generated config must be complete, as serve demands.
+    completing = {
+        "host": config.DEFAULT_HOST,
+        "port": config.DEFAULT_PORT,
+        "proposer_timeout": config.DEFAULT_PROPOSER_TIMEOUT,
+        "state_dir": config.DEFAULT_STATE_DIR,
+    }
+    for key, default in completing.items():
+        values[key] = real.get(key) or default
+    path = Path(tempfile.mkdtemp(prefix="faberon-test-")) / "config.toml"
+    config.write(path, values, dict(real.get("env", {})))
+    os.environ["FABERON_CONFIG"] = str(path)
+    if test_url:
+        _test_url = test_url
+        _postgres_note = _ensure_test_db(test_url)
 
 
 def _postgres_is_reachable(url: str) -> bool:
@@ -43,25 +88,19 @@ def _postgres_is_reachable(url: str) -> bool:
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
-    """Skip specific tests if the correct env vars are not set."""
+    """Skip tests whose infrastructure is not configured or reachable."""
     if "postgres" in item.keywords:
-        url = os.environ.get("FABERON_DATABASE_URL")
-        if not url:
-            pytest.skip("set FABERON_DATABASE_URL to a Postgres instance")
-        if not _postgres_is_reachable(url):
-            pytest.skip(
-                f"no {TEST_DB_NAME} DB at {url}: run scripts/db/create-faberon-db.sh"
-            )
+        if not _test_url or _postgres_note or not _postgres_is_reachable(_test_url):
+            reason = _postgres_note or f"no Postgres at {_test_url}: start it first"
+            pytest.skip(reason)
     if "slurm" in item.keywords:
         if not os.environ.get("FABERON_SLURM_INTEGRATION"):
             pytest.skip("set FABERON_SLURM_INTEGRATION=1 to run on-cluster Slurm tests")
-        if not os.environ.get("FABERON_SLURM_ACCOUNT"):
-            pytest.skip(
-                "set FABERON_SLURM_ACCOUNT to the Slurm account to bill jobs to"
-            )
+        if not config.slurm_account():
+            pytest.skip("no slurm_account in the config file: run `faberon init`")
     if "llm" in item.keywords:
-        if not os.environ.get("FABERON_MODEL"):
-            pytest.skip("set FABERON_MODEL (and the provider key) to run LLM tests")
+        if not config.model():
+            pytest.skip("no model in the config file: run `faberon init`")
 
 
 def _git(repo: Path, *args: str) -> str:
