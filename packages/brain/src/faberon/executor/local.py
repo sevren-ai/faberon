@@ -38,6 +38,15 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
+def _signal_tree(pid: int, sig: signal.Signals) -> None:
+    """Signal the process group led by pid"""
+    try:
+        os.killpg(pid, sig)
+    except ProcessLookupError:
+        # Ignore it if already gone
+        pass
+
+
 def _read_record(path: Path) -> dict[str, Any] | None:
     try:
         with open(path) as f:
@@ -98,7 +107,7 @@ class LocalExecutor:
         pid = record.get("pid")
         if record.get("exit_code") is None and pid is not None:
             if _pid_alive(pid):
-                os.kill(pid, signal.SIGTERM)
+                _signal_tree(pid, signal.SIGTERM)
                 record = self._settle(record, cancelled=True)
         if record.get("exit_code") is not None:
             return
@@ -150,8 +159,8 @@ class LocalExecutor:
         rc = _wait_pid(pid, timeout=0.0)
         if rc is not None:
             return self._finalize(record, rc)
-        if time.monotonic() >= record["deadline"]:
-            os.kill(pid, signal.SIGKILL)
+        if time.time() >= record["deadline"]:
+            _signal_tree(pid, signal.SIGKILL)
             return self._settle(record, cancelled=False)
         return record
 
