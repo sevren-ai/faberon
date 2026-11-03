@@ -12,7 +12,7 @@ import secrets
 import tempfile
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, overload
 
 _DEFAULT_CONFIG_PATH = Path("~/.config/faberon/config.toml").expanduser()
 
@@ -85,6 +85,12 @@ def state_dir() -> str:
     return _get("state_dir", raise_on_none=True)
 
 
+@overload
+def api_token(raise_on_none: Literal[True]) -> str: ...
+
+@overload
+def api_token(raise_on_none: bool = False) -> str | None: ...
+
 def api_token(raise_on_none: bool = False) -> str | None:
     """The bearer token guarding the API; None leaves a local server unguarded."""
     return _get("api_token", raise_on_none=raise_on_none)
@@ -95,10 +101,22 @@ def executor() -> str | None:
     return _get("executor")
 
 
+@overload
+def slurm_account(raise_on_none: Literal[True]) -> str: ...
+
+@overload
+def slurm_account(raise_on_none: bool = False) -> str | None: ...
+
 def slurm_account(raise_on_none: bool = False) -> str | None:
     """The Slurm account to bill jobs to, or None for the local executor."""
     return _get("slurm_account", raise_on_none=raise_on_none)
 
+
+@overload
+def slurm_gpus(raise_on_none: Literal[True]) -> int: ...
+
+@overload
+def slurm_gpus(raise_on_none: bool = False) -> int | None: ...
 
 def slurm_gpus(raise_on_none: bool = False) -> int | None:
     """GPU count per Slurm job, or None for the local executor."""
