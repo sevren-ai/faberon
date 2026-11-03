@@ -46,48 +46,48 @@ def load() -> dict[str, Any]:
         raise ConfigError(f"invalid config at {path}: {exc}") from exc
 
 
-def _get(key: str, required: bool = False) -> Any:
+def _get(key: str, raise_on_none: bool = False) -> Any:
     """One raw value from the config file, or None when the key is absent.
-    If required is set to True and the value is None, raise a ConfigError."""
+    If raise_on_none is set to True and the value is None/empty, raise a ConfigError."""
     value = load().get(key)
-    if required and value is None:
+    if not value and raise_on_none:
         raise ConfigError(f"no {key} in the config file: run `faberon init`")
     return value
 
 
 def database_url() -> str:
     """The Postgres connection URL."""
-    return _get("database_url", required=True)
+    return _get("database_url", raise_on_none=True)
 
 
 def model() -> str:
     """The proposer's LLM, for example ``openrouter:provider/model``."""
-    return _get("model", required=True)
+    return _get("model", raise_on_none=True)
 
 
 def host() -> str:
     """The address ``faberon serve`` binds to."""
-    return _get("host", required=True)
+    return _get("host", raise_on_none=True)
 
 
 def port() -> int:
     """The port ``faberon serve`` binds to."""
-    return int(_get("port", required=True))
+    return int(_get("port", raise_on_none=True))
 
 
 def proposer_timeout() -> float:
     """Timeout (seconds) for one proposer LLM call."""
-    return float(_get("proposer_timeout", required=True))
+    return float(_get("proposer_timeout", raise_on_none=True))
 
 
 def state_dir() -> str:
     """The local executor's private state directory."""
-    return _get("state_dir", required=True)
+    return _get("state_dir", raise_on_none=True)
 
 
-def api_token() -> str | None:
+def api_token(raise_on_none: bool = False) -> str | None:
     """The bearer token guarding the API; None leaves a local server unguarded."""
-    return _get("api_token")
+    return _get("api_token", raise_on_none=raise_on_none)
 
 
 def executor() -> str | None:
@@ -95,14 +95,14 @@ def executor() -> str | None:
     return _get("executor")
 
 
-def slurm_account() -> str | None:
+def slurm_account(raise_on_none: bool = False) -> str | None:
     """The Slurm account to bill jobs to, or None for the local executor."""
-    return _get("slurm_account")
+    return _get("slurm_account", raise_on_none=raise_on_none)
 
 
-def slurm_gpus() -> int | None:
+def slurm_gpus(raise_on_none: bool = False) -> int | None:
     """GPU count per Slurm job, or None for the local executor."""
-    value = _get("slurm_gpus")
+    value = _get("slurm_gpus", raise_on_none=raise_on_none)
     return int(value) if value is not None else None
 
 
