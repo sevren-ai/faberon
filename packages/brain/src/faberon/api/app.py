@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -18,7 +17,7 @@ from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from .. import __version__
+from .. import __version__, config
 from ..executor import Executor
 from ..executor.local import LocalExecutor
 from ..executor.slurm import SlurmExecutor
@@ -90,44 +89,35 @@ def create_app(
     *,
     config_name: str = "default",
     auth_token: str | None = None,
+    no_recover: bool = False,
 ) -> FastAPI:
-    """Build the Faberon HTTP app.
-    Requires ``FABERON_DATABASE_URL`` and ``FABERON_MODEL``.
+    """Build the Faberon HTTP app. Configures the process-global DBOS singleton."""
+    config.apply_env()
+    db_url = config.database_url()
 
-    Configures the process-global DBOS singleton.
-    """
-    db_url = os.environ.get("FABERON_DATABASE_URL")
-    if not db_url:
-        raise RuntimeError("FABERON_DATABASE_URL is not set")
-
-    config: DBOSConfig = {
+    dbos_config: DBOSConfig = {
         "name": "faberon",
         "system_database_url": db_url,
         "application_database_url": db_url,
         "run_admin_server": False,
     }
     DBOS.destroy()
-    DBOS(config=config)
+    DBOS(config=dbos_config)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         assert db_url is not None
         original_recovery = dbos._recovery.startup_recovery_thread
-        no_recover = os.environ.get("FABERON_NO_RECOVER", "").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
         if no_recover:
             # Serve the API without resuming pending workflows, so the
             # operator can inspect and resume campaigns one by one.
             dbos._recovery.startup_recovery_thread = lambda *a, **k: None  # type: ignore
             logging.getLogger(__name__).info(
-                "FABERON_NO_RECOVER set: not resuming pending workflows at launch"
+                "--no-recover set: not resuming pending workflows at launch"
             )
         ledger = Ledger(db_url)
         runtime = Runtime(executor, ledger, config_name=config_name)
-        proposer = AgentProposer.from_env(ledger)
+        proposer = AgentProposer.from_config(ledger)
         runner = CampaignRunner(runtime, proposer=proposer)
         DBOS.register_instance(runtime)
         DBOS.register_instance(runner)
@@ -176,52 +166,25 @@ def create_app(
     return app
 
 
-def create_app_slurm() -> FastAPI:
-    """Uvicorn entrypoint: Slurm executor from the environment.
-
-    Requires ``FABERON_DATABASE_URL``, ``FABERON_SLURM_ACCOUNT``,
-    ``FABERON_API_TOKEN``, and ``FABERON_MODEL``.
-    Optional ``FABERON_SLURM_GPUS`` sets the GPU count per job (default 1).
-    Optional ``FABERON_MAX_TIME`` sets a walltime cap (minutes).
-    """
-    account = os.environ.get("FABERON_SLURM_ACCOUNT")
-    if not account:
-        raise RuntimeError("FABERON_SLURM_ACCOUNT is not set")
-    token = os.environ.get("FABERON_API_TOKEN")
-    if not token:
-        raise RuntimeError(
-            "FABERON_API_TOKEN is not set. On a shared login node, "
-            "localhost is reachable by other users; the API must be guarded."
-        )
-    gpus = int(os.environ.get("FABERON_SLURM_GPUS", "1"))
+def create_app_slurm(*, no_recover: bool = False) -> FastAPI:
+    """Uvicorn entrypoint: Slurm executor from the config file."""
+    account = config.slurm_account(raise_on_none=True)
+    token = config.api_token(raise_on_none=True)
+    gpus = config.slurm_gpus(raise_on_none=True)
     executor = SlurmExecutor(
         account=account,
         gpus=gpus,
-        max_walltime=_max_walltime_from_env(),
+        max_walltime=config.max_time(),
     )
-    return create_app(executor=executor, auth_token=token)
+    return create_app(executor=executor, auth_token=token, no_recover=no_recover)
 
 
-def _max_walltime_from_env() -> int | None:
-    """The FABERON_MAX_TIME walltime cap in minutes, or None if unset."""
-    value = os.environ.get("FABERON_MAX_TIME")
-    return int(value) if value is not None else None
-
-
-def create_app_local() -> FastAPI:
-    """Uvicorn entrypoint: local executor from the environment.
-
-    Requires ``FABERON_DATABASE_URL`` and ``FABERON_MODEL``.
-    Optional ``FABERON_API_TOKEN`` guards the API (recommended)
-    Optional ``FABERON_STATE_DIR`` sets the job state directory.
-    Optional ``FABERON_MAX_TIME`` sets a walltime cap (minutes).
-    """
-    token = os.environ.get("FABERON_API_TOKEN")
-    state_dir = os.environ.get("FABERON_STATE_DIR")
-    if state_dir is None:
-        state_dir = os.path.join(os.path.expanduser("~"), ".local", "share", "faberon")
-    executor = LocalExecutor(state_dir, max_walltime=_max_walltime_from_env())
-    return create_app(executor=executor, auth_token=token)
+def create_app_local(*, no_recover: bool = False) -> FastAPI:
+    """Uvicorn entrypoint: local executor from the config file."""
+    executor = LocalExecutor(config.state_dir(), max_walltime=config.max_time())
+    return create_app(
+        executor=executor, auth_token=config.api_token(), no_recover=no_recover
+    )
 
 
 def _register_routes(app: FastAPI) -> None:
