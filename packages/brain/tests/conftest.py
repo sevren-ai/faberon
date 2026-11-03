@@ -15,18 +15,31 @@ from faberon.schema import ResearchPlan
 
 TEST_DB_NAME = "faberon_test"
 
+# The test database name can never collide with the maintenance
+# database or the production default. Everything below relies on it.
+assert TEST_DB_NAME not in ("postgres", "faberon")
+
 
 def _test_db_url(base: str) -> str:
-    """The base database URL with the database part swapped for the test database."""
+    """The base database URL with the database part swapped for the test database.
+
+    Empty when the base is unparseable or already points at the test
+    database: that would mean the operator's own database is the one we
+    drop, so the suite must refuse.
+    """
     try:
         url = make_url(base)
     except ArgumentError:
+        return ""
+    if url.database == TEST_DB_NAME:
         return ""
     return url.set(database=TEST_DB_NAME).render_as_string(hide_password=False)
 
 
 def _ensure_test_db(test_url: str) -> str:
-    """Create the test database if needed; '' on success, else the reason."""
+    """Recreate the test database. Return '' on success, else the reason."""
+    # Fail stop before any DROP; the URL must point at the test DB.
+    assert make_url(test_url).database == TEST_DB_NAME
     maintenance = (
         make_url(test_url)
         .set(database="postgres")
@@ -34,15 +47,12 @@ def _ensure_test_db(test_url: str) -> str:
     )
     try:
         with psycopg.connect(maintenance, connect_timeout=2, autocommit=True) as conn:
-            exists = conn.execute(
-                "SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB_NAME,)
-            ).fetchone()
-            if not exists:
-                conn.execute(f'CREATE DATABASE "{TEST_DB_NAME}"')
+            conn.execute(f'DROP DATABASE IF EXISTS "{TEST_DB_NAME}"')
+            conn.execute(f'CREATE DATABASE "{TEST_DB_NAME}"')
     except psycopg.OperationalError:
         return f"no Postgres at {maintenance}: start it first"
     except psycopg.Error as exc:
-        return f"could not create the {TEST_DB_NAME} database: {exc}"
+        return f"could not (re)create the {TEST_DB_NAME} database: {exc}"
     return ""
 
 
@@ -54,10 +64,16 @@ _test_url = ""
 
 
 def pytest_configure() -> None:
-    """Point the whole run at a generated config file using the test database."""
+    """Point the run at a generated config using a freshly recreated test database."""
     global _postgres_note, _test_url
     real = config.load()
-    test_url = _test_db_url(real.get("database_url", "postgres:///faberon"))
+    base_url = real.get("database_url", "postgres:///faberon")
+    test_url = _test_db_url(base_url)
+    if not test_url:
+        if TEST_DB_NAME in base_url:
+            _postgres_note = f"database_url must not point at {TEST_DB_NAME}"
+        else:
+            _postgres_note = f"cannot parse database_url {base_url!r}"
     values = {key: real[key] for key in ("model", "slurm_account") if real.get(key)}
     if test_url:
         values["database_url"] = test_url
