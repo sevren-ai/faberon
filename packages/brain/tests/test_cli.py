@@ -1,6 +1,7 @@
 """Tests for the Faberon CLI."""
 
 import json
+import tomllib
 import uuid
 
 import httpx2
@@ -81,12 +82,22 @@ def test_bare_command_shows_help():
     assert "list" in result.output
 
 
-def test_client_requires_token(monkeypatch: pytest.MonkeyPatch):
-    """Without FABERON_API_TOKEN the CLI exits with guidance, not a traceback."""
-    monkeypatch.delenv("FABERON_API_TOKEN", raising=False)
+def test_client_requires_token():
+    """Without a token in the config file, the CLI exits with guidance."""
     result = runner.invoke(cli.app, ["list"])
     assert result.exit_code == 2
-    assert "FABERON_API_TOKEN is not set" in result.output
+    assert "faberon init" in result.output
+
+
+def test_client_reads_token_from_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """The CLI takes the token and URL from the config file."""
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('api_token = "file-token"\napi_url = "http://127.0.0.1:1"\n')
+    monkeypatch.setenv("FABERON_CONFIG", str(config_file))
+    result = runner.invoke(cli.app, ["list"])
+    # Past the token check: fails on the unreachable server instead.
+    assert result.exit_code == 1
+    assert "Cannot reach" in result.output
 
 
 def test_api_error_is_friendly(monkeypatch: pytest.MonkeyPatch):
@@ -102,34 +113,35 @@ def test_api_error_is_friendly(monkeypatch: pytest.MonkeyPatch):
     assert "Traceback" not in result.output
 
 
-def test_connection_error_is_friendly():
+def test_connection_error_is_friendly(tmp_path, monkeypatch: pytest.MonkeyPatch):
     """A down server prints a clear message, not a traceback."""
     # No mock: the client targets a URL with nothing listening.
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setenv("FABERON_API_TOKEN", "test-token")
-    monkeypatch.setenv("FABERON_API_URL", "http://127.0.0.1:1")
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('api_token = "test-token"\napi_url = "http://127.0.0.1:1"\n')
+    monkeypatch.setenv("FABERON_CONFIG", str(config_file))
     result = runner.invoke(cli.app, ["list"])
-    monkeypatch.undo()
     assert result.exit_code == 1
     assert "Cannot reach" in result.output
     assert "Traceback" not in result.output
 
 
-def test_serve_graceful_shutdown(monkeypatch: pytest.MonkeyPatch):
-    """Production uvicorn gets a finite graceful-shutdown timeout."""
-    captured = {}
-    monkeypatch.setattr(
-        uvicorn, "run", lambda *a, **kw: captured.update({"args": a, "kwargs": kw})
-    )
-
-    result = runner.invoke(cli.app, ["serve"])
-
-    assert result.exit_code == 0
-    assert captured["kwargs"]["timeout_graceful_shutdown"] == GRACEFUL_SHUTDOWN_TIMEOUT
+_SERVE_CONFIG = (
+    'database_url = "postgres:///faberon_test"\n'
+    'model = "test-model"\n'
+    'host = "127.0.0.1"\n'
+    "port = 8000\n"
+    "proposer_timeout = 600\n"
+    'state_dir = "/tmp/faberon-test-state"\n'
+)
 
 
-def _serve_factory(monkeypatch: pytest.MonkeyPatch) -> dict:
-    """Capture the factory uvicorn is invoked with."""
+def _serve_setup(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, extra_config: str = ""
+) -> dict:
+    """Write a servable config file and capture the uvicorn invocation."""
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(_SERVE_CONFIG + extra_config)
+    monkeypatch.setenv("FABERON_CONFIG", str(config_file))
     captured = {}
     monkeypatch.setattr(
         uvicorn, "run", lambda *a, **kw: captured.update({"args": a, "kwargs": kw})
@@ -137,68 +149,259 @@ def _serve_factory(monkeypatch: pytest.MonkeyPatch) -> dict:
     return captured
 
 
-def test_serve_defaults_to_slurm(monkeypatch: pytest.MonkeyPatch):
-    captured = _serve_factory(monkeypatch)
-    monkeypatch.delenv("FABERON_EXECUTOR", raising=False)
+def test_serve_graceful_shutdown(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Production uvicorn gets a finite graceful-shutdown timeout."""
+    captured = _serve_setup(tmp_path, monkeypatch)
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert captured["kwargs"]["timeout_graceful_shutdown"] == GRACEFUL_SHUTDOWN_TIMEOUT
+
+
+def test_serve_requires_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Without the required settings, serve points at `faberon init`."""
+    monkeypatch.setenv("FABERON_CONFIG", str(tmp_path / "config.toml"))
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    # No file at all: everything is missing.
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 2
+    assert "missing configuration: database_url, model" in result.output
+    assert "faberon init" in result.output
+
+
+def test_serve_prints_settings(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """The startup output shows what the server will run with."""
+    _serve_setup(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert "executor: local" in result.output
+    assert "database: postgres:///faberon_test" in result.output
+    assert "model:    test-model" in result.output
+
+    # A partial file (the upgrade scenario): only the missing keys are named.
+    (tmp_path / "config.toml").write_text(
+        'database_url = "postgres:///faberon_test"\nmodel = "test-model"\n'
+    )
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 2
+    assert "missing configuration: host, port" in result.output
+
+
+def test_serve_defaults_to_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    captured = _serve_setup(
+        tmp_path,
+        monkeypatch,
+        'api_token = "tok"\nslurm_account = "acct"\nslurm_gpus = 2\n',
+    )
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 0
-    assert captured["args"][0] is cli.create_app_slurm
+    assert captured["args"][0].func is cli.create_app_slurm
     assert "executor: slurm" in result.output
 
 
-def test_serve_defaults_to_local(monkeypatch: pytest.MonkeyPatch):
-    captured = _serve_factory(monkeypatch)
-    monkeypatch.delenv("FABERON_EXECUTOR", raising=False)
-    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
-    result = runner.invoke(cli.app, ["serve"])
-    assert result.exit_code == 0
-    assert captured["args"][0] is cli.create_app_local
-    assert "executor: local" in result.output
-
-
-def test_serve_executor_overrides(monkeypatch: pytest.MonkeyPatch):
-    captured = _serve_factory(monkeypatch)
-    # sbatch present, but the explicit choice wins.
+def test_serve_slurm_requires_token_and_account(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+):
+    _serve_setup(tmp_path, monkeypatch)
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
-    monkeypatch.setenv("FABERON_EXECUTOR", "local")
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 2
+    assert "api_token" in result.output
+    assert "slurm_account" in result.output
+
+
+def test_serve_defaults_to_local(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    captured = _serve_setup(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 0
-    assert captured["args"][0] is cli.create_app_local
+    assert captured["args"][0].func is cli.create_app_local
     assert "executor: local" in result.output
 
 
-def test_serve_unknown_executor(monkeypatch: pytest.MonkeyPatch):
+def test_serve_executor_from_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """The config file's executor wins over autodetection."""
+    captured = _serve_setup(tmp_path, monkeypatch, 'executor = "local"\n')
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert captured["args"][0].func is cli.create_app_local
+    assert "executor: local" in result.output
+
+
+def test_serve_unknown_executor(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    _serve_setup(tmp_path, monkeypatch, 'executor = "kubernetes"\n')
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
-    monkeypatch.setenv("FABERON_EXECUTOR", "kubernetes")
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 2
     assert "unknown executor" in result.output
 
 
-def test_serve_host_port(monkeypatch: pytest.MonkeyPatch):
-    """Flags beat env vars, which beat the defaults."""
-    captured = {}
-    monkeypatch.setattr(
-        uvicorn, "run", lambda *a, **kw: captured.update({"args": a, "kwargs": kw})
-    )
-
-    # Defaults
+def test_serve_host_port(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Host and port come from the config file."""
+    captured = _serve_setup(tmp_path, monkeypatch)
     runner.invoke(cli.app, ["serve"])
     assert captured["kwargs"]["host"] == "127.0.0.1"
     assert captured["kwargs"]["port"] == 8000
 
-    # Env vars override defaults
-    monkeypatch.setenv("FABERON_HOST", "0.3.4.2")
-    monkeypatch.setenv("FABERON_PORT", "9000")
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        _SERVE_CONFIG.replace('host = "127.0.0.1"', 'host = "0.3.4.2"').replace(
+            "port = 8000", "port = 9000"
+        )
+    )
     runner.invoke(cli.app, ["serve"])
     assert captured["kwargs"]["host"] == "0.3.4.2"
     assert captured["kwargs"]["port"] == 9000
 
-    # Flags override env vars
-    runner.invoke(cli.app, ["serve", "--host", "127.6.6.6", "--port", "9100"])
-    assert captured["kwargs"]["host"] == "127.6.6.6"
-    assert captured["kwargs"]["port"] == 9100
+
+def test_serve_no_recover(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """--no-recover is forwarded to the app factory."""
+    captured = _serve_setup(tmp_path, monkeypatch)
+    result = runner.invoke(cli.app, ["serve", "--no-recover"])
+    assert result.exit_code == 0
+    assert captured["args"][0].keywords == {"no_recover": True}
+
+
+def _init_env(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Isolate `init` from the developer's real setup; return the config path."""
+    config_file = tmp_path / "config.toml"
+    monkeypatch.setenv("FABERON_CONFIG", str(config_file))
+    monkeypatch.setattr(cli, "_POSTGRES_ENV_PATH", tmp_path / "postgres.env")
+    monkeypatch.setattr(cli, "_probe_db", lambda url: True)
+    return config_file
+
+
+def test_init_db_default_from_postgres_env(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """A no-sudo Postgres install's postgres.env provides the URL default."""
+    config_file = _init_env(tmp_path, monkeypatch)
+    (tmp_path / "postgres.env").write_text(
+        "# Generated by scripts/db/install-postgres-no-sudo.sh.\n"
+        'export PATH="/x/bin:\\$PATH"\n'
+        'export FABERON_PG_PREFIX="/x"\n'
+        'export FABERON_PG_URL="postgres://localhost:54329/faberon"\n'
+    )
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    # Postgres URL (default from postgres.env), model, executor (default).
+    result = runner.invoke(cli.app, ["init"], input="\ntest-model\n\n")
+    assert result.exit_code == 0
+    data = tomllib.loads(config_file.read_text())
+    assert data["database_url"] == "postgres://localhost:54329/faberon"
+
+
+def test_init_notes_unknown_provider(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """A provider without a credential prompt gets a note, not silence."""
+    config_file = _init_env(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    # Postgres URL (default), model, executor (default).
+    result = runner.invoke(cli.app, ["init"], input="\nanthropic:claude-x\n\n")
+    assert result.exit_code == 0
+    assert "add the credentials needed for 'anthropic'" in result.output
+    data = tomllib.loads(config_file.read_text())
+    assert data["model"] == "anthropic:claude-x"
+    assert "env" not in data
+
+
+def test_init_writes_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    config_file = _init_env(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)  # no sbatch: local
+    # Postgres URL (default), model, OpenRouter key, executor (default).
+    result = runner.invoke(cli.app, ["init"], input="\nopenrouter:x/y\nsk-test\n\n")
+    assert result.exit_code == 0
+    data = tomllib.loads(config_file.read_text())
+    assert data["database_url"] == "postgres:///faberon"
+    assert data["model"] == "openrouter:x/y"
+    assert data["executor"] == "local"
+    assert data["api_token"]
+    assert data["env"] == {"OPENROUTER_API_KEY": "sk-test"}
+    # The file is written complete: every defaulted setting is spelled out.
+    assert data["host"] == "127.0.0.1"
+    assert data["port"] == 8000
+    assert data["proposer_timeout"] == 600.0
+    assert data["state_dir"].endswith(".local/share/faberon")
+    assert "faberon serve" in result.output
+
+
+def test_init_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    config_file = _init_env(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: "/usr/bin/sbatch")
+    # Postgres URL (default), model, executor (default: slurm), account, GPUs (default).
+    result = runner.invoke(cli.app, ["init"], input="\ntest-model\n\nacct01\n\n")
+    assert result.exit_code == 0
+    data = tomllib.loads(config_file.read_text())
+    assert data["executor"] == "slurm"
+    assert data["slurm_account"] == "acct01"
+    assert data["slurm_gpus"] == 1
+    assert data["host"] == "127.0.0.1"
+    assert data["port"] == 8000
+    assert "env" not in data
+
+
+def test_init_keeps_existing_token(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Re-running init keeps the token and offers current values as defaults."""
+    config_file = _init_env(tmp_path, monkeypatch)
+    config_file.write_text(
+        'api_token = "keep-me"\nmodel = "test-model"\nexecutor = "local"\n'
+    )
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    # Postgres URL, model, executor: all defaults kept.
+    result = runner.invoke(cli.app, ["init"], input="\n\n\n")
+    assert result.exit_code == 0
+    # Keys the sparse existing file lacked are reported as filled in.
+    assert "filled in new settings: host, port" in result.output
+    assert "updating existing config" in result.output
+    data = tomllib.loads(config_file.read_text())
+    assert data["api_token"] == "keep-me"
+    assert data["model"] == "test-model"
+
+
+def test_init_creates_missing_database(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Server up, database missing: init creates it without asking."""
+    config_file = _init_env(tmp_path, monkeypatch)
+    probed = {"ok": False}
+    calls = []
+    monkeypatch.setattr(cli, "_probe_db", lambda url: probed["ok"])
+    monkeypatch.setattr(cli, "_server_up", lambda url: True)
+
+    def fake_create(url, pg_env):
+        calls.append(url)
+        probed["ok"] = True
+
+    monkeypatch.setattr(cli, "_create_db", fake_create)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    # Postgres URL (default), model, executor (default).
+    result = runner.invoke(cli.app, ["init"], input="\ntest-model\n\n")
+    assert result.exit_code == 0
+    assert calls == ["postgres:///faberon"]
+    assert "creating database" in result.output
+    assert config_file.exists()
+
+
+def test_init_requires_running_postgres(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """No server: init fails with guidance instead of writing anything."""
+    config_file = _init_env(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli, "_probe_db", lambda url: False)
+    monkeypatch.setattr(cli, "_server_up", lambda url: False)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    # Postgres URL (default); init exits before further prompts.
+    result = runner.invoke(cli.app, ["init"], input="\n")
+    assert result.exit_code == 2
+    assert "no Postgres running" in result.output
+    assert not config_file.exists()
+
+
+def test_init_fails_when_createdb_fails(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Server up but the database still missing after createdb: init fails."""
+    config_file = _init_env(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli, "_probe_db", lambda url: False)
+    monkeypatch.setattr(cli, "_server_up", lambda url: True)
+    monkeypatch.setattr(cli, "_create_db", lambda url, pg_env: None)
+    monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
+    result = runner.invoke(cli.app, ["init"], input="\n")
+    assert result.exit_code == 2
+    assert "could not create the database" in result.output
+    assert not config_file.exists()
 
 
 def test_list(api_client):

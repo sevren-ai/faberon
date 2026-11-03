@@ -4,8 +4,7 @@ Starts the brain in a subprocess, lets it submit a job and enter the
 durable poll loop, kills the process, restarts a fresh process, and verifies
 that the workflow restarts without resubmitting and judges/logs exactly once.
 
-Requires a real Postgres (``FABERON_DATABASE_URL``) for the DBOS checkpoints
-and the ledger.
+Requires a running Postgres for the DBOS checkpoints and the ledger.
 
 This test uses a file-backed fake executor to stand in for the cluster, so it
 verifies the brain-side durability (DBOS recovery + exactly-once
@@ -21,6 +20,7 @@ from uuid import UUID
 
 import pytest
 
+from faberon import config
 from faberon.ledger import Ledger
 from faberon.schema import EventType
 
@@ -105,7 +105,7 @@ def test_restart_after_kill(tmp_path):
     )
 
     # Exactly once: one submitted (implicit), one completed, one judged.
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     events = list(ledger.tail(UUID(campaign_id)))
     ledger.close()
     types = [e.type for e in events]

@@ -12,13 +12,13 @@ pass to sbatch/squeue/sacct/scancel are accepted and that real Slurm output
 is parsed correctly.
 """
 
-import os
 import subprocess
 import time
 import uuid
 
 import pytest
 
+from faberon import config
 from faberon.executor import JobState, SubmitRequest
 from faberon.executor.slurm import SlurmExecutor
 
@@ -30,8 +30,11 @@ _POLL_INTERVAL_S = 1.0
 
 @pytest.fixture
 def executor(tmp_path) -> SlurmExecutor:
+    account = config.slurm_account()
+    # The slurm account exists or this test would have been skipped
+    assert account is not None
     return SlurmExecutor(
-        account=os.environ["FABERON_SLURM_ACCOUNT"],
+        account=account,
         max_walltime=10,
     )
 
