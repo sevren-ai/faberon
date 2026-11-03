@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Install a Postgres server for Faberon without sudo (e.g. on a cluster login node).
 #
-# This only installs the server, it does not create the faberon database:
-# after you start Postgres, run scripts/db/create-faberon-db.sh for that.
+# This only installs the server, it does not create the faberon database (`faberon init` does that).
 #
 # Optional env:
 #   FABERON_PG_PREFIX   install root (default: $HOME/faberon/postgres)
@@ -124,7 +123,7 @@ export FABERON_PGDATA="$data"
 export PGDATA="$data"
 export PGHOST=localhost
 export PGPORT=$port
-export FABERON_DATABASE_URL="$db_url"
+export FABERON_PG_URL="$db_url"
 EOF
 
 cat <<EOF
@@ -139,9 +138,9 @@ To start it (from the Faberon repo root):
 
     bash scripts/db/start-postgres.sh
 
-Once (with Postgres running):
+Then set up Faberon (creates the database when it is missing):
 
-    bash scripts/db/create-faberon-db.sh
+    faberon init
 
 To stop it:
 
