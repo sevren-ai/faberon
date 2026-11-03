@@ -33,13 +33,13 @@ def pytest_configure() -> None:
         os.environ["FABERON_DATABASE_URL"] = url
 
 
-def _postgres_is_reachable(url: str) -> bool:
+def _test_postgres(url: str) -> str | None:
+    """None if the test database accepts a connection, else the error message."""
     try:
-        conn = psycopg.connect(url, connect_timeout=2)
-        conn.close()
-        return True
-    except psycopg.OperationalError:
-        return False
+        psycopg.connect(url, connect_timeout=2).close()
+    except psycopg.OperationalError as exc:
+        return str(exc)
+    return None
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
@@ -48,10 +48,9 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         url = os.environ.get("FABERON_DATABASE_URL")
         if not url:
             pytest.skip("set FABERON_DATABASE_URL to a Postgres instance")
-        if not _postgres_is_reachable(url):
-            pytest.skip(
-                f"no {TEST_DB_NAME} DB at {url}: run scripts/db/create-faberon-db.sh"
-            )
+        assert url is not None
+        if error := _test_postgres(url):
+            pytest.skip(f"cannot reach the {TEST_DB_NAME} database: {error}")
     if "slurm" in item.keywords:
         if not os.environ.get("FABERON_SLURM_INTEGRATION"):
             pytest.skip("set FABERON_SLURM_INTEGRATION=1 to run on-cluster Slurm tests")

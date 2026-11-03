@@ -8,10 +8,11 @@ set -euo pipefail
 main_db="faberon"
 dbs=("$main_db" "${main_db}_test")
 
-# Source the no-sudo Postgres env if present (puts psql on PATH, sets PGPORT).
-if [ -f ~/.config/faberon/postgres.env ]; then
-    # shellcheck disable=SC1091
-    source ~/.config/faberon/postgres.env
+# Source the no-sudo Postgres env if present (puts psql on PATH, sets PGHOST/PGPORT).
+env_file="${XDG_CONFIG_HOME:-$HOME/.config}/faberon/postgres.env"
+if [ -f "$env_file" ]; then
+    # shellcheck disable=SC1090
+    source "$env_file"
 fi
 
 echo ">> checking postgres"
