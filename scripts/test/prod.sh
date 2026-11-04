@@ -18,7 +18,7 @@ echo ">> uv sync --locked"
 uv sync --locked
 
 for key in slurm_account model; do
-    if ! uv run python -c "from faberon import config; raise SystemExit(0 if config.get('$key') else 1)"; then
+    if ! uv run python -c "from faberon import config; raise SystemExit(0 if config.load().get('$key') else 1)"; then
         echo "error: no $key in the config file: run \`faberon init\`" >&2
         exit 1
     fi

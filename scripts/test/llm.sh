@@ -14,7 +14,7 @@ cd "$pkg"
 echo ">> uv sync --locked"
 uv sync --locked
 
-if ! uv run python -c "from faberon import config; raise SystemExit(0 if config.get('model') else 1)"; then
+if ! uv run python -c "from faberon import config; raise SystemExit(0 if config.load().get('model') else 1)"; then
     echo "error: no model in the config file: run \`faberon init\`" >&2
     exit 1
 fi
