@@ -14,4 +14,9 @@ fi
 
 # shellcheck disable=SC1090
 source "$env_file"
+
+if ! pg_ctl -D "$FABERON_PGDATA" status >/dev/null 2>&1; then
+    echo "postgres is not running"
+    exit 0
+fi
 pg_ctl -D "$FABERON_PGDATA" stop

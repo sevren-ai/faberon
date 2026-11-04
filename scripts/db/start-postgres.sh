@@ -15,7 +15,12 @@ fi
 # shellcheck disable=SC1090
 source "$env_file"
 
-log_file="$FABERON_PGDATA/../log/pg.log"
+if pg_ctl -D "$FABERON_PGDATA" status >/dev/null 2>&1; then
+    echo "postgres is already running (port $PGPORT)"
+    exit 0
+fi
+
+log_file="$FABERON_PG_PREFIX/log/pg.log"
 if ! pg_ctl -D "$FABERON_PGDATA" -l "$log_file" start; then
     echo "error: postgres failed to start; the real error is in the server log:" >&2
     echo "    tail -20 $log_file" >&2

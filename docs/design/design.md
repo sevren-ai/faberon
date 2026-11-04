@@ -49,7 +49,7 @@ Three tiers connected by explicit contracts (typed JSON over HTTP/SSE). Any tier
 
 Design rule: **one brain**. The CLI/chat interface and the drafter propose; the brain decides; the ledger remembers.
 
-**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: the brain, Postgres, chat interface (when present), and the experiment checkout. All state (Postgres, notes, artifacts) lives there; there is no central Faberon server. The brain runs as a single process: uvicorn serves the FastAPI app, and the app lifespan brings DBOS up and down with it. FastAPI binds to localhost. A bearer token (`FABERON_API_TOKEN`) guards the API: on a shared login node, the token is mandatory. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote chat interface, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
+**Deployment model.** Self-hosted per deployment. Default topology is **all on the login node**: the brain, Postgres, chat interface (when present), and the experiment checkout. All state (Postgres, notes, artifacts) lives there; there is no central Faberon server. The brain runs as a single process: uvicorn serves the FastAPI app, and the app lifespan brings DBOS up and down with it. FastAPI binds to localhost. A bearer token guards the API: on a shared login node, the token is mandatory. All operator settings (token, database URL, model, executor) live in one config file (`~/.config/faberon/config.toml`), written and repaired by `faberon init`; it is the only configuration mechanism, so every terminal and every component sees the same values. Dev loop for Faberon itself: workstation → GitHub → pull on the login node. Deferred options (remote chat interface, non-Slurm executors, multi-user, and more) live in [future.md](future.md).
 
 ## 3. Key Mechanisms
 
@@ -91,5 +91,5 @@ Contracts are **skeleton-first**: shapes live as Pydantic models in one quaranti
 | Agent chassis | Pydantic AI | Typed tools, boundary validation, durable-execution integrations.                                                                                                                   |
 | Durability | DBOS Transact (MIT) | Durable sleep, signals, SQL state, flow-controlled queues, step audit, with only Postgres to operate. Youngest dependency, mitigated by the tier boundaries and operator-owned state. |
 | Chat | Pi extension (TS) | Open-source (MIT), European, extensible; npm-distributed. Replaceable through the API contract.                                                                                     |
-| Models | Provider-agnostic env config (`FABERON_MODEL`) | Local/open models first-class. Tests use `TestModel`.                                                                                                     |
-| Database | Postgres via `FABERON_DATABASE_URL` | Native install on dev machines; scripted no-sudo install on login nodes. |
+| Models | Provider-agnostic config (`model` in the config file) | Local/open models first-class. Tests use `TestModel`.                                                                                                     |
+| Database | Postgres via `database_url` in the config file | Native install on dev machines; scripted no-sudo install on login nodes. |

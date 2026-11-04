@@ -2,22 +2,10 @@
 # Run all integration tests against real infrastructure: Slurm jobs and the
 # configured LLM. Combines slurm.sh and llm.sh in one pytest run.
 #
-# Required env:
-#   FABERON_SLURM_ACCOUNT Slurm account to bill jobs to.
-#   FABERON_MODEL         model string, e.g. openrouter:<provider>/<model>
-#   provider key          OPENROUTER_API_KEY or OPENAI_API_KEY, matching the
-#                         FABERON_MODEL prefix (see README.md).
+# Required: `slurm_account` and `model` in the Faberon config file,
+# plus the provider key in its [env] table
 
 set -euo pipefail
-
-if [ -z "${FABERON_SLURM_ACCOUNT:-}" ]; then
-    echo "error: set FABERON_SLURM_ACCOUNT to the Slurm account to bill jobs to" >&2
-    exit 1
-fi
-if [ -z "${FABERON_MODEL:-}" ]; then
-    echo "error: set FABERON_MODEL to the model to test against" >&2
-    exit 1
-fi
 
 # Resolve the repo root from the script location so it works from any cwd.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,12 +14,19 @@ pkg="$repo_root/packages/brain"
 
 cd "$pkg"
 
+echo ">> uv sync --locked"
+uv sync --locked
+
+for key in slurm_account model; do
+    if ! uv run python -c "from faberon import config; raise SystemExit(0 if config.load().get('$key') else 1)"; then
+        echo "error: no $key in the config file: run \`faberon init\`" >&2
+        exit 1
+    fi
+done
+
 # Compute nodes cannot see the login node's /tmp, so use the shared home.
 # pytest wipes this directory on each run.
 basetemp="${XDG_CACHE_HOME:-$HOME/.cache}/faberon-pytest"
-
-echo ">> uv sync --locked"
-uv sync --locked
 
 echo ">> pytest -m 'slurm or llm'"
 FABERON_SLURM_INTEGRATION=1 uv run pytest -rs -m "slurm or llm" --basetemp="$basetemp"

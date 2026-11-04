@@ -1,19 +1,8 @@
 #!/usr/bin/env bash
-# Run the LLM integration tests. These call the real model configured in
-# FABERON_MODEL, so they require network access to the provider and opt-in
-# env vars.
-#
-# Required env:
-#   FABERON_MODEL         model string, e.g. openrouter:<provider>/<model>
-#   provider key          OPENROUTER_API_KEY or OPENAI_API_KEY, matching the
-#                         FABERON_MODEL prefix (see README.md).
+# Run the LLM integration tests. These call the real model configured in config file, so they require network access to the
+# provider.
 
 set -euo pipefail
-
-if [ -z "${FABERON_MODEL:-}" ]; then
-    echo "error: set FABERON_MODEL to the model to test against" >&2
-    exit 1
-fi
 
 # Resolve the repo root from the script location so it works from any cwd.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,6 +13,11 @@ cd "$pkg"
 
 echo ">> uv sync --locked"
 uv sync --locked
+
+if ! uv run python -c "from faberon import config; raise SystemExit(0 if config.load().get('model') else 1)"; then
+    echo "error: no model in the config file: run \`faberon init\`" >&2
+    exit 1
+fi
 
 echo ">> pytest -m llm"
 uv run pytest -rs -m llm

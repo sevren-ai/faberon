@@ -1,11 +1,11 @@
 """Tests for the Postgres-backed ledger. Requires a real Postgres."""
 
-import os
 import uuid
 from collections.abc import Iterator
 
 import pytest
 
+from faberon import config
 from faberon.ledger import Ledger
 from faberon.schema import Actor, Event, EventType
 
@@ -16,7 +16,7 @@ pytestmark = pytest.mark.postgres
 
 @pytest.fixture
 def ledger() -> Iterator[Ledger]:
-    db = Ledger(os.environ["FABERON_DATABASE_URL"])
+    db = Ledger(config.database_url())
     # Test isolation: start each test from an empty log at seq 1.
     db._conn.execute("TRUNCATE events RESTART IDENTITY")
     db._conn.execute("TRUNCATE campaigns")
