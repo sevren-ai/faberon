@@ -35,44 +35,13 @@ For more details, see [design.md](docs/design/design.md).
 
 ## Install
 
-### Prerequisites
-Pick the guide for your machine. Each installs Postgres, Node, and the Pi CLI:
-- [Install on a workstation](docs/install-workstation.md): you have sudo, or you are on macOS
-- [Install on a login node](docs/install-login-node.md): no sudo (e.g. cluster login node)
-
-
-### Faberon brain and chat
-With the prerequisites in place, install the Faberon brain and register the chat interface with Pi.
-
-From PyPI and npm:
-
-```bash
-uv venv
-
-uv pip install faberon
-pi install npm:@faberon/chat
-```
-
-or from source:
-```bash
-git clone https://github.com/sevren-ai/faberon
-cd faberon
-
-uv tool install packages/brain
-pi install ./packages/chat
-```
+Follow [the install guide](docs/install.md). It has two tracks: a workstation you administer (sudo or macOS) and a shared cluster login node (no sudo). Each track installs the prerequisites (Postgres, uv, Node); shared steps then install the Faberon brain, run the `faberon init` setup wizard, and optionally install Faberon Chat.
 
 ## Quickstart
 
 > ⚠️ Faberon executes unsandboxed LLM-generated code, with your user's (or the Slurm job's) permissions, and it rewrites the target repo as it experiments. Only point it at repos and clusters where that is acceptable.
 
-Set up once: `faberon init` writes your settings (API token, database, model, executor) to `~/.config/faberon/config.toml`:
-
-```bash
-faberon init
-```
-
-Then start the API inside `tmux` or `screen` so it survives your SSH session:
+The install guide ends with `faberon init`, which writes your settings (API token, database, model, executor) to `~/.config/faberon/config.toml`. With that in place, start the API inside `tmux` or `screen` so it survives your SSH session:
 
 ```bash
 faberon serve
