@@ -66,7 +66,7 @@ pi install ./packages/chat
 
 > ⚠️ Faberon executes unsandboxed LLM-generated code, with your user's (or the Slurm job's) permissions, and it rewrites the target repo as it experiments. Only point it at repos and clusters where that is acceptable.
 
-Set up once: `faberon init` writes your settings (API token, database, model, executor) to `~/.config/faberon/config.toml`, so every terminal can talk to Faberon without exporting anything:
+Set up once: `faberon init` writes your settings (API token, database, model, executor) to `~/.config/faberon/config.toml`:
 
 ```bash
 faberon init
