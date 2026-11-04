@@ -32,26 +32,13 @@ export PATH="$(brew --prefix postgresql@17)/bin:$PATH"   # keg-only; add to your
 
 `postgres:///faberon` connects over the local unix socket using peer auth (you are authenticated as your OS user, no password, no network). The system package runs Postgres as a background service that starts on boot, so there is nothing to start or stop by hand.
 
-### Create the databases
+## 2. Configure Faberon
 
-Copy-paste the `create-faberon-db.sh` [script](https://github.com/sevren-ai/faberon/blob/main/scripts/db/create-faberon-db.sh) and execute it:
-
-```bash
-bash scripts/db/create-faberon-db.sh   # creates faberon and faberon_test DBs
-```
-
-The script should print `FABERON_DATABASE_URL` that needs to be set in your env, e.g.:
-```bash 
-export FABERON_DATABASE_URL=postgres:///faberon
-```
-
-## 2. Set the environment
-
-Refer to [the env guide](prepare-env.md).
+Refer to [the configuration guide](configure-faberon.md).
 
 ## 3. Get node
 
-Faberon Chat needs Node 22.19 or newer.
+This is only required if you want to use Faberon Chat. Faberon Chat needs Node 22.19 or newer.
 
 E.g. on fedora:
 
@@ -67,7 +54,7 @@ brew install node
 
 ## 4. Install Pi
 
-Faberon Chat is a Pi extension, so install the Pi CLI. A system-wide Node has its global npm prefix outside your home, so this uses sudo:
+This is only required if you want to use Faberon Chat. Faberon Chat is a Pi extension, so install the Pi CLI. A system-wide Node has its global npm prefix outside your home, so this uses sudo:
 
 ```bash
 sudo npm install -g --ignore-scripts @earendil-works/pi-coding-agent # drop `sudo` on macOS

@@ -12,27 +12,28 @@ bash scripts/db/install-postgres-no-sudo.sh   # binaries + initdb + env file
 
 The installer writes an env file to `~/.config/faberon/postgres.env` (or `$XDG_CONFIG_HOME/faberon/postgres.env`) recording the install paths and connection settings.
 
-Now, also copy over the `start-postgres.sh` [script](https://github.com/sevren-ai/faberon/blob/main/scripts/db/start-postgres.sh), the `stop-postgres.sh` [script](https://github.com/sevren-ai/faberon/blob/main/scripts/db/stop-postgres.sh) and the `create-faberon-db` [script](https://github.com/sevren-ai/faberon/blob/main/scripts/db/create-faberon-db.sh).
-Start Postgres (each session, from the repo root), then create the databases once:
+Now, also copy over the `start-postgres.sh` [script](https://github.com/sevren-ai/faberon/blob/main/scripts/db/start-postgres.sh) and the `stop-postgres.sh` [script](https://github.com/sevren-ai/faberon/blob/main/scripts/db/stop-postgres.sh).
+Start Postgres (each session, from the repo root):
 
 ```bash
 bash scripts/db/start-postgres.sh
-bash scripts/db/create-faberon-db.sh         # creates faberon and faberon_test
 ```
-
-The create script prints the `FABERON_DATABASE_URL` to export. It is also recorded in the env file `~/.config/faberon/postgres.env`.
-
-To stop it: `bash scripts/db/stop-postgres.sh`.
 
 Postgres does not start on boot, so start it after each login or reboot.
 
-## 2. Set the environment
+To stop it after a session, you can run (but don't do this now):
 
-Refer to [the env guide](prepare-env.md).
+```bash
+bash scripts/db/stop-postgres.sh
+```
+
+## 2. Configure Faberon
+
+Refer to [the configuration guide](configure-faberon.md).
 
 ## 3. Get Node
 
-Faberon Chat needs Node 22.19 or newer, installed user-space since there is no sudo. 
+This is only required if you want to use Faberon Chat. Faberon Chat needs Node 22.19 or newer, installed user-space since there is no sudo. 
 
 One way, a plain tarball:
 
@@ -46,7 +47,7 @@ A version manager such as `nvm` or `mise` works too.
 
 ## 4. Install Pi
 
-Faberon Chat is a Pi extension, so install the Pi CLI. The user-space Node above has its global npm prefix inside your home, so no sudo is needed:
+This is only required if you want to use Faberon Chat. Faberon Chat is a Pi extension, so install the Pi CLI. The user-space Node above has its global npm prefix inside your home, so no sudo is needed:
 
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent

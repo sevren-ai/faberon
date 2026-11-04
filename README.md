@@ -66,7 +66,13 @@ pi install ./packages/chat
 
 > ⚠️ Faberon executes unsandboxed LLM-generated code, with your user's (or the Slurm job's) permissions, and it rewrites the target repo as it experiments. Only point it at repos and clusters where that is acceptable.
 
-Start the API inside `tmux` or `screen` so it survives your SSH session:
+Set up once: `faberon init` writes your settings (API token, database, model, executor) to `~/.config/faberon/config.toml`, so every terminal can talk to Faberon without exporting anything:
+
+```bash
+faberon init
+```
+
+Then start the API inside `tmux` or `screen` so it survives your SSH session:
 
 ```bash
 faberon serve
