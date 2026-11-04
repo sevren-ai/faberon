@@ -94,21 +94,23 @@ def pytest_configure() -> None:
         _postgres_note = _ensure_test_db(test_url)
 
 
-def _postgres_is_reachable(url: str) -> bool:
+def _test_postgres(url: str) -> str | None:
+    """None if the test database accepts a connection, else the error message."""
     try:
-        conn = psycopg.connect(url, connect_timeout=2)
-        conn.close()
-        return True
-    except psycopg.OperationalError:
-        return False
+        psycopg.connect(url, connect_timeout=2).close()
+    except psycopg.OperationalError as exc:
+        return str(exc)
+    return None
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
     """Skip tests whose infrastructure is not configured or reachable."""
     if "postgres" in item.keywords:
-        if not _test_url or _postgres_note or not _postgres_is_reachable(_test_url):
+        if not _test_url or _postgres_note:
             reason = _postgres_note or f"no Postgres at {_test_url}: start it first"
             pytest.skip(reason)
+        if error := _test_postgres(_test_url):
+            pytest.skip(f"cannot reach the {TEST_DB_NAME} database: {error}")
     if "slurm" in item.keywords:
         if not os.environ.get("FABERON_SLURM_INTEGRATION"):
             pytest.skip("set FABERON_SLURM_INTEGRATION=1 to run on-cluster Slurm tests")
