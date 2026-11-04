@@ -81,9 +81,7 @@ This runs `uv sync --locked` and `uv run pytest` in `packages/brain/`, mirroring
 
 #### Postgres ledger tests
 
-They are included in the local tests, but skip themselves when `FABERON_DATABASE_URL` is unset or when the postgres isn't running.
-
-The test suite runs against the `faberon_test` database, not the actual (production) database named in `FABERON_DATABASE_URL`. The tests truncate tables and reset the DBOS system database, so this separation keeps production data safe.
+They are included in the local tests, but skip themselves when Postgres is unreachable. The suite takes the database URL from your Faberon config file, redirects it to the `faberon_test` database, and recreates that database from scratch on every run. The tests truncate tables and reset the DBOS system database, so this separation keeps production data safe.
 
 
 ### Slurm tests (login node)
@@ -92,7 +90,7 @@ The test suite runs against the `faberon_test` database, not the actual (product
 bash scripts/test/slurm.sh
 ```
 
-This (only) runs the tests that submit real jobs to Slurm. It requires `sbatch` on `PATH` and `̀FABERON_SLURM_ACCOUNT`. 
+This (only) runs the tests that submit real jobs to Slurm. It requires `sbatch` on `PATH` and `slurm_account` in the Faberon config file.
 
 To run them on a login node that has `sbatch` on `PATH`:
 
@@ -102,7 +100,7 @@ To run them on a login node that has `sbatch` on `PATH`:
 bash scripts/test/llm.sh
 ```
 
-This runs the proposer against the real model configured in `FABERON_MODEL`. 
+This runs the proposer against the real model configured as `model` in the Faberon config file.
 
 ### LLM + Slurm tests (login node)
 
