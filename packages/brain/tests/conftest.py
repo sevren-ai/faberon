@@ -89,6 +89,8 @@ def pytest_configure() -> None:
     path = Path(tempfile.mkdtemp(prefix="faberon-test-")) / "config.toml"
     config.write(path, values, dict(real.get("env", {})))
     os.environ["FABERON_CONFIG"] = str(path)
+    # Export the [env] table (provider keys)
+    config.apply_env()
     if test_url:
         _test_url = test_url
         _postgres_note = _ensure_test_db(test_url)
