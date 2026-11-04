@@ -30,6 +30,18 @@ faberon cancel <id>                   # or cancel one you do not want to run aga
 
 ## Upgrading Faberon
 
+Upgrade the brain the same way you installed it. From PyPI:
+
+```bash
+uv tool upgrade faberon
+```
+
+From a source checkout: `uv tool install` builds a snapshot of the source, so `git pull` alone does not update the installed `faberon` command. Reinstall after every pull:
+
+```bash
+uv tool install --force packages/brain
+```
+
 After every upgrade, re-run `faberon init` to review your settings: it shows every current value as the prompt default, fills in keys the new version added, and re-checks the database.
 
 Be careful when upgrading Faberon while you have an active campaign running. DBOS won't be able to recover the old workflow, and the campaign won't resume after starting the new version of Faberon.

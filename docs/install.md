@@ -140,7 +140,7 @@ cd faberon
 uv tool install packages/brain
 ```
 
-`uv tool` puts the `faberon` command on your `PATH`, so it works from any shell, including a fresh `tmux` session.
+`uv tool` puts the `faberon` command on your `PATH`, so it works from any shell, including a fresh `tmux` session. To upgrade later, see [Upgrading Faberon](troubleshooting.md#upgrading-faberon).
 
 ## 5. Configure Faberon
 
