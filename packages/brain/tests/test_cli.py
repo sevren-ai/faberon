@@ -146,6 +146,8 @@ def _serve_setup(
     config_file = tmp_path / "config.toml"
     config_file.write_text(_SERVE_CONFIG + extra_config)
     monkeypatch.setenv("FABERON_CONFIG", str(config_file))
+    # Serve preflights the DB; stub the probe, there is no live Postgres here.
+    monkeypatch.setattr(cli, "_probe_db", lambda url: None)
     captured = {}
     monkeypatch.setattr(
         uvicorn, "run", lambda *a, **kw: captured.update({"args": a, "kwargs": kw})

@@ -132,6 +132,16 @@ def serve(
         echo(f"missing configuration: {', '.join(missing)}", err=True)
         echo(f"run `faberon init` (config file: {config.config_path()})", err=True)
         raise typer.Exit(code=2)
+    db_url = settings["database_url"]
+    if err := _probe_db(db_url):
+        echo(f"cannot connect to Postgres at {_redacted(db_url)}: {err}", err=True)
+        echo(
+            "start Postgres first (install guide, step A1 or B1); on a login "
+            "node, Postgres only runs on the node where you started it "
+            "(docs/troubleshooting.md)",
+            err=True,
+        )
+        raise typer.Exit(code=2)
     echo(f"executor: {name}")
     echo(f"database: {_redacted(settings['database_url'])}")
     echo(f"model:    {settings['model']}")
