@@ -133,7 +133,7 @@ def serve(
         echo(f"run `faberon init` (config file: {config.config_path()})", err=True)
         raise typer.Exit(code=2)
     echo(f"executor: {name}")
-    echo(f"database: {settings['database_url']}")
+    echo(f"database: {_redacted(settings['database_url'])}")
     echo(f"model:    {settings['model']}")
     uvicorn.run(
         functools.partial(factories[name], no_recover=no_recover),
@@ -162,6 +162,14 @@ def _postgres_env() -> dict[str, str]:
         if sep:
             values[key] = value.strip().strip('"')
     return values
+
+
+def _redacted(url: str) -> str:
+    """The URL with any password masked, for display."""
+    try:
+        return make_url(url).render_as_string(hide_password=True)
+    except ArgumentError:
+        return url
 
 
 def _probe_db(db_url: str) -> str | None:
@@ -228,7 +236,7 @@ def init() -> None:
         raise typer.Exit(code=2) from None
     if existing:
         echo(f"updating existing config at {path}")
-    echo("press Enter to accept the proposed default")
+    echo("press Enter to accept the proposed default shown in brackets []")
     pg_env = _postgres_env()
 
     db_default = (
@@ -236,10 +244,18 @@ def init() -> None:
         or pg_env.get("FABERON_PG_URL")
         or config.DEFAULT_DB_URL
     )
-    db_url = typer.prompt("Postgres URL", default=db_default)
+    db_url = (
+        typer.prompt(
+            f"Postgres URL [{_redacted(db_default)}]", default="", show_default=False
+        )
+        or db_default
+    )
     if _probe_db(db_url) is not None:
         if (up_err := _server_up(db_url)) is not None:
-            echo(f"cannot connect to Postgres at {db_url}: {up_err}", err=True)
+            echo(
+                f"cannot connect to Postgres at {_redacted(db_url)}: {up_err}",
+                err=True,
+            )
             echo(
                 "start Postgres first (install guide, step A1 or B1); if it is "
                 "already running, check the URL's credentials "
@@ -247,7 +263,7 @@ def init() -> None:
                 err=True,
             )
             raise typer.Exit(code=2)
-        echo(f"creating database for {db_url}")
+        echo(f"creating database for {_redacted(db_url)}")
         _create_db(db_url, pg_env)
         if (err := _probe_db(db_url)) is not None:
             echo(
