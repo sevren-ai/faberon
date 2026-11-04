@@ -10,7 +10,11 @@ import uvicorn
 from typer.testing import CliRunner
 
 from faberon import cli
-from faberon.api.app import GRACEFUL_SHUTDOWN_TIMEOUT
+from faberon.api.app import (
+    GRACEFUL_SHUTDOWN_TIMEOUT,
+    create_app_local,
+    create_app_slurm,
+)
 from faberon.schema import EventType
 
 runner = CliRunner()
@@ -196,7 +200,7 @@ def test_serve_defaults_to_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 0
-    assert captured["args"][0].func is cli.create_app_slurm
+    assert captured["args"][0].func is create_app_slurm
     assert "executor: slurm" in result.output
 
 
@@ -216,7 +220,7 @@ def test_serve_defaults_to_local(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 0
-    assert captured["args"][0].func is cli.create_app_local
+    assert captured["args"][0].func is create_app_local
     assert "executor: local" in result.output
 
 
@@ -226,7 +230,7 @@ def test_serve_executor_from_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 0
-    assert captured["args"][0].func is cli.create_app_local
+    assert captured["args"][0].func is create_app_local
     assert "executor: local" in result.output
 
 

@@ -14,14 +14,12 @@ from uuid import UUID, uuid4
 import httpx2
 import psycopg
 import typer
-import uvicorn
 from pydantic import ValidationError
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 from typer import Argument, FileText, Option, echo
 
 from . import config
-from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_local, create_app_slurm
 from .schema import Event, ResearchPlan
 
 _POSTGRES_ENV_PATH = Path("~/.config/faberon/postgres.env").expanduser()
@@ -106,6 +104,15 @@ def serve(
 
     The executor defaults to `slurm` when 'sbatch' is on PATH, else `local`.
     """
+    # Lazy loads to avoid startup costs for other commands.
+    import uvicorn
+
+    from .api.app import (
+        GRACEFUL_SHUTDOWN_TIMEOUT,
+        create_app_local,
+        create_app_slurm,
+    )
+
     factories = {"slurm": create_app_slurm, "local": create_app_local}
     settings = config.load()
     name = settings.get("executor")
