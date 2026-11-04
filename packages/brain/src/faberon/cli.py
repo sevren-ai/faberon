@@ -220,7 +220,8 @@ def init() -> None:
         echo(str(exc), err=True)
         raise typer.Exit(code=2) from None
     if existing:
-        echo(f"updating existing config at {path}; press Enter to keep a value")
+        echo(f"updating existing config at {path}")
+    echo("press Enter to accept the proposed default")
     pg_env = _postgres_env()
 
     db_default = (
