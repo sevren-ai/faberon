@@ -157,18 +157,18 @@ def _postgres_env() -> dict[str, str]:
     return values
 
 
-def _probe_db(db_url: str) -> bool:
-    """Whether the database at the URL accepts a connection."""
+def _probe_db(db_url: str) -> str | None:
+    """None when the database at the URL accepts a connection, else the error."""
     try:
         conn = psycopg.connect(db_url, connect_timeout=2)
         conn.close()
-        return True
-    except psycopg.OperationalError:
-        return False
+        return None
+    except psycopg.OperationalError as exc:
+        return " ".join(str(exc).split())
 
 
-def _server_up(db_url: str) -> bool:
-    """Whether or not the Postgres server is running"""
+def _server_up(db_url: str) -> str | None:
+    """None when the Postgres server is running, else the connection error."""
     maintenance = (
         make_url(db_url).set(database="postgres").render_as_string(hide_password=False)
     )
@@ -230,19 +230,21 @@ def init() -> None:
         or config.DEFAULT_DB_URL
     )
     db_url = typer.prompt("Postgres URL", default=db_default)
-    if not _probe_db(db_url):
-        if not _server_up(db_url):
+    if _probe_db(db_url) is not None:
+        if (up_err := _server_up(db_url)) is not None:
+            echo(f"cannot connect to Postgres at {db_url}: {up_err}", err=True)
             echo(
-                f"no Postgres running at {db_url}: install and start it first "
-                "(install guide, step 1)",
+                "start Postgres first (install guide, step A1 or B1); if it is "
+                "already running, check the URL's credentials "
+                "(docs/troubleshooting.md)",
                 err=True,
             )
             raise typer.Exit(code=2)
         echo(f"creating database for {db_url}")
         _create_db(db_url, pg_env)
-        if not _probe_db(db_url):
+        if (err := _probe_db(db_url)) is not None:
             echo(
-                "could not create the database; create it with createdb, "
+                f"could not create the database ({err}); create it with createdb, "
                 "then re-run `faberon init`",
                 err=True,
             )

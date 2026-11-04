@@ -269,7 +269,7 @@ def _init_env(tmp_path, monkeypatch: pytest.MonkeyPatch):
     config_file = tmp_path / "config.toml"
     monkeypatch.setenv("FABERON_CONFIG", str(config_file))
     monkeypatch.setattr(cli, "_POSTGRES_ENV_PATH", tmp_path / "postgres.env")
-    monkeypatch.setattr(cli, "_probe_db", lambda url: True)
+    monkeypatch.setattr(cli, "_probe_db", lambda url: None)
     return config_file
 
 
@@ -359,14 +359,14 @@ def test_init_keeps_existing_token(tmp_path, monkeypatch: pytest.MonkeyPatch):
 def test_init_creates_missing_database(tmp_path, monkeypatch: pytest.MonkeyPatch):
     """Server up, database missing: init creates it without asking."""
     config_file = _init_env(tmp_path, monkeypatch)
-    probed = {"ok": False}
+    probed: dict[str, str | None] = {"err": "database missing"}
     calls = []
-    monkeypatch.setattr(cli, "_probe_db", lambda url: probed["ok"])
-    monkeypatch.setattr(cli, "_server_up", lambda url: True)
+    monkeypatch.setattr(cli, "_probe_db", lambda url: probed["err"])
+    monkeypatch.setattr(cli, "_server_up", lambda url: None)
 
     def fake_create(url, pg_env):
         calls.append(url)
-        probed["ok"] = True
+        probed["err"] = None
 
     monkeypatch.setattr(cli, "_create_db", fake_create)
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
@@ -381,21 +381,22 @@ def test_init_creates_missing_database(tmp_path, monkeypatch: pytest.MonkeyPatch
 def test_init_requires_running_postgres(tmp_path, monkeypatch: pytest.MonkeyPatch):
     """No server: init fails with guidance instead of writing anything."""
     config_file = _init_env(tmp_path, monkeypatch)
-    monkeypatch.setattr(cli, "_probe_db", lambda url: False)
-    monkeypatch.setattr(cli, "_server_up", lambda url: False)
+    monkeypatch.setattr(cli, "_probe_db", lambda url: "connection refused")
+    monkeypatch.setattr(cli, "_server_up", lambda url: "connection refused")
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
     # Postgres URL (default); init exits before further prompts.
     result = runner.invoke(cli.app, ["init"], input="\n")
     assert result.exit_code == 2
-    assert "no Postgres running" in result.output
+    assert "cannot connect to Postgres" in result.output
+    assert "connection refused" in result.output
     assert not config_file.exists()
 
 
 def test_init_fails_when_createdb_fails(tmp_path, monkeypatch: pytest.MonkeyPatch):
     """Server up but the database still missing after createdb: init fails."""
     config_file = _init_env(tmp_path, monkeypatch)
-    monkeypatch.setattr(cli, "_probe_db", lambda url: False)
-    monkeypatch.setattr(cli, "_server_up", lambda url: True)
+    monkeypatch.setattr(cli, "_probe_db", lambda url: "database missing")
+    monkeypatch.setattr(cli, "_server_up", lambda url: None)
     monkeypatch.setattr(cli, "_create_db", lambda url, pg_env: None)
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: None)
     result = runner.invoke(cli.app, ["init"], input="\n")
