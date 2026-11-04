@@ -117,7 +117,11 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         if not config.slurm_account():
             pytest.skip("no slurm_account in the config file: run `faberon init`")
     if "llm" in item.keywords:
-        if not config.model():
+        try:
+            model = config.model()
+        except config.ConfigError:
+            model = None
+        if not model:
             pytest.skip("no model in the config file: run `faberon init`")
 
 
