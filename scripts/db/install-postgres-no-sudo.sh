@@ -180,7 +180,7 @@ else
         db_url="$(
             # shellcheck disable=SC1090
             source "$env_file" >/dev/null 2>&1 || true
-            printf '%s' "${FABERON_DATABASE_URL:-}"
+            printf '%s' "${FABERON_PG_URL:-}"
         )"
     fi
     if [ -z "$db_url" ]; then
@@ -223,12 +223,12 @@ Postgres (no-sudo install) is ready.
 
 Connections:
   psql and the db scripts use the private unix socket in $run_dir (no password).
-  Faberon connects over TCP with a password; FABERON_DATABASE_URL in the env
+  Faberon connects over TCP with a password; FABERON_PG_URL in the env
   file carries it.
 
-To start it (from the Faberon repo root):
+To start it, run start-postgres.sh. docs/install.md shows where to get it:
 
-    bash scripts/db/start-postgres.sh
+    bash ~/.local/bin/start-postgres.sh
 
 Then set up Faberon (creates the database when it is missing):
 
