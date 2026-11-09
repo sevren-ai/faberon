@@ -214,7 +214,7 @@ def _server_up(db_url: str) -> str | None:
 
 
 def _create_db(db_url: str, pg_env: dict[str, str]) -> None:
-    """Create the database"""
+    """Create the database, keeping the URL's credentials."""
     search_path = os.environ.get("PATH", "")
     prefix = pg_env.get("FABERON_PG_PREFIX")
     if prefix:
@@ -232,13 +232,21 @@ def _create_db(db_url: str, pg_env: dict[str, str]) -> None:
     except ArgumentError:
         echo(f"cannot parse a database name from {db_url!r}", err=True)
         return
-    args = [createdb]
+    # createdb takes no connection URL: pass the credentials as flags and
+    # PGPASSWORD, and never prompt (-w). The no-sudo installer's generated
+    # password is unknown to the user, so a prompt would stall init.
+    args = [createdb, "-w"]
     if url.host:
         args += ["-h", url.host]
     if url.port:
         args += ["-p", str(url.port)]
+    if url.username:
+        args += ["-U", url.username]
     args.append(url.database or "faberon")
-    result = subprocess.run(args, capture_output=True, text=True)
+    env = dict(os.environ)
+    if url.password:
+        env["PGPASSWORD"] = url.password
+    result = subprocess.run(args, capture_output=True, text=True, env=env)
     if result.returncode != 0:
         echo(f"Creating the DB failed: {result.stderr.strip()}", err=True)
         echo("is Postgres running? Ensure it is, then re-run `faberon init`", err=True)
