@@ -15,6 +15,18 @@ bash install-postgres-no-sudo.sh      # re-run: repairs FABERON_PG_URL
 
 Then re-run `faberon init`.
 
+## Postgres broken after logout on a login node
+
+Some login nodes run systemd-logind with `RemoveIPC=yes`, which deletes your IPC objects (including Postgres's `/dev/shm` segments) when your last session ends; some also kill leftover processes. Either way Postgres misbehaves after logout, and `pg_ctl` may still report the postmaster as running while connections fail.
+
+Just restart it. The start script detects the broken state:
+
+```bash
+bash ~/.local/bin/start-postgres.sh
+```
+
+If you want Postgres to survive logout instead, ask your admin to enable linger for your user: `loginctl enable-linger <your-user>`.
+
 ## Safe restart and recovery
 
 By default Faberon resumes every pending campaign workflow at startup (DBOS recovery). If a recovered workflow is what destabilized the cluster, that becomes a crash loop: recover, resubmit, kill, repeat. To break it, start in no-recover mode so no workflow resumes at boot, then act on campaigns one by one:

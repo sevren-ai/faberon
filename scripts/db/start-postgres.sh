@@ -16,8 +16,15 @@ fi
 source "$env_file"
 
 if pg_ctl -D "$FABERON_PGDATA" status >/dev/null 2>&1; then
-    echo "postgres is already running (port $PGPORT)"
-    exit 0
+    if PGCONNECT_TIMEOUT=5 psql -d postgres -tAc 'SELECT 1' >/dev/null 2>&1; then
+        echo "postgres is already running (port $PGPORT)"
+        exit 0
+    fi
+    # The postmaster is alive but not answering. Seen on login nodes after
+    # logout, where systemd-logind's RemoveIPC=yes deleted its shared memory
+    # segments. Restart it.
+    echo "postgres is running but not answering connections; restarting it"
+    pg_ctl -D "$FABERON_PGDATA" stop -m fast
 fi
 
 log_file="$FABERON_PG_PREFIX/log/pg.log"
