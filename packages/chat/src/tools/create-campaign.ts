@@ -15,7 +15,6 @@ export function formatCreated(created: CampaignCreated): string {
   return `campaign: ${created.campaign_id}\nworkflow: ${created.workflow_id}`;
 }
 
-/** The ResearchPlan shape the create tool accepts. Mirrors the brain's model. */
 export const planSchema = Type.Object({
   goal: Type.String({
     description: "What the campaign tries to achieve.",
