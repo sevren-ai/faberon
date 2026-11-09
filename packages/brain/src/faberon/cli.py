@@ -271,8 +271,8 @@ def init() -> None:
     pg_env = _postgres_env()
 
     db_default = (
-        existing.get("database_url")
-        or pg_env.get("FABERON_PG_URL")
+        pg_env.get("FABERON_PG_URL")
+        or existing.get("database_url")
         or config.DEFAULT_DB_URL
     )
     db_url = (
