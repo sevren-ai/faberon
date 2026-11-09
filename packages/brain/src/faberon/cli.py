@@ -182,6 +182,19 @@ def _redacted(url: str) -> str:
         return url
 
 
+def _prompt_secret(label: str, current: str) -> str:
+    """Prompt for a secret without echoing it"""
+    hint = ""
+    if current:
+        masked = f"...{current[-4:]}" if len(current) > 4 else "***"
+        hint = f" [{masked}]"
+
+    return (
+        typer.prompt(f"{label}{hint}", default="", show_default=False, hide_input=True)
+        or current
+    )
+
+
 def _probe_db(db_url: str) -> str | None:
     """None when the database at the URL accepts a connection, else the error."""
     try:
@@ -290,9 +303,8 @@ def init() -> None:
     )
     env_values: dict[str, str] = dict(existing.get("env", {}))
     if model.startswith("openrouter:"):
-        key = typer.prompt(
-            "OpenRouter API key",
-            default=env_values.get("OPENROUTER_API_KEY") or "",
+        key = _prompt_secret(
+            "OpenRouter API key", env_values.get("OPENROUTER_API_KEY", "")
         )
         if key:
             env_values["OPENROUTER_API_KEY"] = key
@@ -303,9 +315,8 @@ def init() -> None:
         )
         if base:
             env_values["OPENAI_BASE_URL"] = base
-        key = typer.prompt(
-            "OpenAI-compatible API key",
-            default=env_values.get("OPENAI_API_KEY") or "",
+        key = _prompt_secret(
+            "OpenAI-compatible API key", env_values.get("OPENAI_API_KEY", "")
         )
         if key:
             env_values["OPENAI_API_KEY"] = key

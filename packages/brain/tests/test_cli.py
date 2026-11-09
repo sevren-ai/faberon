@@ -318,6 +318,8 @@ def test_init_writes_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
     # Postgres URL (default), model, OpenRouter key, executor (default).
     result = runner.invoke(cli.app, ["init"], input="\nopenrouter:x/y\nsk-test\n\n")
     assert result.exit_code == 0
+    # The key is never echoed to the terminal.
+    assert "sk-test" not in result.output
     data = tomllib.loads(config_file.read_text())
     assert data["database_url"] == "postgres:///faberon"
     assert data["model"] == "openrouter:x/y"
