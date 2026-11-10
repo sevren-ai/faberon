@@ -6,6 +6,7 @@ import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from pathlib import Path
 from uuid import UUID
 
 import dbos._recovery
@@ -34,6 +35,7 @@ from ..workflow import (
     end_outdated_campaigns,
     get_campaign_info,
 )
+from ..workflow.tree import current_branch, current_head
 from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
 
 _HEALTHZ_PATH = "/healthz"
@@ -255,6 +257,19 @@ def _register_routes(app: FastAPI) -> None:
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
 
+        # Record the repo state the campaign starts from. A detached HEAD
+        # has no branch for the campaign to commit on.
+        try:
+            start_sha = current_head(Path(body.repo_path))
+        except RuntimeError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+        branch = current_branch(Path(body.repo_path))
+        if branch is None:
+            raise HTTPException(
+                status_code=409,
+                detail="repo is on a detached HEAD; check out a branch first",
+            )
+
         setup = CampaignSetup(
             campaign_id=campaign_id,
             plan=body.plan,
@@ -272,6 +287,8 @@ def _register_routes(app: FastAPI) -> None:
             body.plan,
             body.repo_path,
             body.poll_interval_seconds,
+            branch=branch,
+            start_sha=start_sha,
         )
         return CampaignCreated(
             campaign_id=campaign_id,
