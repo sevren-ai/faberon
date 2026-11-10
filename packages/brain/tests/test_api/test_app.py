@@ -22,7 +22,7 @@ from faberon.schema import EventType
 from faberon.workflow import AgentProposer
 
 from .._fakes import FakeExecutor, FakeProposer
-from ..conftest import make_plan
+from ..conftest import make_plan, make_repo
 
 pytestmark = pytest.mark.postgres
 
@@ -119,6 +119,47 @@ def test_create_rejects_absolute_target(api: ApiFixture):
     response = api.client.post("/v0/campaigns", json=body)
     assert response.status_code == 422
     assert "relative path" in response.json()["detail"]
+
+
+def test_create_rejects_non_repo(api: ApiFixture, tmp_path):
+    """A repo path that is not a git repository is rejected at creation."""
+    body = _create_body(str(uuid.uuid4()), str(tmp_path))
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 422
+
+
+def test_create_rejects_detached_head(api: ApiFixture):
+    """A repo on a detached HEAD has no branch for the campaign to commit on."""
+    subprocess.run(
+        ["git", "checkout", "HEAD~0"],
+        cwd=api.repo_path,
+        check=True,
+        capture_output=True,
+    )
+    body = _create_body(str(uuid.uuid4()), api.repo_path)
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 409
+    assert "detached" in response.json()["detail"]
+
+
+def test_create_records_branch_and_sha(api: ApiFixture):
+    """The campaign record carries the repo's branch and commit at creation."""
+    start_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=api.repo_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    body = _create_body(str(uuid.uuid4()), api.repo_path)
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 201
+    campaign_id = response.json()["campaign_id"]
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    info = api.client.get(f"/v0/campaigns/{campaign_id}").json()
+    assert info["campaign"]["branch"] == "main"
+    assert info["campaign"]["start_sha"] == start_sha
 
 
 def test_get_campaign(api: ApiFixture):
@@ -366,7 +407,8 @@ def test_second_campaign_rejected(tmp_path, repo):
         assert first.json()["campaign_id"] in conflict.json()["detail"]
 
         # A different repo path is unaffected.
-        other = tmp_path / "other-repo"
+        (tmp_path / "other-repo").mkdir()
+        other = make_repo(tmp_path / "other-repo")
         accepted = client.post(
             "/v0/campaigns",
             json=_create_body(str(uuid.uuid4()), str(other)),
