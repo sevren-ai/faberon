@@ -1,7 +1,6 @@
 """Tests for the Faberon CLI."""
 
 import json
-import shutil
 import tomllib
 import uuid
 
