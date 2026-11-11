@@ -1,6 +1,5 @@
 """Campaign workflow tests: loop, hard caps, budget, cancel."""
 
-import os
 import subprocess
 import uuid
 from collections.abc import Iterator
@@ -10,6 +9,7 @@ from dbos import DBOS, DBOSConfig
 from pydantic import ValidationError
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, UserError
 
+from faberon import config
 from faberon.ledger import Ledger
 from faberon.schema import EventType, ResearchPlan, StopReason
 from faberon.workflow import CampaignRunner, CampaignSetup, Runtime
@@ -25,16 +25,16 @@ pytestmark = pytest.mark.postgres
 @pytest.fixture
 def dbos() -> Iterator[None]:
     DBOS.destroy()
-    config: DBOSConfig = {
+    dbos_config: DBOSConfig = {
         "name": "faberon-campaign-test",
-        "system_database_url": os.environ["FABERON_DATABASE_URL"],
-        "application_database_url": os.environ["FABERON_DATABASE_URL"],
+        "system_database_url": config.database_url(),
+        "application_database_url": config.database_url(),
         "run_admin_server": False,
         "log_level": "WARNING",
     }
-    DBOS(config=config)
+    DBOS(config=dbos_config)
     DBOS.reset_system_database(truncate=True)
-    connection = Ledger(os.environ["FABERON_DATABASE_URL"])._conn
+    connection = Ledger(config.database_url())._conn
     connection.execute("TRUNCATE events RESTART IDENTITY")
     connection.execute("TRUNCATE campaigns")
     yield
@@ -48,7 +48,7 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     # Create runtime with fake executor
     runtime = Runtime(
         FakeExecutor(elapsed_seconds=3600.0),
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        Ledger(config.database_url()),
         config_name=f"campaign-{uuid.uuid4().hex}",
     )
     DBOS.register_instance(runtime)
@@ -68,7 +68,7 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     stop_reason = runner.run_campaign(setup)
 
     assert stop_reason == StopReason.MAX_EXPERIMENTS.value
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     events = list(ledger.tail(setup.campaign_id))
     ledger.close()
     types = [e.type for e in events]
@@ -106,7 +106,7 @@ def test_campaign_commit_msg(dbos, repo, tmp_path):
     (log_dir / f"{campaign_id}:2.out").write_text("val_bpb: 1.00\n")
     runtime = Runtime(
         FakeExecutor(),
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        Ledger(config.database_url()),
         config_name=f"campaign-{uuid.uuid4().hex}",
     )
     DBOS.register_instance(runtime)
@@ -173,7 +173,7 @@ def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
 
     runtime = Runtime(
         FakeExecutor(),
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        Ledger(config.database_url()),
         config_name=f"campaign-{uuid.uuid4().hex}",
     )
     DBOS.register_instance(runtime)
@@ -190,7 +190,7 @@ def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
     stop_reason = runner.run_campaign(setup)
 
     assert stop_reason == StopReason.MAX_EXPERIMENTS.value
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     events = list(ledger.tail(setup.campaign_id))
     ledger.close()
     # started designing 5 times, 3 of which failed
@@ -224,7 +224,7 @@ def test_campaign_ends_max_propose_failure(dbos, repo, tmp_path):
 
     runtime = Runtime(
         FakeExecutor(),
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        Ledger(config.database_url()),
         config_name=f"campaign-{uuid.uuid4().hex}",
     )
     DBOS.register_instance(runtime)
@@ -241,7 +241,7 @@ def test_campaign_ends_max_propose_failure(dbos, repo, tmp_path):
     stop_reason = runner.run_campaign(setup)
 
     assert stop_reason == StopReason.ERROR.value
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     events = list(ledger.tail(campaign_id))
     ledger.close()
     ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
@@ -268,7 +268,7 @@ def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
 
     runtime = Runtime(
         FakeExecutor(),
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        Ledger(config.database_url()),
         config_name=f"campaign-{uuid.uuid4().hex}",
     )
     DBOS.register_instance(runtime)
@@ -285,7 +285,7 @@ def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
     with pytest.raises(UserError):
         runner.run_campaign(setup)
 
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     events = list(ledger.tail(campaign_id))
     ledger.close()
     crashed = next(e for e in events if e.type == EventType.CAMPAIGN_CRASHED)
@@ -298,7 +298,7 @@ def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
 def test_campaign_stops_on_budget(dbos, repo, tmp_path):
     runtime = Runtime(
         FakeExecutor(elapsed_seconds=7200.0),  # 2 GPU-hours per job
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        Ledger(config.database_url()),
         config_name=f"campaign-{uuid.uuid4().hex}",
     )
     DBOS.register_instance(runtime)
@@ -317,7 +317,7 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
     stop_reason = runner.run_campaign(setup)
 
     assert stop_reason == StopReason.BUDGET_EXHAUSTED.value
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     events = list(ledger.tail(setup.campaign_id))
     ledger.close()
     ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
@@ -336,7 +336,7 @@ def test_campaign_reads_metric_from_job_log(dbos, repo, tmp_path):
     (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.10\n")
     runtime = Runtime(
         FakeExecutor(),
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        Ledger(config.database_url()),
         config_name=f"campaign-{uuid.uuid4().hex}",
     )
     DBOS.register_instance(runtime)
@@ -355,7 +355,7 @@ def test_campaign_reads_metric_from_job_log(dbos, repo, tmp_path):
     stop_reason = runner.run_campaign(setup)
 
     assert stop_reason == StopReason.MAX_EXPERIMENTS.value
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     events = list(ledger.tail(setup.campaign_id))
     ledger.close()
     judged = next(e for e in events if e.type == EventType.EXPERIMENT_JUDGED)
@@ -372,7 +372,7 @@ def test_campaign_ends_on_cancel(dbos, repo):
     """A cancelled campaign ends with stop_reason ``cancelled`` by the human."""
     runtime = Runtime(
         FakeExecutor(),
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        Ledger(config.database_url()),
         config_name=f"campaign-{uuid.uuid4().hex}",
     )
     DBOS.register_instance(runtime)
@@ -399,7 +399,7 @@ def test_campaign_ends_on_cancel(dbos, repo):
     stop_reason = handle.get_result()
 
     assert stop_reason == StopReason.CANCELLED.value
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     events = list(ledger.tail(campaign_id))
     ledger.close()
     ended = events[-1]

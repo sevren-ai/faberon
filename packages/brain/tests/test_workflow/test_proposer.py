@@ -56,7 +56,7 @@ def test_proposer():
         }
     )
 
-    proposer = AgentProposer(events, model)
+    proposer = AgentProposer(events, model, timeout=60.0)
     try:
         with capture_run_messages() as messages:
             proposal = proposer.propose(
@@ -99,7 +99,7 @@ def test_proposer_rejects_unchanged():
         }
     )
 
-    proposer = AgentProposer(FakeEvents(), model)
+    proposer = AgentProposer(FakeEvents(), model, timeout=60.0)
     try:
         with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
             proposer.propose(
@@ -122,7 +122,7 @@ def test_proposer_rejects_unparseable():
         }
     )
 
-    proposer = AgentProposer(FakeEvents(), model)
+    proposer = AgentProposer(FakeEvents(), model, timeout=60.0)
     try:
         with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
             proposer.propose(
@@ -134,11 +134,11 @@ def test_proposer_rejects_unparseable():
         proposer.close()
 
 
-def test_proposer_requires_model(monkeypatch):
-    monkeypatch.delenv("FABERON_MODEL", raising=False)
-
-    with pytest.raises(RuntimeError, match="FABERON_MODEL is not set"):
-        AgentProposer.from_env(FakeEvents())
+def test_proposer_requires_model(tmp_path, monkeypatch):
+    """Without `model` in the config file, proposer construction fails clearly."""
+    monkeypatch.setenv("FABERON_CONFIG", str(tmp_path / "config.toml"))
+    with pytest.raises(RuntimeError, match="no model in the config file"):
+        AgentProposer.from_config(FakeEvents())
 
 
 async def _value(proposal: Proposal) -> Proposal:
