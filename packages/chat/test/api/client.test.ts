@@ -1,30 +1,56 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
-  configFromEnv,
   FaberonClient,
+  loadClientConfig,
 } from "../../src/api/client.js";
 import { makeEvent, makeInfo, samplePlan } from "../fixtures.js";
 
 const sampleInfo = makeInfo();
 
-describe("configFromEnv", () => {
+// Point at a nonexistent config file unless a test writes one.
+const NO_CONFIG = { FABERON_CONFIG: "/nonexistent/faberon/config.toml" };
+
+function writeConfig(contents: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "faberon-chat-test-"));
+  const path = join(dir, "config.toml");
+  writeFileSync(path, contents);
+  return path;
+}
+
+describe("loadClientConfig", () => {
   it("requires the token", () => {
-    expect(() => configFromEnv({})).toThrow(/FABERON_API_TOKEN/);
+    expect(() => loadClientConfig(NO_CONFIG)).toThrow(/faberon init/);
   });
 
-  it("defaults the base URL and strips trailing slashes", () => {
-    const config = configFromEnv({
-      FABERON_API_TOKEN: "tok",
-      FABERON_API_URL: "http://localhost:9000/",
-    });
-    expect(config.baseUrl).toBe("http://localhost:9000");
-    expect(config.token).toBe("tok");
+  it("reads token and URL from the config file", () => {
+    const path = writeConfig(
+      'api_token = "file-token"\napi_url = "http://localhost:9100/"\n',
+    );
+    const config = loadClientConfig({ FABERON_CONFIG: path });
+    expect(config.token).toBe("file-token");
+    expect(config.baseUrl).toBe("http://localhost:9100");
   });
 
-  it("uses the default URL when unset", () => {
-    const config = configFromEnv({ FABERON_API_TOKEN: "tok" });
-    expect(config.baseUrl).toBe("http://127.0.0.1:8000");
+  it("derives the URL from host and port, with no code defaults", () => {
+    let path = writeConfig('api_token = "tok"\n');
+    expect(() => loadClientConfig({ FABERON_CONFIG: path })).toThrow(
+      /faberon init/,
+    );
+    path = writeConfig('api_token = "tok"\nhost = "0.0.0.0"\nport = 9100\n');
+    expect(loadClientConfig({ FABERON_CONFIG: path }).baseUrl).toBe(
+      "http://0.0.0.0:9100",
+    );
+  });
+
+  it("ignores env var overrides and keys inside sections", () => {
+    const path = writeConfig('[env]\napi_token = "section-token"\n');
+    expect(() =>
+      loadClientConfig({ FABERON_CONFIG: path, FABERON_API_TOKEN: "env" }),
+    ).toThrow(/faberon init/);
   });
 });
 

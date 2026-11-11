@@ -1,7 +1,6 @@
 """HTTP API tests. Require Postgres (``postgres`` marker)."""
 
 import json
-import os
 import socket
 import subprocess
 import threading
@@ -16,6 +15,7 @@ import uvicorn
 from dbos import DBOS
 from fastapi.testclient import TestClient
 
+from faberon import config
 from faberon.api import create_app
 from faberon.executor import JobState
 from faberon.ledger import Ledger
@@ -32,7 +32,7 @@ pytestmark = pytest.mark.postgres
 def _fake_proposer(monkeypatch: pytest.MonkeyPatch) -> None:
     """Replace the LLM proposer with a deterministic one for API tests."""
     monkeypatch.setattr(
-        AgentProposer, "from_env", classmethod(lambda cls, events: FakeProposer())
+        AgentProposer, "from_config", classmethod(lambda cls, events: FakeProposer())
     )
 
 
@@ -46,7 +46,7 @@ class ApiFixture:
 def _reset_databases() -> None:
     """Clear workflow and ledger state between API tests."""
     DBOS.reset_system_database(truncate=True)
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     ledger._conn.execute("TRUNCATE events RESTART IDENTITY")
     ledger._conn.execute("TRUNCATE campaigns")
     ledger.close()
@@ -456,7 +456,7 @@ def test_died_campaign_status(api: ApiFixture):
     workflow_id = created.json()["workflow_id"]
 
     # The workflow dies (without recording campaign.ended)
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     sql_stat = (
         "UPDATE dbos.workflow_status SET status = 'ERROR' WHERE workflow_uuid = %s"
     )
@@ -517,7 +517,7 @@ def test_upgrade_ends_outdated_campaign(tmp_path, repo):
     DBOS.destroy()
 
     # Set the campaign's application version to "fake_old"
-    ledger = Ledger(os.environ["FABERON_DATABASE_URL"])
+    ledger = Ledger(config.database_url())
     ledger._conn.execute(
         "UPDATE dbos.workflow_status "
         "SET application_version = 'fake_old' "
