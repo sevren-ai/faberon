@@ -19,7 +19,7 @@ Default is Pi on the login node next to the brain (see [design.md](design.md)).
 
 ## CLI configuration
 
-- **`faberon serve --model` flag.** The CLI reads `FABERON_MODEL` only from the environment. A `--model` flag would suit users who swap models between campaigns. The clean path threads the value as an explicit parameter through `create_app_slurm` / `create_app` into the proposer construction (which today reads env in `AgentProposer.from_env`), not by mutating `os.environ` from the CLI. The other `serve` settings stay env-only: the API token and database URL are secrets that must not appear in shell history or `ps` output on a shared login node, and the Slurm account is stable per deployment.
+- **Swapping models without editing the config file.** The proposer's model comes from `model` in the config file. Users who swap models between campaigns could get a `faberon serve --model` flag that overrides it for that launch. The clean path threads the value as an explicit parameter through `create_app_slurm` / `create_app` into the proposer construction, not by mutating the config file from the CLI.
 
 ## Observability
 

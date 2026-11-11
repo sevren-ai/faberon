@@ -61,7 +61,7 @@ def test_proposer_with_llm():
             ),
         ]
     )
-    proposer = AgentProposer.from_env(events)
+    proposer = AgentProposer.from_config(events)
 
     with capture_run_messages() as messages:
         proposal = proposer.propose(campaign_id, make_plan(), _BASELINE)

@@ -1,26 +1,36 @@
 """Faberon CLI: steer campaigns from a shell."""
 
 import contextlib
+import functools
 import json
 import os
 import shutil
+import subprocess
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
 import httpx2
+import psycopg
 import typer
-import uvicorn
 from pydantic import ValidationError
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 from typer import Argument, FileText, Option, echo
 
-from .api.app import GRACEFUL_SHUTDOWN_TIMEOUT, create_app_local, create_app_slurm
+from . import config
 from .schema import Event, ResearchPlan
 
-_DEFAULT_HOST = "127.0.0.1"
-_DEFAULT_PORT = 8000
-_DEFAULT_API_URL = f"http://{_DEFAULT_HOST}:{_DEFAULT_PORT}"
+_POSTGRES_ENV_PATH = Path("~/.config/faberon/postgres.env").expanduser()
+
+# Settings init always writes
+_INIT_DEFAULTS = {
+    "host": config.DEFAULT_HOST,
+    "port": config.DEFAULT_PORT,
+    "proposer_timeout": config.DEFAULT_PROPOSER_TIMEOUT,
+    "state_dir": config.DEFAULT_STATE_DIR,
+}
 
 
 def _chat_install_guidance() -> None:
@@ -41,11 +51,15 @@ app = typer.Typer(
 
 @contextlib.contextmanager
 def _client() -> Iterator[httpx2.Client]:
-    """Build an API client from the environment, or exit with guidance"""
-    base_url = os.environ.get("FABERON_API_URL", _DEFAULT_API_URL)
-    token = os.environ.get("FABERON_API_TOKEN")
+    """Build an API client from the config file, or exit with guidance"""
+    try:
+        base_url = config.api_url()
+        token = config.api_token()
+    except config.ConfigError as exc:
+        echo(str(exc), err=True)
+        raise typer.Exit(code=2) from None
     if not token:
-        echo("FABERON_API_TOKEN is not set", err=True)
+        echo(f"no API token in {config.config_path()}: run `faberon init`", err=True)
         raise typer.Exit(code=2)
     client = httpx2.Client(
         base_url=base_url,
@@ -82,35 +96,286 @@ def _check(response: httpx2.Response) -> httpx2.Response:
 
 @app.command("serve")
 def serve(
-    host: str = Option(_DEFAULT_HOST, envvar="FABERON_HOST"),
-    port: int = Option(_DEFAULT_PORT, envvar="FABERON_PORT"),
-    executor: str | None = Option(None, envvar="FABERON_EXECUTOR"),
+    no_recover: bool = Option(
+        False, "--no-recover", help="Do not resume pending workflows at startup."
+    ),
 ) -> None:
-    """Start the Faberon server, with the given executor or a default one.
+    """Start the Faberon server, using the config file written by `faberon init`.
 
-    Requires FABERON_DATABASE_URL, FABERON_API_TOKEN and FABERON_MODEL.
-    The Slurm executor also requires FABERON_SLURM_ACCOUNT.
+    The executor defaults to `slurm` when 'sbatch' is on PATH, else `local`.
     """
+    # Lazy loads to avoid startup costs for other commands.
+    import uvicorn
+
+    from .api.app import (
+        GRACEFUL_SHUTDOWN_TIMEOUT,
+        create_app_local,
+        create_app_slurm,
+    )
+
     factories = {"slurm": create_app_slurm, "local": create_app_local}
-    # validate given executor name
-    name = executor
+    settings = config.load()
+    name = settings.get("executor")
     if name is not None and name not in factories.keys():
         echo(
             f"unknown executor {name!r}: expected one of {sorted(factories)}",
             err=True,
         )
         raise typer.Exit(code=2)
-    # default name if none was given: slurm if 'sbatch' is available
     if name is None:
         name = "slurm" if shutil.which("sbatch") else "local"
+    required = ["database_url", "model", *_INIT_DEFAULTS]
+    if name == "slurm":
+        required += ["api_token", "slurm_account", "slurm_gpus"]
+    missing = [key for key in required if not settings.get(key)]
+    if missing:
+        echo(f"missing configuration: {', '.join(missing)}", err=True)
+        echo(f"run `faberon init` (config file: {config.config_path()})", err=True)
+        raise typer.Exit(code=2)
+    db_url = settings["database_url"]
+    if err := _probe_db(db_url):
+        echo(f"cannot connect to Postgres at {_redacted(db_url)}: {err}", err=True)
+        echo(
+            "start Postgres first (install guide, step A1 or B1); on a login "
+            "node, Postgres only runs on the node where you started it "
+            "(docs/troubleshooting.md)",
+            err=True,
+        )
+        raise typer.Exit(code=2)
     echo(f"executor: {name}")
+    echo(f"database: {_redacted(settings['database_url'])}")
+    echo(f"model:    {settings['model']}")
     uvicorn.run(
-        factories[name],
-        host=host,
-        port=port,
+        functools.partial(factories[name], no_recover=no_recover),
+        host=settings["host"],
+        port=int(settings["port"]),
         factory=True,
         timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_TIMEOUT,
     )
+
+
+def _postgres_env() -> dict[str, str]:
+    """The no-sudo Postgres settings (postgres.env), if any.
+
+    The file has a fixed format written by install-postgres-no-sudo.sh:
+    one ``export KEY="value"`` per line.
+    """
+    values: dict[str, str] = {}
+    if not _POSTGRES_ENV_PATH.exists():
+        return values
+    for line in _POSTGRES_ENV_PATH.read_text().splitlines():
+        line = line.strip()
+        if line.startswith("#"):
+            continue
+        line = line.removeprefix("export ")
+        key, sep, value = line.partition("=")
+        if sep:
+            values[key] = value.strip().strip('"')
+    return values
+
+
+def _redacted(url: str) -> str:
+    """The URL with any password masked, for display."""
+    try:
+        return make_url(url).render_as_string(hide_password=True)
+    except ArgumentError:
+        return url
+
+
+def _prompt_secret(label: str, current: str) -> str:
+    """Prompt for a secret without echoing it"""
+    hint = ""
+    if current:
+        masked = f"...{current[-4:]}" if len(current) > 4 else "***"
+        hint = f" [{masked}]"
+
+    return (
+        typer.prompt(f"{label}{hint}", default="", show_default=False, hide_input=True)
+        or current
+    )
+
+
+def _probe_db(db_url: str) -> str | None:
+    """None when the database at the URL accepts a connection, else the error."""
+    try:
+        conn = psycopg.connect(db_url, connect_timeout=2)
+        conn.close()
+        return None
+    except psycopg.OperationalError as exc:
+        return " ".join(str(exc).split())
+
+
+def _server_up(db_url: str) -> str | None:
+    """None when the Postgres server is running, else the connection error."""
+    maintenance = (
+        make_url(db_url).set(database="postgres").render_as_string(hide_password=False)
+    )
+    return _probe_db(maintenance)
+
+
+def _create_db(db_url: str, pg_env: dict[str, str]) -> None:
+    """Create the database, keeping the URL's credentials."""
+    search_path = os.environ.get("PATH", "")
+    prefix = pg_env.get("FABERON_PG_PREFIX")
+    if prefix:
+        search_path = f"{prefix}/bin:{search_path}"
+    createdb = shutil.which("createdb", path=search_path)
+    if createdb is None:
+        echo(
+            "createdb not found: install Postgres and put its tools on PATH, "
+            "then re-run `faberon init`",
+            err=True,
+        )
+        return
+    try:
+        url = make_url(db_url)
+    except ArgumentError:
+        echo(f"cannot parse a database name from {db_url!r}", err=True)
+        return
+    # createdb takes no connection URL: pass the credentials as flags and
+    # PGPASSWORD, and never prompt (-w). The no-sudo installer's generated
+    # password is unknown to the user, so a prompt would stall init.
+    args = [createdb, "-w"]
+    if url.host:
+        args += ["-h", url.host]
+    if url.port:
+        args += ["-p", str(url.port)]
+    if url.username:
+        args += ["-U", url.username]
+    args.append(url.database or "faberon")
+    env = dict(os.environ)
+    if url.password:
+        env["PGPASSWORD"] = url.password
+    result = subprocess.run(args, capture_output=True, text=True, env=env)
+    if result.returncode != 0:
+        echo(f"Creating the DB failed: {result.stderr.strip()}", err=True)
+        echo("is Postgres running? Ensure it is, then re-run `faberon init`", err=True)
+
+
+@app.command("init")
+def init() -> None:
+    """Set up Faberon: write the config file and create the database.
+
+    Requires a running Postgres.
+    Generates the API token and records the model and executor settings.
+    """
+    path = config.config_path()
+    try:
+        existing = config.load()
+    except config.ConfigError as exc:
+        echo(str(exc), err=True)
+        raise typer.Exit(code=2) from None
+    if existing:
+        echo(f"updating existing config at {path}")
+    echo("press Enter to accept the proposed default shown in brackets []")
+    pg_env = _postgres_env()
+
+    db_default = (
+        pg_env.get("FABERON_PG_URL")
+        or existing.get("database_url")
+        or config.DEFAULT_DB_URL
+    )
+    db_url = (
+        typer.prompt(
+            f"Postgres URL [{_redacted(db_default)}]", default="", show_default=False
+        )
+        or db_default
+    )
+    if _probe_db(db_url) is not None:
+        if (up_err := _server_up(db_url)) is not None:
+            echo(
+                f"cannot connect to Postgres at {_redacted(db_url)}: {up_err}",
+                err=True,
+            )
+            echo(
+                "start Postgres first (install guide, step A1 or B1); if it is "
+                "already running, check the URL's credentials "
+                "(docs/troubleshooting.md)",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        echo(f"creating database for {_redacted(db_url)}")
+        _create_db(db_url, pg_env)
+        if (err := _probe_db(db_url)) is not None:
+            echo(
+                f"could not create the database ({err}); create it with createdb, "
+                "then re-run `faberon init`",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+
+    token = existing.get("api_token") or config.generate_token()
+    model = typer.prompt(
+        "LLM model (for example openrouter:provider/model)",
+        default=existing.get("model"),
+    )
+    env_values: dict[str, str] = dict(existing.get("env", {}))
+    if model.startswith("openrouter:"):
+        key = _prompt_secret(
+            "OpenRouter API key", env_values.get("OPENROUTER_API_KEY", "")
+        )
+        if key:
+            env_values["OPENROUTER_API_KEY"] = key
+    elif model.startswith("openai:"):
+        base = typer.prompt(
+            "OpenAI-compatible base URL",
+            default=env_values.get("OPENAI_BASE_URL") or "",
+        )
+        if base:
+            env_values["OPENAI_BASE_URL"] = base
+        key = _prompt_secret(
+            "OpenAI-compatible API key", env_values.get("OPENAI_API_KEY", "")
+        )
+        if key:
+            env_values["OPENAI_API_KEY"] = key
+    else:
+        provider = "model"
+        if ":" in model:
+            provider = model.split(":")[0]
+        echo(
+            f"note: add the credentials needed for {provider!r} "
+            "to the [env] section in the config file"
+        )
+
+    detected = "slurm" if shutil.which("sbatch") else "local"
+    executor = typer.prompt(
+        "Executor (slurm or local)",
+        default=existing.get("executor") or detected,
+    )
+    if executor not in ("slurm", "local"):
+        echo(f"unknown executor {executor!r}: expected slurm or local", err=True)
+        raise typer.Exit(code=2)
+
+    # Write all configuration settings
+    values = {key: value for key, value in existing.items() if key != "env"}
+    values.update(
+        {
+            "api_token": token,
+            "database_url": db_url,
+            "model": model,
+            "executor": executor,
+        }
+    )
+    added = [key for key in _INIT_DEFAULTS if key not in existing]
+    for key, default in _INIT_DEFAULTS.items():
+        values[key] = existing.get(key) or default
+    if existing and added:
+        echo(f"filled in new settings: {', '.join(added)}")
+    if executor == "slurm":
+        values["slurm_account"] = typer.prompt(
+            "Slurm account",
+            default=existing.get("slurm_account"),
+        )
+        values["slurm_gpus"] = typer.prompt(
+            "GPUs per job", type=int, default=int(existing.get("slurm_gpus", 1))
+        )
+    else:
+        values.pop("slurm_account", None)
+        values.pop("slurm_gpus", None)
+
+    config.write(path, values, env_values)
+    echo(f"wrote {path} (private to your user)")
+    echo("start the server with: faberon serve")
 
 
 @app.command("create")

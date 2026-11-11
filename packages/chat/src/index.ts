@@ -60,7 +60,7 @@ async function promptNonEmpty(
 }
 
 export default function faberonChat(pi: ExtensionAPI): void {
-  const client = FaberonClient.fromEnv();
+  const client = FaberonClient.fromConfig();
 
   pi.registerTool(listCampaignsTool(client));
   pi.registerTool(showCampaignTool(client));
