@@ -112,10 +112,6 @@ def _test_postgres(url: str) -> str | None:
 _PATH_GATES = {
     "sbatch": "sbatch",
     "no_sbatch": "sbatch",
-    "pi": "pi",
-    "no_pi": "pi",
-    "faberon_chat": "faberon-chat",
-    "no_faberon_chat": "faberon-chat",
 }
 
 

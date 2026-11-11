@@ -53,10 +53,6 @@ markers = [
     "slurm: requires a real Slurm cluster; opt in with FABERON_SLURM_INTEGRATION=1",
     "sbatch: needs sbatch on PATH (a Slurm login node); submits no jobs",
     "no_sbatch: needs no sbatch on PATH",
-    "pi: needs the Pi CLI on PATH",
-    "no_pi: needs no Pi CLI on PATH",
-    "faberon_chat: needs the faberon-chat launcher on PATH",
-    "no_faberon_chat: needs no faberon-chat launcher on PATH",
     "llm: requires `model` in the Faberon config file (run `faberon init`)",
 ]
 filterwarnings = [
