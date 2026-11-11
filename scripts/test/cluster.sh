@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Run the full test suite on a Slurm login node: unit tests, Postgres ledger
-# tests, CLI tests that need sbatch on PATH, Slurm job-submission tests, and
-# LLM tests. This is the run every PR must paste into its description.
+# Run on a Slurm login node the tests CI cannot: Slurm job-submission tests,
+# LLM tests, and the CLI tests that need sbatch on PATH. This is the run every PR
+# must paste into its description.
 #
 # Required: `slurm_account` and `model` in the Faberon config file,
 # plus the provider key in its [env] table
@@ -29,7 +29,7 @@ done
 # pytest wipes this directory on each run.
 basetemp="${XDG_CACHE_HOME:-$HOME/.cache}/faberon-pytest"
 
-echo ">> pytest (full suite, Slurm job submission enabled)"
-FABERON_SLURM_INTEGRATION=1 uv run pytest -rs --basetemp="$basetemp"
+echo ">> pytest -m 'slurm or llm or sbatch'"
+FABERON_SLURM_INTEGRATION=1 uv run pytest -rs -m "slurm or llm or sbatch" --basetemp="$basetemp"
 
 echo "Cluster tests passed."

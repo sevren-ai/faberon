@@ -1,6 +1,7 @@
 """Tests for the Faberon CLI."""
 
 import json
+import shutil
 import tomllib
 import uuid
 
@@ -16,17 +17,6 @@ from faberon.api.app import (
     create_app_slurm,
 )
 from faberon.schema import EventType
-
-from ._markers import (
-    FABERON_CHAT,
-    PI,
-    requires_faberon_chat,
-    requires_no_faberon_chat,
-    requires_no_pi,
-    requires_no_sbatch,
-    requires_pi,
-    requires_sbatch,
-)
 
 runner = CliRunner()
 
@@ -223,7 +213,7 @@ def test_serve_prints_settings(
     assert "missing configuration: host, port" in result.output
 
 
-@requires_sbatch
+@pytest.mark.sbatch
 def test_serve_defaults_to_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
     captured = _serve_setup(
         tmp_path,
@@ -236,7 +226,7 @@ def test_serve_defaults_to_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
     assert "executor: slurm" in result.output
 
 
-@requires_sbatch
+@pytest.mark.sbatch
 def test_serve_slurm_requires_token_and_account(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -247,7 +237,7 @@ def test_serve_slurm_requires_token_and_account(
     assert "slurm_account" in result.output
 
 
-@requires_no_sbatch
+@pytest.mark.no_sbatch
 def test_serve_defaults_to_local(tmp_path, monkeypatch: pytest.MonkeyPatch):
     captured = _serve_setup(tmp_path, monkeypatch)
     result = runner.invoke(cli.app, ["serve"])
@@ -374,7 +364,7 @@ def test_init_writes_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
     assert "faberon serve" in result.output
 
 
-@requires_sbatch
+@pytest.mark.sbatch
 def test_init_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
     config_file = _init_env(tmp_path, monkeypatch)
     # Postgres URL (default), model, executor (default: slurm), account, GPUs (default).
@@ -389,7 +379,7 @@ def test_init_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
     assert "env" not in data
 
 
-@requires_no_sbatch
+@pytest.mark.no_sbatch
 def test_init_defaults_to_local(tmp_path, monkeypatch: pytest.MonkeyPatch):
     config_file = _init_env(tmp_path, monkeypatch)
     # Postgres URL (default), model, executor (default: local).
@@ -609,7 +599,7 @@ def test_create(api_client, tmp_path):
     assert "workflow" in result.output
 
 
-@requires_pi
+@pytest.mark.pi
 def test_chat_uses_pi(monkeypatch: pytest.MonkeyPatch):
     """With the extension installed into Pi, `faberon chat` execs plain `pi`."""
     captured = {}
@@ -622,11 +612,11 @@ def test_chat_uses_pi(monkeypatch: pytest.MonkeyPatch):
     result = runner.invoke(cli.app, ["chat", "--", "--help"])
     assert result.exit_code == 0
     # Typer strips the "--" separator; extra args arrive bare.
-    assert captured["args"] == [PI, "--help"]
+    assert captured["args"] == [shutil.which("pi"), "--help"]
 
 
-@requires_no_pi
-@requires_faberon_chat
+@pytest.mark.no_pi
+@pytest.mark.faberon_chat
 def test_chat_falls_back_to_shim(monkeypatch: pytest.MonkeyPatch):
     """Without `pi` on PATH, `faberon chat` falls back to the npm shim."""
     captured = {}
@@ -638,11 +628,11 @@ def test_chat_falls_back_to_shim(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(cli.os, "execvp", fake_execvp)
     result = runner.invoke(cli.app, ["chat", "--version"])
     assert result.exit_code == 0
-    assert captured["args"] == [FABERON_CHAT, "--version"]
+    assert captured["args"] == [shutil.which("faberon-chat"), "--version"]
 
 
-@requires_no_pi
-@requires_no_faberon_chat
+@pytest.mark.no_pi
+@pytest.mark.no_faberon_chat
 def test_chat_without_chat_installed():
     """No `pi` and no shim: install guidance, not a traceback."""
     result = runner.invoke(cli.app, ["chat"])

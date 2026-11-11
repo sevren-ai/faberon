@@ -9,7 +9,7 @@
 ## Cluster tests
 
 <!--
-Every PR must run the full test suite on a Slurm login node (unit, Postgres, Slurm job-submission, and LLM tests) and paste the output below.
+Every PR must run the cluster-only tests on a Slurm login node (Slurm job submission, LLM, and the CLI tests that need `sbatch`) and paste the output below.
 
 Run on the login node:
 
@@ -18,12 +18,14 @@ Run on the login node:
 Paste the full output, including the summary line, for example:
 
 ```
-tests/test_cli.py ...................................... [ 22%]
-tests/test_executor/test_slurm_integration.py .....      [ 71%]
-tests/test_workflow/test_experiment_on_slurm.py .        [ 85%]
-...
+collected 191 items / 181 deselected / 10 selected
 
-191 passed, 4 skipped in 251.17s
+tests/test_cli.py ...                                [ 30%]
+tests/test_executor/test_slurm_integration.py .....  [ 80%]
+tests/test_workflow/test_experiment_on_slurm.py .    [ 90%]
+tests/test_workflow/test_proposer_llm.py .           [100%]
+
+10 passed, 181 deselected in 41.36s
 Cluster tests passed.
 ```
 

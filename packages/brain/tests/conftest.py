@@ -1,6 +1,7 @@
 """Shared pytest hooks and fixtures for the brain test suite."""
 
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -105,8 +106,27 @@ def _test_postgres(url: str) -> str | None:
     return None
 
 
+# Markers that gate on a tool's presence on PATH, in tool/no_tool pairs.
+# Detection runs here against the real PATH: a marked test runs only where
+# the tool it exercises is genuinely available (or genuinely absent).
+_PATH_GATES = {
+    "sbatch": "sbatch",
+    "no_sbatch": "sbatch",
+    "pi": "pi",
+    "no_pi": "pi",
+    "faberon_chat": "faberon-chat",
+    "no_faberon_chat": "faberon-chat",
+}
+
+
 def pytest_runtest_setup(item: pytest.Item) -> None:
     """Skip tests whose infrastructure is not configured or reachable."""
+    for mark, command in _PATH_GATES.items():
+        if mark in item.keywords:
+            found = shutil.which(command) is not None
+            if mark.startswith("no_") == found:
+                not_ = "no " if mark.startswith("no_") else ""
+                pytest.skip(f"needs {not_}{command} on PATH")
     if "postgres" in item.keywords:
         if not _test_url or _postgres_note:
             reason = _postgres_note or f"no Postgres at {_test_url}: start it first"
