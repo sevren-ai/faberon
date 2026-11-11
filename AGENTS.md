@@ -14,6 +14,7 @@ Before any contribution, load context in this order:
 
 - Treat sandbox and permission limits as hard stops. When a command is blocked, report the blocker and wait. Never route around them (no `su`, no alternate paths, no side steps).
 - Do not install infrastructure (databases, services, system packages). If a test needs an external service, stop and ask the user to start it.
+- The human may edit files in the working tree at any time. Before every edit, re-read the target file from disk. Never rewrite or revert concurrent edits; merge around them or ask.
 
 ## Writing style
 

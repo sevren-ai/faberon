@@ -24,6 +24,7 @@ from uuid import UUID
 
 from dbos import DBOS, DBOSConfig, SetWorkflowID
 
+from faberon import config
 from faberon.ledger import Ledger
 from faberon.workflow import ExperimentSetup, Runtime
 
@@ -33,8 +34,8 @@ from ..._fakes import FakeFileExecutor
 def _config() -> DBOSConfig:
     return {
         "name": "faberon-test",
-        "system_database_url": os.environ["FABERON_DATABASE_URL"],
-        "application_database_url": os.environ["FABERON_DATABASE_URL"],
+        "system_database_url": config.database_url(),
+        "application_database_url": config.database_url(),
         "run_admin_server": False,
         "log_level": "WARNING",
     }
@@ -43,7 +44,7 @@ def _config() -> DBOSConfig:
 def _make_runtime() -> Runtime:
     runtime = Runtime(
         FakeFileExecutor(os.environ["FABERON_TEST_EXECUTOR_DIR"]),
-        Ledger(os.environ["FABERON_DATABASE_URL"]),
+        Ledger(config.database_url()),
         config_name="default",
     )
     DBOS.register_instance(runtime)
@@ -71,9 +72,7 @@ def _start() -> None:
     runtime = _make_runtime()
     DBOS.launch()
     # Clean slate for the events table.
-    Ledger(os.environ["FABERON_DATABASE_URL"])._conn.execute(
-        "TRUNCATE events RESTART IDENTITY"
-    )
+    Ledger(config.database_url())._conn.execute("TRUNCATE events RESTART IDENTITY")
     with SetWorkflowID(os.environ["FABERON_TEST_WF_ID"]):
         DBOS.start_workflow(runtime.run_experiment, _experiment_setup())
     # Stay alive so the parent can kill us mid-poll.

@@ -49,9 +49,9 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 markers = [
-    "postgres: requires a real Postgres; set FABERON_DATABASE_URL",
+    "postgres: requires a running Postgres (the suite creates a faberon_test DB)",
     "slurm: requires a real Slurm cluster; opt in with FABERON_SLURM_INTEGRATION=1",
-    "llm: requires a real model; set FABERON_MODEL and the provider key",
+    "llm: requires `model` in the Faberon config file (run `faberon init`)",
 ]
 filterwarnings = [
     # Starlette TestClient still imports anyio.abc.BlockingPortal; fixed upstream later.

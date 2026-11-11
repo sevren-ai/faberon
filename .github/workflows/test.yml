@@ -15,17 +15,13 @@ jobs:
     defaults:
       run:
         working-directory: packages/brain
-    env:
-      FABERON_DATABASE_URL: postgres://postgres:postgres@localhost:5432/faberon
     services:
       postgres:
         image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          # The test suite redirects FABERON_DATABASE_URL to faberon_test (see
-          # tests/conftest.py), so that is the only database CI needs.
-          POSTGRES_DB: faberon_test
+          # The test suite creates faberon_test on startup
         ports:
           - 5432:5432
         options: >-
@@ -40,6 +36,12 @@ jobs:
           enable-cache: true
           python-version: "3.14"
       - run: uv sync --locked
+      - name: Write the Faberon config file
+        working-directory: .
+        run: |
+          mkdir -p "$HOME/.config/faberon"
+          printf 'database_url = "postgres://postgres:postgres@localhost:5432/faberon"\n' \
+            > "$HOME/.config/faberon/config.toml"
       - run: uv run pytest -rs
 
   vitest:
