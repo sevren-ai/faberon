@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Install a Postgres server for Faberon without sudo (e.g. on a cluster login node).
 #
-# This only installs the server, it does not create the faberon database:
-# after you start Postgres, run scripts/db/create-faberon-db.sh for that.
+# This only installs the server, it does not create the faberon database (`faberon init` does that).
 #
 # Optional env:
 #   FABERON_PG_PREFIX   install root (default: $HOME/faberon/postgres)
@@ -181,11 +180,31 @@ else
         db_url="$(
             # shellcheck disable=SC1090
             source "$env_file" >/dev/null 2>&1 || true
-            printf '%s' "${FABERON_DATABASE_URL:-}"
+            printf '%s' "${FABERON_PG_URL:-}"
         )"
     fi
     if [ -z "$db_url" ]; then
         db_url="postgres://localhost:${port}/faberon"
+    fi
+    # A credential-less URL only works with trust auth. Clusters this script
+    # creates require scram-sha-256 for TCP, so a credential-less URL means an
+    # older installer dropped the password. Reset it over the
+    # trust-authenticated unix socket and put it back into the URL.
+    if [[ "$db_url" != *"://"*:*@* ]] \
+        && grep -qE '^[[:space:]]*host[[:space:]]+[^#]*scram-sha-256' "$data/pg_hba.conf"; then
+        password="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
+        if PGHOST="$run_dir" PGPORT="$port" "$prefix/bin/psql" -d postgres -tAc 'SELECT 1' >/dev/null 2>&1; then
+            PGHOST="$run_dir" PGPORT="$port" "$prefix/bin/psql" -d postgres \
+                -c "ALTER ROLE \"$USER\" PASSWORD '$password';" >/dev/null
+            db_url="postgres://${USER}:${password}@localhost:${port}/faberon"
+            echo ">> reset the database password over the trust socket; FABERON_PG_URL repaired"
+        else
+            cat >&2 <<'EOF'
+warning: the connection URL has no password, but this cluster requires one
+for TCP, and the server is not running so the password cannot be reset.
+Start Postgres and re-run this installer to repair the env file.
+EOF
+        fi
     fi
     if grep -qE '^[[:space:]]*host[[:space:]]+.*[[:space:]]trust[[:space:]]*$' "$data/pg_hba.conf"; then
         cat >&2 <<'EOF'
@@ -208,7 +227,7 @@ export FABERON_PGDATA="$data"
 export PGDATA="$data"
 export PGHOST="$run_dir"
 export PGPORT=$port
-export FABERON_DATABASE_URL="$db_url"
+export FABERON_PG_URL="$db_url"
 EOF
 # The env file carries the database password.
 chmod 0600 "$env_file"
@@ -224,16 +243,16 @@ Postgres (no-sudo install) is ready.
 
 Connections:
   psql and the db scripts use the private unix socket in $run_dir (no password).
-  Faberon connects over TCP with a password; FABERON_DATABASE_URL in the env
+  Faberon connects over TCP with a password; FABERON_PG_URL in the env
   file carries it.
 
-To start it (from the Faberon repo root):
+To start it, run start-postgres.sh. docs/install.md shows where to get it:
 
-    bash scripts/db/start-postgres.sh
+    bash ~/.local/bin/start-postgres.sh
 
-Once (with Postgres running):
+Then set up Faberon (creates the database when it is missing):
 
-    bash scripts/db/create-faberon-db.sh
+    faberon init
 
 To stop it:
 

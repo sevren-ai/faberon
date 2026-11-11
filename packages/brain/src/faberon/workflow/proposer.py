@@ -3,7 +3,6 @@
 import ast
 import asyncio
 import contextvars
-import os
 import threading
 from collections.abc import Awaitable, Callable
 from concurrent.futures import TimeoutError as FuturesTimeoutError
@@ -15,12 +14,10 @@ from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models import Model, infer_model
 from pydantic_ai.settings import ModelSettings
 
+from .. import config
 from ..schema.events import Event
 from ..schema.plan import ResearchPlan
 from .models import Proposal
-
-# Default proposer timeout (seconds). Overridable with FABERON_PROPOSER_TIMEOUT
-DEFAULT_TIMEOUT = 600.0
 
 
 class CampaignEventReader(Protocol):
@@ -71,7 +68,7 @@ class AgentProposer:
         events: CampaignEventReader,
         model: Model,
         *,
-        timeout: float = DEFAULT_TIMEOUT,
+        timeout: float,
     ) -> None:
         self._events = events
         self._model = model
@@ -106,13 +103,13 @@ class AgentProposer:
             return proposal
 
     @classmethod
-    def from_env(cls, events: CampaignEventReader) -> AgentProposer:
-        """Build a proposer from ``FABERON_MODEL``, resolved at startup."""
-        name = os.environ.get("FABERON_MODEL", "").strip()
-        if not name:
-            raise RuntimeError("FABERON_MODEL is not set")
-        timeout = float(os.environ.get("FABERON_PROPOSER_TIMEOUT", DEFAULT_TIMEOUT))
-        return cls(events, infer_model(name), timeout=timeout)
+    def from_config(cls, events: CampaignEventReader) -> AgentProposer:
+        """Build a proposer from ``model`` in the config file, resolved at startup."""
+        return cls(
+            events,
+            infer_model(config.model().strip()),
+            timeout=config.proposer_timeout(),
+        )
 
     def propose(
         self,

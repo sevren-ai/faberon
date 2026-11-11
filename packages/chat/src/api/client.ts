@@ -1,10 +1,11 @@
 /**
  * Thin typed HTTP client for the v0 API.
  *
- * Reads the base URL and bearer token from the environment
- * (`FABERON_API_URL`, `FABERON_API_TOKEN`), matching the Faberon CLI.
+ * Reads the base URL and bearer token from the shared config file written
+ * by `faberon init`.
  */
 
+import { configPath, readConfigFile } from "./config.js";
 import type {
   ApiErrorBody,
   CampaignCreate,
@@ -14,25 +15,35 @@ import type {
   StatusResponse,
 } from "./types.js";
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:8000";
-
 export interface ClientConfig {
   baseUrl: string;
   token: string;
 }
 
-/** Resolve the client config from the environment. */
-export function configFromEnv(
+/** Resolve the client config from the Faberon config file. */
+export function loadClientConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): ClientConfig {
-  const token = env.FABERON_API_TOKEN;
+  const file = readConfigFile(configPath(env));
+  const token = file.api_token;
   if (!token) {
     throw new Error(
-      "FABERON_API_TOKEN is not set. Faberon Chat talks to the API " +
-        "over an authenticated channel; set the same token the server uses.",
+      `No API token in ${configPath(env)}. Faberon Chat talks to the API ` +
+        "over an authenticated channel; run `faberon init` to set one up.",
     );
   }
-  const baseUrl = (env.FABERON_API_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+  // api_url wins; otherwise derive from host and port, which the file must
+  // carry (defaults exist only to write the file, never to read it).
+  const derived =
+    file.host !== undefined && file.port !== undefined
+      ? `http://${file.host}:${file.port}`
+      : undefined;
+  const baseUrl = (file.api_url ?? derived)?.replace(/\/+$/, "");
+  if (!baseUrl) {
+    throw new Error(
+      `No api_url (or host/port) in ${configPath(env)}: run \`faberon init\`.`,
+    );
+  }
   return { baseUrl, token };
 }
 
@@ -49,8 +60,8 @@ export class ApiError extends Error {
 export class FaberonClient {
   constructor(private readonly config: ClientConfig) {}
 
-  static fromEnv(env: NodeJS.ProcessEnv = process.env): FaberonClient {
-    return new FaberonClient(configFromEnv(env));
+  static fromConfig(env: NodeJS.ProcessEnv = process.env): FaberonClient {
+    return new FaberonClient(loadClientConfig(env));
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
