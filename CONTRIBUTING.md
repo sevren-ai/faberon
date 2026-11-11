@@ -64,7 +64,7 @@ After a release, the related `vX.Y.Z.md` (if it exists) is archived and becomes 
 - `main` stays green. CI runs `ruff`, `ty`, and the test suite (`.github/workflows/lint.yml`, `.github/workflows/test.yml`) on every PR and on `main`; a red run blocks the merge.
 - A release is cut by merging to `main` and pushing the package's tag.
 
-### PR reviewing
+### Pull Requests (PRs)
 
 For a contributor opening a PR:
 - Allows follow the PR template. Declare AI usage and the output for the integration tests run on Slurm, when relevant.
@@ -76,6 +76,10 @@ For any reviewer:
   - optional (smaller things that are optional to address and don't influence approval status)
   - discussion (a question or comment to follow-up on, not necessarily requiring a code change)
   - kudos (name the good things in the PR specifically)
+
+For the maintainer merging:
+- Always pull in `main` right before merging and ensure all unit tests pass
+- Always use squash-merge
 
 ## Testing
 
