@@ -142,10 +142,7 @@ _SERVE_CONFIG = (
 # Executor-agnostic serve behavior runs against both executors.
 _SERVE_LOCAL = 'executor = "local"\n'
 _SERVE_SLURM = (
-    'executor = "slurm"\n'
-    'api_token = "tok"\n'
-    'slurm_account = "acct"\n'
-    "slurm_gpus = 2\n"
+    'executor = "slurm"\napi_token = "tok"\nslurm_account = "acct"\nslurm_gpus = 2\n'
 )
 
 
@@ -266,9 +263,7 @@ def test_serve_unknown_executor(tmp_path, monkeypatch: pytest.MonkeyPatch):
     "extra_config",
     [_SERVE_LOCAL, _SERVE_SLURM],
 )
-def test_serve_host_port(
-    tmp_path, monkeypatch: pytest.MonkeyPatch, extra_config: str
-):
+def test_serve_host_port(tmp_path, monkeypatch: pytest.MonkeyPatch, extra_config: str):
     """Host and port come from the config file."""
     captured = _serve_setup(tmp_path, monkeypatch, extra_config)
     runner.invoke(cli.app, ["serve"])
@@ -291,9 +286,7 @@ def test_serve_host_port(
     "extra_config",
     [_SERVE_LOCAL, _SERVE_SLURM],
 )
-def test_serve_no_recover(
-    tmp_path, monkeypatch: pytest.MonkeyPatch, extra_config: str
-):
+def test_serve_no_recover(tmp_path, monkeypatch: pytest.MonkeyPatch, extra_config: str):
     """--no-recover is forwarded to the app factory."""
     captured = _serve_setup(tmp_path, monkeypatch, extra_config)
     result = runner.invoke(cli.app, ["serve", "--no-recover"])
