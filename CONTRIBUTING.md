@@ -17,31 +17,32 @@ We are not accepting pull requests for new features right now. Please do not ope
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) (this document): process rules for every contributor, human or agent
 - [`AGENTS.md`](../AGENTS.md): agent-specific rules, read first by any coding agent
 
-## What is work in progress
+## Planned work and roadmap
 
-Read the design docs before starting, in this order:
+Faberon's stable system design is documented in `docs/design/design.md`. All work should adhere to it. 
+Features planned for the near future are recorded in `docs/design/roadmap.md` and more specific releases are planned in `docs/design/vX.Y.Z.md` files.
 
-1. `docs/design/design.md`: the stable system design.
-2. `docs/design/roadmap.md`: features planned for the near future, plus open questions.
-3. The current WIP release doc: the `docs/design/vX.Y.Z.md` whose status line reads "current WIP".
+To suggest a new high-level idea or feature, these design docs can be edited and PR'd by maintainers of the code base. 
+This is the perfect point in time to discuss high-level design decisions. They shouldn't be edited by external contributors - they can open a discussion thread instead.
 
-How to use them:
+Follow-up code PRs should largely follow those design docs, though small deviations may be warranted. 
+In those cases, the PRs should edit the design docs to keep them in-sync and to alert other maintainers of the design choices that were made.
 
-- Work targets the current WIP release. Its progress checklist is the to-do list.
-- Check off items in the same commit/PR that implements the work.
-- Update docs in the same commit/PR that changes a decision: `roadmap.md` for plan changes, `design.md` only when the stable architecture genuinely changes.
-- Speculative ideas belong in `docs/design/future.md`, not in the roadmap or in code comments.
-- The current WIP release doc stays editable until it ships. Never edit a `vX.Y.Z.md` after that version has shipped.
-- Bump the version right before a release is cut: `packages/brain/pyproject.toml` and `faberon.__version__` for the brain, `packages/chat/package.json` for Faberon Chat.
+The current WIP release(s) usually contain a progress TODO list. Check off items in the same PR that implements the work.
+
+Never use code comments to document speculative ideas or TODO items.
+
+Smaller TODO items can be logged as issues on the Github tracker, feature requests by external contributors should be logged in the relevant [discussion forum](https://github.com/sevren-ai/faberon/discussions/categories/feature-requests).
+Issues and discussions that are adopted into the design docs, may be closed as they are then considered to be work-in-progress.
 
 ### Releases and versioning
 
 The two packages version independently; the design makes them independently replaceable. What keeps them compatible is the API contract version (`v0` today), not a shared release number. The tag names are asymmetric on purpose:
 
-- **Brain** (`packages/brain/`, the default artifact): tag `vX.Y.Z`, for example `v0.2.2`. Bare, no prefix, matching the tags that already exist.
-- **Faberon Chat** (`packages/chat/`): tag `chat-vX.Y.Z`, first release `chat-v0.1.0`. Prefixed so chat tags never collide with brain tags.
+- **Brain** (`packages/brain/`, the default artifact): tag `vX.Y.Z`, for example `v0.2.2`. Bare, no prefix, matching the tags that already exist. (cf. `packages/brain/pyproject.toml` and `faberon.__version__`)
+- **Faberon Chat** (`packages/chat/`): tag `chat-vX.Y.Z`, first release `chat-v0.1.0`. Prefixed so chat tags never collide with brain tags. (cf. `packages/chat/package.json`)
 
-Cut a release by merging to `main`, bumping that package's version, and pushing the package's tag:
+Cut a release by bumping the version and pushing the package's tag:
 
 ```bash
 # brain
@@ -53,13 +54,34 @@ git tag chat-v0.1.0 && git push origin chat-v0.1.0
 
 GitHub Releases keys off the tag you push; each release notes which contract version it speaks. Both packages are also published to their registries: the brain to PyPI as `faberon` (`uv publish`, built from a worktree at the tag, never from a feature branch) and the chat interface to npm as `@faberon/chat` (`npm publish --access public`).
 
+After a release, the related `vX.Y.Z.md` (if it exists) is archived and becomes frozen.
+
 ## Git and pull requests
 
 - Work on feature branches. Keep PRs small and self-contained.
 - Agents must not commit, push, or open PRs. A human reviews the changes, commits, pushes, and opens the PR.
-- Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Agents must not draft the description, not even in chat. Follow the PR template in `.github/PULL_REQUEST_TEMPLATE.md` (summary, AI disclaimer, and the on-cluster integration test output).
+- Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Agents must not draft the description, not even in chat. Follow the PR template in `.github/PULL_REQUEST_TEMPLATE.md` (summary, AI disclaimer, reviewer guidelines, and the on-cluster test output).
 - `main` stays green. CI runs `ruff`, `ty`, and the test suite (`.github/workflows/lint.yml`, `.github/workflows/test.yml`) on every PR and on `main`; a red run blocks the merge.
 - A release is cut by merging to `main` and pushing the package's tag.
+
+### Pull Requests (PRs)
+
+For a contributor opening a PR:
+- Allows follow the PR template. Declare AI usage and the output for the integration tests run on Slurm, when relevant.
+- State clearly which parts of the PR you're unsure about or would like feedback on (in the PR description or as reviewer comments).
+
+For any reviewer:
+- State in how much depth you reviewed the PR (e.g. just a quick drive-by comment, looked at the code diff in detail, ran a full campaign with the branch, ...)
+- When providing comments, for clarity you can mark them with one of the following prefixes:
+  - `blocking` (important comments that should be resolved before merging)
+  - `nit` (smaller things that should be addressed or discussed before merging)
+  - `optional` (smaller things that are optional to address and don't influence approval status)
+  - `discussion` (a question or comment to follow-up on, not necessarily requiring a code change)
+  - `kudos` (name the good things in the PR specifically)
+
+For the maintainer merging:
+- Always pull in `main` right before merging and ensure all unit tests pass
+- Always use squash-merge (this is enforced by repo policy)
 
 ## Testing
 
@@ -84,31 +106,23 @@ This runs `uv sync --locked` and `uv run pytest` in `packages/brain/`, mirroring
 They are included in the local tests, but skip themselves when Postgres is unreachable. The suite takes the database URL from your Faberon config file, redirects it to the `faberon_test` database, and recreates that database from scratch on every run. The tests truncate tables and reset the DBOS system database, so this separation keeps production data safe.
 
 
-### Slurm tests (login node)
+### Cluster tests (login node)
 
 ```bash
-bash scripts/test/slurm.sh
+bash scripts/test/cluster.sh
 ```
 
-This (only) runs the tests that submit real jobs to Slurm. It requires `sbatch` on `PATH` and `slurm_account` in the Faberon config file.
+Run this on a Slurm login node before every PR. It runs what CI cannot: the Slurm job-submission tests, the LLM tests, and the CLI tests that need `sbatch` on `PATH` (the `sbatch` marker; they submit nothing). The script requires `slurm_account` and `model` in the Faberon config file, plus the provider key in its `[env]` table.
 
-To run them on a login node that has `sbatch` on `PATH`:
-
-### LLM tests
+To iterate on one area, run pytest directly:
 
 ```bash
-bash scripts/test/llm.sh
+cd packages/brain
+uv run pytest -m llm                     # LLM tests only
+FABERON_SLURM_INTEGRATION=1 uv run pytest -m slurm --basetemp="$HOME/.cache/faberon-pytest"
 ```
 
-This runs the proposer against the real model configured as `model` in the Faberon config file.
-
-### LLM + Slurm tests (login node)
-
-```bash
-bash scripts/test/prod.sh
-```
-
-Run the Slurm and LLM integration tests together.
+The Slurm job tests need `--basetemp` on the shared home: compute nodes cannot see the login node's `/tmp`.
 
 ### Chat tests
 
