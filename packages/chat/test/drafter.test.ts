@@ -19,7 +19,7 @@ describe("drafterPrompt", () => {
 
   it("gates running the baseline on permission", () => {
     expect(prompt).toMatch(/never run it without asking/i);
-    expect(prompt).toMatch(/how long the run will take/i);
+    expect(prompt).toMatch(/time estimate/i);
   });
 
   it("gates submission on a separate yes after the plan is settled", () => {
