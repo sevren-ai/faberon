@@ -68,18 +68,20 @@ After a release, the related `vX.Y.Z.md` (if it exists) is archived and becomes 
 
 For a contributor opening a PR:
 - Allows follow the PR template. Declare AI usage and the output for the integration tests run on Slurm, when relevant.
+- State clearly which parts of the PR you're unsure about or would like feedback on (in the PR description or as reviewer comments).
 
 For any reviewer:
+- State in how much depth you reviewed the PR (e.g. just a quick drive-by comment, looked at the code diff in detail, ran a full campaign with the branch, ...)
 - When providing comments, for clarity you can mark them with one of the following prefixes:
-  - blocking (important comments that should be resolved before merging)
-  - nit (smaller things that should be addressed or discussed before merging)
-  - optional (smaller things that are optional to address and don't influence approval status)
-  - discussion (a question or comment to follow-up on, not necessarily requiring a code change)
-  - kudos (name the good things in the PR specifically)
+  - `blocking` (important comments that should be resolved before merging)
+  - `nit` (smaller things that should be addressed or discussed before merging)
+  - `optional` (smaller things that are optional to address and don't influence approval status)
+  - `discussion` (a question or comment to follow-up on, not necessarily requiring a code change)
+  - `kudos` (name the good things in the PR specifically)
 
 For the maintainer merging:
 - Always pull in `main` right before merging and ensure all unit tests pass
-- Always use squash-merge
+- Always use squash-merge (this is enforced by repo policy)
 
 ## Testing
 

@@ -7,6 +7,7 @@
 <!--
 If it's a larger or more complex PR, tell the reviewer how best to approach it: e.g. which files to look at first (with the core logic), 
 or whether to review commit-by-commit if you've arranged them so. 
+Even consider adding a flow diagram (e.g. https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams).
 
 By default it's assumed that reviewers can provide feedback on any level of detail. If you only want high-level feedback for a first iteration, tell them specifically.
 
