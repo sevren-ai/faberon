@@ -60,7 +60,7 @@ After a release, the related `vX.Y.Z.md` (if it exists) is archived and becomes 
 
 - Work on feature branches. Keep PRs small and self-contained.
 - Agents must not commit, push, or open PRs. A human reviews the changes, commits, pushes, and opens the PR.
-- Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Agents must not draft the description, not even in chat. Follow the PR template in `.github/PULL_REQUEST_TEMPLATE.md` (summary, AI disclaimer, reviewer guidelines, and the on-cluster integration test output).
+- Humans write the PR description themselves: concise, readable, no long LLM-generated walls of text. Agents must not draft the description, not even in chat. Follow the PR template in `.github/PULL_REQUEST_TEMPLATE.md` (summary, AI disclaimer, reviewer guidelines, and the on-cluster test output).
 - `main` stays green. CI runs `ruff`, `ty`, and the test suite (`.github/workflows/lint.yml`, `.github/workflows/test.yml`) on every PR and on `main`; a red run blocks the merge.
 - A release is cut by merging to `main` and pushing the package's tag.
 
@@ -106,31 +106,23 @@ This runs `uv sync --locked` and `uv run pytest` in `packages/brain/`, mirroring
 They are included in the local tests, but skip themselves when Postgres is unreachable. The suite takes the database URL from your Faberon config file, redirects it to the `faberon_test` database, and recreates that database from scratch on every run. The tests truncate tables and reset the DBOS system database, so this separation keeps production data safe.
 
 
-### Slurm tests (login node)
+### Cluster tests (login node)
 
 ```bash
-bash scripts/test/slurm.sh
+bash scripts/test/cluster.sh
 ```
 
-This (only) runs the tests that submit real jobs to Slurm. It requires `sbatch` on `PATH` and `slurm_account` in the Faberon config file.
+Run this on a Slurm login node before every PR. It runs what CI cannot: the Slurm job-submission tests, the LLM tests, and the CLI tests that need `sbatch` on `PATH` (the `sbatch` marker; they submit nothing). The script requires `slurm_account` and `model` in the Faberon config file, plus the provider key in its `[env]` table.
 
-To run them on a login node that has `sbatch` on `PATH`:
-
-### LLM tests
+To iterate on one area, run pytest directly:
 
 ```bash
-bash scripts/test/llm.sh
+cd packages/brain
+uv run pytest -m llm                     # LLM tests only
+FABERON_SLURM_INTEGRATION=1 uv run pytest -m slurm --basetemp="$HOME/.cache/faberon-pytest"
 ```
 
-This runs the proposer against the real model configured as `model` in the Faberon config file.
-
-### LLM + Slurm tests (login node)
-
-```bash
-bash scripts/test/prod.sh
-```
-
-Run the Slurm and LLM integration tests together.
+The Slurm job tests need `--basetemp` on the shared home: compute nodes cannot see the login node's `/tmp`.
 
 ### Chat tests
 
