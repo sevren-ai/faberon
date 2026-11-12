@@ -9,6 +9,7 @@ import pytest
 import uvicorn
 from typer.testing import CliRunner
 
+import faberon
 from faberon import cli
 from faberon.api.app import (
     GRACEFUL_SHUTDOWN_TIMEOUT,
@@ -84,6 +85,13 @@ def test_bare_command_shows_help():
     assert "Usage" in result.output
     assert "serve" in result.output
     assert "list" in result.output
+
+
+def test_version_flag():
+    """`faberon --version` prints the package version and exits."""
+    result = runner.invoke(cli.app, ["--version"])
+    assert result.exit_code == 0
+    assert result.output.strip() == f"faberon {faberon.__version__}"
 
 
 def test_client_requires_token():
