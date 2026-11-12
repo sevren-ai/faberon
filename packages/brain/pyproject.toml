@@ -1,6 +1,6 @@
 [project]
 name = "faberon"
-version = "0.3.0"
+version = "0.3.1"
 description = "Faberon: Autonomous ML Research Harness"
 readme = "README.md"
 requires-python = ">=3.14"
