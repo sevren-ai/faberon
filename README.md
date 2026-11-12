@@ -65,7 +65,7 @@ faberon chat
 
 The chat interface and CLI speak to the same API; use whichever suits the moment.
 
-> See this [runbook](https://github.com/sevren-ai/faberon/discussions/61) for using v0.3.0 on a local workstation.
+> See this [runbook](https://github.com/sevren-ai/faberon/discussions/95) for using v0.3.1 with a Slurm cluster.
 
 ## Future work
 
