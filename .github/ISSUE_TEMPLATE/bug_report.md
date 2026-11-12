@@ -1,7 +1,6 @@
 ---
 name: Bug report
-about: Tell us about something that is not working
-labels: bug
+about: Report a problem with Faberon
 ---
 
 ## What happened
@@ -14,9 +13,9 @@ labels: bug
 
 ## Setup
 
-- Part: <!-- brain / CLI / Faberon Chat -->
 - Version: <!-- release tag or commit SHA -->
-- Runs on: <!-- Slurm / local -->
+- Executor: <!-- Slurm / local -->
+- OS: <!-- e.g. Ubuntu 24.04 -->
 
 ## Logs
 
