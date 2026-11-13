@@ -34,7 +34,14 @@ from ..workflow import (
     end_outdated_campaigns,
     get_campaign_info,
 )
-from ..workflow.tree import current_branch, current_head
+from ..workflow.tree import (
+    branch_exists,
+    branch_tip,
+    create_branch,
+    current_branch,
+    current_head,
+    uncommitted_changes,
+)
 from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
 
 _HEALTHZ_PATH = "/healthz"
@@ -51,6 +58,7 @@ def _rebuild_setup(campaign: Campaign) -> CampaignSetup:
         campaign_id=campaign.campaign_id,
         plan=campaign.plan,
         repo_path=campaign.repo_path,
+        branch=campaign.branch,
         poll_interval_seconds=campaign.poll_interval_seconds,
     )
 
@@ -220,23 +228,46 @@ def _register_routes(app: FastAPI) -> None:
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
 
-        # Record the repo state the campaign starts from. A detached HEAD
-        # has no branch for the campaign to commit on.
+        # Record the repo state the campaign starts from.
+        repo = Path(body.repo_path)
         try:
-            start_sha = current_head(Path(body.repo_path))
+            start_sha = current_head(repo)
         except RuntimeError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
-        branch = current_branch(Path(body.repo_path))
+
+        # A repo with uncommited changes is not allowed
+        dirty = uncommitted_changes(repo)
+        if dirty:
+            error = "repo has uncommitted changes, commit or stash them first"
+            raise HTTPException(status_code=409, detail=error)
+
+        branch = body.branch
         if branch is None:
-            raise HTTPException(
-                status_code=409,
-                detail="repo is on a detached HEAD; check out a branch first",
-            )
+            # Default: repo's current branch
+            branch = current_branch(repo)
+            if branch is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "repo is on a detached HEAD; check out a branch first "
+                        "or name one in the `branch` field"
+                    ),
+                )
+        elif branch_exists(repo, branch):
+            # Adopt existing branch
+            start_sha = branch_tip(repo, branch)
+        else:
+            # Create named branch
+            try:
+                create_branch(repo, branch, start_sha)
+            except RuntimeError as e:
+                raise HTTPException(status_code=422, detail=str(e)) from e
 
         setup = CampaignSetup(
             campaign_id=campaign_id,
             plan=body.plan,
             repo_path=body.repo_path,
+            branch=branch,
             poll_interval_seconds=body.poll_interval_seconds,
         )
         # Idempotent: DBOS dedupes on workflow id, the ledger dedupes on

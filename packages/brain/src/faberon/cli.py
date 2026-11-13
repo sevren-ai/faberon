@@ -390,6 +390,12 @@ def create_campaign(
         resolve_path=True,
     ),
     poll: float = Option(30.0, "--poll", "-p", help="Poll interval in seconds."),
+    branch: str | None = Option(
+        None,
+        "--branch",
+        "-b",
+        help="Working branch to adopt or create; defaults to the current branch.",
+    ),
 ) -> None:
     """Submit a new campaign from a research plan."""
     try:
@@ -412,6 +418,8 @@ def create_campaign(
         "repo_path": str(repo),
         "poll_interval_seconds": poll,
     }
+    if branch is not None:
+        payload["branch"] = branch
     with _client() as client:
         response = _check(client.post("/v0/campaigns", json=payload))
         created = response.json()

@@ -40,6 +40,7 @@ export interface CampaignCreate {
   campaign_id: string;
   plan: ResearchPlan;
   repo_path: string;
+  branch?: string;
   poll_interval_seconds: number;
 }
 

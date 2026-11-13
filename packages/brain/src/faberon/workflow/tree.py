@@ -48,6 +48,49 @@ def current_branch(repo: Path) -> str | None:
     return result.stdout.strip()
 
 
+def uncommitted_changes(repo: Path) -> list[str]:
+    """Return tracked files with uncommited changes"""
+    out = _run(repo, "diff", "--name-only", "HEAD", "--")
+    return out.splitlines()
+
+
+def branch_exists(repo: Path, name: str) -> bool:
+    """Return whether the repo has a local branch with that name."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            f"refs/heads/{name}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    raise RuntimeError(f"git rev-parse failed: {result.stderr.strip()}")
+
+
+def branch_tip(repo: Path, name: str) -> str:
+    """Return the full sha of the branch's tip commit."""
+    return _run(repo, "rev-parse", f"refs/heads/{name}")
+
+
+def create_branch(repo: Path, name: str, sha: str) -> None:
+    """Create a branch pointing at the given commit."""
+    _run(repo, "branch", name, sha)
+
+
+def checkout(repo: Path, branch: str) -> None:
+    """Switch the working tree to the given branch."""
+    _run(repo, "checkout", branch)
+
+
 def commit_file(repo: Path, path: str, message: str) -> CommitResult:
     """Stage and commit one file on top of the current head.
 
