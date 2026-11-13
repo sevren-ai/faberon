@@ -12,7 +12,12 @@ import type { CampaignInfo } from "../api/types.js";
  */
 export function formatCampaign(info: CampaignInfo): string {
   const campaign = info.campaign;
+  const progress = info.progress;
   const created = campaign.created_at.slice(0, 16).replace("T", " ");
+  const best =
+    progress.best_metric != null
+      ? `${progress.baseline} -> ${progress.best_metric}`
+      : `baseline:${progress.baseline}`;
   const lines = [
     `campaign: ${campaign.campaign_id}`,
     `created:  ${created}`,
@@ -21,6 +26,9 @@ export function formatCampaign(info: CampaignInfo): string {
     `metric:   ${campaign.plan.metric}`,
     `budget:   ${campaign.plan.budget_gpu_hours} gpu-hours`,
     `max exp:  ${campaign.plan.max_experiments}`,
+    `exp done: ${progress.experiments_done}/${campaign.plan.max_experiments}`,
+    `burned:   ${progress.gpu_hours_burned}/${campaign.plan.budget_gpu_hours} gpu-hours`,
+    `best:     ${best}`,
     `status:   ${info.status}`,
   ];
   if (info.stop_reason != null) {
@@ -34,8 +42,7 @@ export function showCampaignTool(client: FaberonClient) {
     name: "faberon_show_campaign",
     label: "Show one Faberon campaign",
     description:
-      "Show one Faberon campaign's live status and research plan: goal, " +
-      "metric, budget, experiment limit, and stop reason when it has ended.",
+      "Show one Faberon campaign's live status, research plan, and progress.",
     promptSnippet: "Show one Faberon campaign's status and plan",
     parameters: Type.Object({
       campaign_id: Type.String({

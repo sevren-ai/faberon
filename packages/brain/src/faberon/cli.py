@@ -430,18 +430,40 @@ def list_campaigns(
         if as_json:
             echo(json.dumps(infos, indent=2))
             return
-        echo(f"{'ID':<36}  {'CREATED':<16}  {'STATUS':<6}  {'METRIC':<12}  REPO")
+        header = (
+            f"{'ID':<36}  {'CREATED':<16}  {'STATUS':<6}  {'METRIC':<12}  "
+            f"{'EXPS':<7}  {'GPU-H':<12}  {'BEST':<16}  REPO"
+        )
+        echo(header)
         for info in infos:
             campaign = info["campaign"]
             created = datetime.fromisoformat(campaign["created_at"])
+            exps, gpu_h, best = _progress_columns(info)
             line = (
                 f"{campaign['campaign_id']}  "
                 f"{created.strftime('%Y-%m-%d %H:%M')}  "
                 f"{info['status']:<6}  "
                 f"{campaign['plan']['metric']:<12}  "
+                f"{exps:<7}  "
+                f"{gpu_h:<12}  "
+                f"{best:<16}  "
                 f"{campaign['repo_path']}"
             )
             echo(line)
+
+
+def _progress_columns(info: dict) -> tuple[str, str, str]:
+    """The EXPS, GPU-H, and BEST list columns for one campaign."""
+    progress = info["progress"]
+    plan = info["campaign"]["plan"]
+    exps = f"{progress['experiments_done']}/{plan['max_experiments']}"
+    gpu_h = f"{progress['gpu_hours_burned']:g}/{plan['budget_gpu_hours']:g}"
+    best = progress["best_metric"]
+    if best is not None:
+        best_s = f"{progress['baseline']:g}->{best:g}"
+    else:
+        best_s = f"baseline:{progress['baseline']:g}"
+    return exps, gpu_h, best_s
 
 
 @app.command("show")
@@ -465,6 +487,18 @@ def show_campaign(
         echo(f"metric:   {campaign['plan']['metric']}")
         echo(f"budget:   {campaign['plan']['budget_gpu_hours']} gpu-hours")
         echo(f"max exp:  {campaign['plan']['max_experiments']}")
+        progress = info["progress"]
+        max_exp = campaign["plan"]["max_experiments"]
+        echo(f"exp done: {progress['experiments_done']}/{max_exp}")
+        echo(
+            f"burned:   {progress['gpu_hours_burned']:g}"
+            f"/{campaign['plan']['budget_gpu_hours']:g} gpu-hours"
+        )
+        best = progress["best_metric"]
+        if best is not None:
+            echo(f"best:     {progress['baseline']:g} -> {best:g}")
+        else:
+            echo(f"best:     baseline:{progress['baseline']:g}")
         echo(f"status:   {info['status']}")
         if info["stop_reason"] is not None:
             echo(f"reason:   {info['stop_reason']}")
