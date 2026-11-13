@@ -96,3 +96,37 @@ def test_discard_uncommitted_changes(tmp_path: Path) -> None:
     assert _BASELINE_EXPERIMENT not in train_loc.read_text()
     tree.reset_hard(repo, result.parent_sha)
     assert _BASELINE_EXPERIMENT in train_loc.read_text()
+
+
+def test_uncommitted_changes(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    assert tree.uncommitted_changes(repo) == []
+
+    # Untracked files do not count.
+    (repo / "notes.txt").write_text("scratch\n")
+    assert tree.uncommitted_changes(repo) == []
+
+    # Modified and staged tracked files do.
+    (repo / "train.py").write_text("work in progress\n")
+    assert tree.uncommitted_changes(repo) == ["train.py"]
+    _git(repo, "add", "train.py")
+    assert tree.uncommitted_changes(repo) == ["train.py"]
+
+
+def test_branch_helpers(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    head = _head(repo)
+    assert tree.branch_exists(repo, "main")
+    assert not tree.branch_exists(repo, "work")
+    assert tree.branch_tip(repo, "main") == head
+
+    tree.create_branch(repo, "work", head)
+    assert tree.branch_exists(repo, "work")
+    assert tree.branch_tip(repo, "work") == head
+    # Creating a branch does not move HEAD.
+    assert tree.current_branch(repo) == "main"
+
+    tree.checkout(repo, "work")
+    assert tree.current_branch(repo) == "work"
+    tree.checkout(repo, "main")
+    assert tree.current_branch(repo) == "main"
