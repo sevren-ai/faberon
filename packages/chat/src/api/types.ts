@@ -23,6 +23,8 @@ export interface Campaign {
   workflow_id: string;
   plan: ResearchPlan;
   repo_path: string;
+  branch: string;
+  start_sha: string;
   poll_interval_seconds: number;
   created_at: string;
 }

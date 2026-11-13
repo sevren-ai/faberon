@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS campaigns (
     workflow_id   TEXT        NOT NULL,
     plan          JSONB       NOT NULL,
     repo_path     TEXT        NOT NULL,
+    branch        TEXT        NOT NULL,
+    start_sha     TEXT        NOT NULL,
     poll_interval_seconds DOUBLE PRECISION NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL
 )
@@ -97,6 +99,9 @@ class Ledger:
         plan: ResearchPlan,
         repo_path: str,
         poll_interval_seconds: float,
+        *,
+        branch: str,
+        start_sha: str,
     ) -> bool:
         """Atomically insert a campaign row and the ``campaign.created`` event.
 
@@ -109,8 +114,8 @@ class Ledger:
                 """
                 INSERT INTO campaigns
                     (campaign_id, workflow_id, plan, repo_path,
-                     poll_interval_seconds, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                     branch, start_sha, poll_interval_seconds, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (campaign_id) DO NOTHING
                 RETURNING campaign_id
                 """,
@@ -119,6 +124,8 @@ class Ledger:
                     workflow_id,
                     Jsonb(plan_json),
                     repo_path,
+                    branch,
+                    start_sha,
                     poll_interval_seconds,
                     datetime.now(UTC),
                 ),
@@ -141,7 +148,7 @@ class Ledger:
         row = self._conn.execute(
             """
             SELECT campaign_id, workflow_id, plan, repo_path,
-                   poll_interval_seconds, created_at
+                   branch, start_sha, poll_interval_seconds, created_at
             FROM campaigns
             WHERE campaign_id = %s
             """,
@@ -156,7 +163,7 @@ class Ledger:
         rows = self._conn.execute(
             """
             SELECT campaign_id, workflow_id, plan, repo_path,
-                   poll_interval_seconds, created_at
+                   branch, start_sha, poll_interval_seconds, created_at
             FROM campaigns
             ORDER BY created_at
             """
@@ -168,7 +175,7 @@ class Ledger:
         rows = self._conn.execute(
             """
             SELECT campaign_id, workflow_id, plan, repo_path,
-                   poll_interval_seconds, created_at
+                   branch, start_sha, poll_interval_seconds, created_at
             FROM campaigns
             WHERE repo_path = %s
             ORDER BY created_at
@@ -237,8 +244,10 @@ def _row_to_campaign(row: tuple) -> Campaign:
         workflow_id=row[1],
         plan=ResearchPlan.model_validate(row[2]),
         repo_path=row[3],
-        poll_interval_seconds=float(row[4]),
-        created_at=row[5],
+        branch=row[4],
+        start_sha=row[5],
+        poll_interval_seconds=float(row[6]),
+        created_at=row[7],
     )
 
 

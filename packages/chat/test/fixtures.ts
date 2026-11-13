@@ -29,6 +29,8 @@ export function makeInfo(overrides: Partial<CampaignInfo> = {}): CampaignInfo {
       workflow_id: "wf",
       plan: samplePlan(),
       repo_path: "/srv/autoresearch",
+      branch: "main",
+      start_sha: "e3f1c9a",
       poll_interval_seconds: 30,
       created_at: "2026-10-02T03:42:00",
       ...overrides.campaign,

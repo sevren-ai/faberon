@@ -29,6 +29,8 @@ class Campaign(BaseModel):
     workflow_id: str
     plan: ResearchPlan
     repo_path: str
+    branch: str
+    start_sha: str
     poll_interval_seconds: float
     created_at: datetime
 
