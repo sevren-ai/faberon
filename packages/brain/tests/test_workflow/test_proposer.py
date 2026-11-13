@@ -158,7 +158,8 @@ def test_run_with_timeout_returns():
 
 def test_run_with_timeout_raises():
     async def hang() -> Proposal:
-        time.sleep(60)
+        # The sleep wedges the worker loop; close() pays it when joining.
+        time.sleep(2)
         raise AssertionError("a timed-out call must not return")
 
     loop = _ProposerLoop()
