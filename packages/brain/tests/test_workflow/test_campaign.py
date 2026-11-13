@@ -41,10 +41,7 @@ def dbos() -> Iterator[None]:
     DBOS.destroy()
 
 
-def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
-    # Write dummy metric file
-    path = tmp_path / f"metric-{uuid.uuid4().hex}.txt"
-    path.write_text(f"val_bpb: {1.10}\n")
+def test_campaign_stops_on_max_experiments(dbos, repo):
     # Create runtime with fake executor
     runtime = Runtime(
         FakeExecutor(elapsed_seconds=3600.0),
