@@ -34,6 +34,13 @@ _PLAN = {
     "stop_conditions": ["n/a"],
 }
 
+_PROGRESS = {
+    "experiments_done": 2,
+    "gpu_hours_burned": 0.05,
+    "baseline": 1.42,
+    "best_metric": 1.1,
+}
+
 _CAMPAIGN_INFO = {
     "campaign": {
         "campaign_id": CAMPAIGN_ID,
@@ -44,6 +51,7 @@ _CAMPAIGN_INFO = {
         "created_at": "2026-10-01T03:42:22Z",
     },
     "status": "active",
+    "progress": _PROGRESS,
     "stop_reason": None,
 }
 
@@ -455,12 +463,18 @@ def test_list(api_client):
     assert "CREATED" in result.output
     assert "STATUS" in result.output
     assert "METRIC" in result.output
+    assert "EXPS" in result.output
+    assert "GPU-H" in result.output
+    assert "BEST" in result.output
     assert "REPO" in result.output
 
-    # Row carries the campaign's id, status, metric, and repo path.
+    # Row carries the campaign's id, status, metric, progress, and repo path.
     assert CAMPAIGN_ID in result.output
     assert "active" in result.output
     assert "val_bpb" in result.output
+    assert "2/3" in result.output
+    assert "0.05/100" in result.output
+    assert "1.42->1.1" in result.output
     assert "/tmp/my_repo" in result.output
     assert "2026-10-01 03:42" in result.output
 
@@ -482,6 +496,32 @@ def test_show(api_client):
     assert "metric:   val_bpb" in result.output
     assert "budget:   100.0 gpu-hours" in result.output
     assert "max exp:  3" in result.output
+    assert "exp done: 2/3" in result.output
+    assert "burned:   0.05/100 gpu-hours" in result.output
+    assert "best:     1.42 -> 1.1" in result.output
+
+
+def _no_best_info() -> dict:
+    """The campaign fixture with no kept experiment yet."""
+    return {
+        **_CAMPAIGN_INFO,
+        "progress": {**_PROGRESS, "best_metric": None},
+    }
+
+
+def test_list_baseline(api_client):
+    api_client[("GET", "/v0/campaigns")] = [_no_best_info()]
+    result = runner.invoke(cli.app, ["list"])
+    assert result.exit_code == 0
+    assert "baseline:1.42" in result.output
+    assert "1.42->" not in result.output
+
+
+def test_show_baseline(api_client):
+    api_client[("GET", f"/v0/campaigns/{CAMPAIGN_ID}")] = _no_best_info()
+    result = runner.invoke(cli.app, ["show", CAMPAIGN_ID])
+    assert result.exit_code == 0
+    assert "best:     baseline:1.42" in result.output
 
 
 def test_show_json(api_client):
