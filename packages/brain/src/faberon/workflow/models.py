@@ -47,3 +47,4 @@ class CampaignSetup(BaseModel):
     plan: ResearchPlan
     poll_interval_seconds: float = Field(default=30.0, gt=0)
     repo_path: str = Field(min_length=1, default=".")
+    branch: str = Field(min_length=1)

@@ -51,6 +51,7 @@ def _rebuild_setup(campaign: Campaign) -> CampaignSetup:
         campaign_id=campaign.campaign_id,
         plan=campaign.plan,
         repo_path=campaign.repo_path,
+        branch=campaign.branch,
         poll_interval_seconds=campaign.poll_interval_seconds,
     )
 
@@ -237,6 +238,7 @@ def _register_routes(app: FastAPI) -> None:
             campaign_id=campaign_id,
             plan=body.plan,
             repo_path=body.repo_path,
+            branch=branch,
             poll_interval_seconds=body.poll_interval_seconds,
         )
         # Idempotent: DBOS dedupes on workflow id, the ledger dedupes on
