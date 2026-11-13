@@ -3,8 +3,10 @@
  *
  * The extension exposes each v0 API operation as a Pi tool (for the
  * model to call in conversation) plus a matching slash command (for the human
- * to invoke directly). `faberon serve` stays CLI-only: it starts the server
- * the chat interface talks to.
+ * to invoke directly). It also hosts the drafter: `/faberon-draft` starts a
+ * conversational intake that ends in the same create path as a hand-written
+ * plan. `faberon serve` stays CLI-only: it starts the server the chat
+ * interface talks to.
  */
 
 import { readFile } from "node:fs/promises";
@@ -16,6 +18,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { FaberonClient } from "./api/client.js";
 import type { ResearchPlan } from "./api/types.js";
+import { drafterPrompt } from "./drafter.js";
 import { campaignEventsTool, formatEvents } from "./tools/campaign-events.js";
 import { cancelCampaignTool } from "./tools/cancel-campaign.js";
 import { createCampaignTool, formatCreated } from "./tools/create-campaign.js";
@@ -107,6 +110,14 @@ export default function faberonChat(pi: ExtensionAPI): void {
           .getEvents(campaignId)
           .then((events) => formatEvents(events, verbose)),
       );
+    },
+  });
+
+  pi.registerCommand("faberon-draft", {
+    description:
+      "Draft a research plan conversationally, review it, then submit it",
+    handler: async (_args, ctx) => {
+      pi.sendUserMessage(drafterPrompt(ctx.cwd));
     },
   });
 

@@ -15,7 +15,7 @@ export function formatCreated(created: CampaignCreated): string {
   return `campaign: ${created.campaign_id}\nworkflow: ${created.workflow_id}`;
 }
 
-const planSchema = Type.Object({
+export const planSchema = Type.Object({
   goal: Type.String({
     description: "What the campaign tries to achieve.",
     minLength: 1,
