@@ -16,7 +16,7 @@ from ..schema.plan import resolve_target_in_repo
 from .models import CampaignSetup, ExperimentSetup, Proposal
 from .proposer import ExperimentProposer
 from .runtime import Runtime
-from .tree import CommitResult, commit_file, reset_hard
+from .tree import CommitResult, checkout, commit_file, reset_hard
 
 # Consecutive propose-step failures that end the campaign
 MAX_PROP_FAILS = 5
@@ -50,6 +50,11 @@ class CampaignRunner:
     def propose_step(self, setup: CampaignSetup, current: str) -> Proposal:
         """Ask the proposer for one replacement."""
         return self.proposer.propose(setup.campaign_id, setup.plan, current)
+
+    @DBOS.step()
+    def checkout_step(self, repo: Path, branch: str) -> None:
+        """Put the working tree on the campaign's branch."""
+        checkout(repo, branch)
 
     @DBOS.step()
     def commit_step(self, repo: Path, target_file: str, message: str) -> CommitResult:
@@ -97,6 +102,7 @@ class CampaignRunner:
         prop_fails = 0
 
         try:
+            self.checkout_step(repo, setup.branch)
             while True:
                 # One check site, in precedence order: cancel, budget, cap.
                 if self._cancel_received():
