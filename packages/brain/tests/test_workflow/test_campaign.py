@@ -139,6 +139,69 @@ def test_campaign_commit_msg(dbos, repo, tmp_path):
     assert log[1] == "exp 1: test proposal 1"
 
 
+def test_campaign_commits_on_its_branch(dbos, repo, tmp_path):
+    """The loop checks out the campaign's branch; other branches stay put."""
+    campaign_id = uuid.uuid4()
+    log_dir = repo / ".faberon"
+    log_dir.mkdir()
+    (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.10\n")
+    main_sha = subprocess.run(
+        ["git", "rev-parse", "main"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(["git", "branch", "work"], cwd=repo, check=True, capture_output=True)
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(config.database_url()),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(
+        runtime,
+        proposer=FakeProposer(),
+    )
+    setup = CampaignSetup(
+        campaign_id=campaign_id,
+        plan=make_plan(max_experiments=1),
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        branch="work",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
+    head = subprocess.run(
+        ["git", "symbolic-ref", "--short", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert head == "work"
+    # The kept experiment commit is on the working branch; main did not move.
+    main_tip = subprocess.run(
+        ["git", "rev-parse", "main"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert main_tip == main_sha
+    parent = subprocess.run(
+        ["git", "rev-parse", "work^"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert parent == main_sha
+
+
 def test_proposal_title_max_length():
     """A title over 55 characters is rejected at the model boundary."""
     with pytest.raises(ValidationError):
