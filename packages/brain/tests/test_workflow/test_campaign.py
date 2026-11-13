@@ -96,8 +96,8 @@ def test_campaign_stops_on_max_experiments(dbos, repo, tmp_path):
     assert ended.payload["stop_reason"] == "max_experiments"
 
 
-def test_campaign_commit_msg(dbos, repo, tmp_path):
-    """Experiment commits are titled ``exp N: <proposal title>``."""
+def test_campaign_commits(dbos, repo, tmp_path):
+    """The loop checks out the campaign's branch and commits there."""
     # One job log per experiment, each better than the last, so both
     # experiments keep and their commits stay on the branch.
     campaign_id = uuid.uuid4()
@@ -105,46 +105,6 @@ def test_campaign_commit_msg(dbos, repo, tmp_path):
     log_dir.mkdir()
     (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.10\n")
     (log_dir / f"{campaign_id}:2.out").write_text("val_bpb: 1.00\n")
-    runtime = Runtime(
-        FakeExecutor(),
-        Ledger(config.database_url()),
-        config_name=f"campaign-{uuid.uuid4().hex}",
-    )
-    DBOS.register_instance(runtime)
-    runner = CampaignRunner(
-        runtime,
-        proposer=FakeProposer(),
-    )
-    setup = CampaignSetup(
-        campaign_id=campaign_id,
-        plan=make_plan(max_experiments=2),
-        poll_interval_seconds=0.05,
-        repo_path=str(repo),
-        branch="main",
-    )
-    DBOS.launch()
-
-    stop_reason = runner.run_campaign(setup)
-
-    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
-    log = subprocess.run(
-        ["git", "log", "--format=%s"],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
-    # Newest first; both experiments keep, so nothing is reset away.
-    assert log[0] == "exp 2: test proposal 2"
-    assert log[1] == "exp 1: test proposal 1"
-
-
-def test_campaign_commits_on_its_branch(dbos, repo, tmp_path):
-    """The loop checks out the campaign's branch; other branches stay put."""
-    campaign_id = uuid.uuid4()
-    log_dir = repo / ".faberon"
-    log_dir.mkdir()
-    (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.10\n")
     main_sha = subprocess.run(
         ["git", "rev-parse", "main"],
         cwd=repo,
@@ -165,7 +125,7 @@ def test_campaign_commits_on_its_branch(dbos, repo, tmp_path):
     )
     setup = CampaignSetup(
         campaign_id=campaign_id,
-        plan=make_plan(max_experiments=1),
+        plan=make_plan(max_experiments=2),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
         branch="work",
@@ -175,31 +135,23 @@ def test_campaign_commits_on_its_branch(dbos, repo, tmp_path):
     stop_reason = runner.run_campaign(setup)
 
     assert stop_reason == StopReason.MAX_EXPERIMENTS.value
-    head = subprocess.run(
-        ["git", "symbolic-ref", "--short", "HEAD"],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    assert head == "work"
-    # The kept experiment commit is on the working branch; main did not move.
-    main_tip = subprocess.run(
-        ["git", "rev-parse", "main"],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    assert main_tip == main_sha
-    parent = subprocess.run(
-        ["git", "rev-parse", "work^"],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    assert parent == main_sha
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    # Newest first; both experiments keep, so nothing is reset away.
+    log = git("log", "--format=%s", "work").splitlines()
+    assert log[0] == "exp 2: test proposal 2"
+    assert log[1] == "exp 1: test proposal 1"
+    assert git("symbolic-ref", "--short", "HEAD") == "work"
+    # The kept experiment commits are on the working branch; main did not move.
+    assert git("rev-parse", "main") == main_sha
+    assert git("rev-parse", "work~2") == main_sha
 
 
 def test_proposal_title_max_length():

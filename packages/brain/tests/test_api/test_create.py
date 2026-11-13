@@ -25,6 +25,13 @@ pytestmark = pytest.mark.postgres
 
 def test_create_campaign(api: ApiFixture):
     camp_id = str(uuid.uuid4())
+    start_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=api.repo_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     response = api.client.post(
         "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
     )
@@ -37,6 +44,11 @@ def test_create_campaign(api: ApiFixture):
     stop_reason = handle.get_result()
     assert stop_reason == "max_experiments"
     assert api.executor.submit_count == 3
+
+    # The campaign record carries the repo's branch and commit at creation.
+    info = api.client.get(f"/v0/campaigns/{camp_id}").json()
+    assert info["campaign"]["branch"] == "main"
+    assert info["campaign"]["start_sha"] == start_sha
 
     response = api.client.get(f"/v0/campaigns/{body['campaign_id']}/events.jsonl")
     types = [json.loads(line)["type"] for line in response.text.splitlines()]
@@ -84,26 +96,6 @@ def test_detached_head(api: ApiFixture):
     assert "detached" in response.json()["detail"]
 
 
-def test_branch_and_sha(api: ApiFixture):
-    """The campaign record carries the repo's branch and commit at creation."""
-    start_sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=api.repo_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    body = _create_body(str(uuid.uuid4()), api.repo_path)
-    response = api.client.post("/v0/campaigns", json=body)
-    assert response.status_code == 201
-    campaign_id = response.json()["campaign_id"]
-    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
-
-    info = api.client.get(f"/v0/campaigns/{campaign_id}").json()
-    assert info["campaign"]["branch"] == "main"
-    assert info["campaign"]["start_sha"] == start_sha
-
-
 def test_dirty_tree(api: ApiFixture):
     """Uncommitted changes to tracked files are rejected with guidance."""
     (Path(api.repo_path) / "train.py").write_text("work in progress\n")
@@ -112,14 +104,14 @@ def test_dirty_tree(api: ApiFixture):
     assert response.status_code == 409
     assert "commit or stash" in response.json()["detail"]
 
-
-def test_untracked_files(api: ApiFixture):
-    """Untracked files do not conflict with a campaign."""
+    # Restore the tree; an untracked file may stay.
+    _git(api.repo_path, "checkout", "--", "train.py")
     (Path(api.repo_path) / "notes.txt").write_text("scratch\n")
-    body = _create_body(str(uuid.uuid4()), api.repo_path)
     response = api.client.post("/v0/campaigns", json=body)
     assert response.status_code == 201
     DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+    # The campaign's discards (reset --hard) left the untracked file alone.
+    assert (Path(api.repo_path) / "notes.txt").exists()
 
 
 def test_new_branch(api: ApiFixture):
