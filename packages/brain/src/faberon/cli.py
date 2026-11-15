@@ -19,7 +19,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 from typer import Argument, FileText, Option, echo
 
-from . import config
+from . import __version__, config
 from .schema import Event, ResearchPlan
 
 _POSTGRES_ENV_PATH = Path("~/.config/faberon/postgres.env").expanduser()
@@ -47,6 +47,25 @@ app = typer.Typer(
     help="Faberon: run autonomous ML research campaigns.",
     no_args_is_help=True,
 )
+
+
+def _print_version(value: bool) -> None:
+    if value:
+        echo(f"faberon {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: bool = Option(
+        False,
+        "--version",
+        help="Show the version and exit.",
+        callback=_print_version,
+        is_eager=True,
+    ),
+) -> None:
+    pass
 
 
 @contextlib.contextmanager
