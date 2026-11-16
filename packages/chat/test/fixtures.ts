@@ -1,5 +1,6 @@
 import type {
   CampaignInfo,
+  CampaignProgress,
   FaberonEvent,
   ResearchPlan,
 } from "../src/api/types.js";
@@ -22,7 +23,12 @@ export function samplePlan(
   };
 }
 
-export function makeInfo(overrides: Partial<CampaignInfo> = {}): CampaignInfo {
+type MakeInfoOverrides = Omit<Partial<CampaignInfo>, "progress"> & {
+  progress?: Partial<CampaignProgress>;
+};
+
+export function makeInfo(overrides: MakeInfoOverrides = {}): CampaignInfo {
+  const { progress, ...rest } = overrides;
   return {
     campaign: {
       campaign_id: "abcdef12-0000-0000-0000-000000000000",
@@ -33,11 +39,18 @@ export function makeInfo(overrides: Partial<CampaignInfo> = {}): CampaignInfo {
       start_sha: "e3f1c9a",
       poll_interval_seconds: 30,
       created_at: "2026-10-02T03:42:00",
-      ...overrides.campaign,
+      ...rest.campaign,
     },
     status: "active",
+    progress: {
+      experiments_done: 2,
+      gpu_hours_burned: 0.05,
+      baseline: 1.23,
+      best_metric: 1.1,
+      ...progress,
+    },
     stop_reason: null,
-    ...overrides,
+    ...rest,
   };
 }
 
