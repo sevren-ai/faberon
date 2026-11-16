@@ -208,17 +208,17 @@ def test_campaign_progress(api: ApiFixture):
     (log_dir / f"{camp_id}:1.out").write_text("val_bpb: 1.10\n")
     (log_dir / f"{camp_id}:2.out").write_text("val_bpb: 1.20\n")
     (log_dir / f"{camp_id}:3.out").write_text("val_bpb: 1.00\n")
-    response = api.client.post(
-        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
-    )
+    body = _create_body(camp_id, api.repo_path)
+    body["plan"]["gpus"] = 2
+    response = api.client.post("/v0/campaigns", json=body)
     assert response.status_code == 201
     DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
 
     info = api.client.get(f"/v0/campaigns/{camp_id}").json()
     progress = info["progress"]
     assert progress["experiments_done"] == 3
-    # The fake executor reports 60 elapsed seconds per job.
-    assert progress["gpu_hours_burned"] == pytest.approx(3 * 60.0 / 3600.0)
+    # The fake executor reports 60 elapsed seconds per job on 2 GPUs.
+    assert progress["gpu_hours_burned"] == pytest.approx(3 * 2 * 60.0 / 3600.0)
     assert progress["baseline"] == 1.23
     assert progress["best_metric"] == 1.00
 
@@ -240,6 +240,28 @@ def test_campaign_progress_without_keeps(api: ApiFixture):
     assert progress["gpu_hours_burned"] == pytest.approx(3 * 60.0 / 3600.0)
     assert progress["baseline"] == 1.23
     assert progress["best_metric"] is None
+
+
+def test_create_caps_gpus(repo):
+    """A plan requesting more GPUs than the deployment cap is rejected."""
+    DBOS.destroy()
+    app = create_app(
+        executor=FakeExecutor(JobState.COMPLETED, exit_code=0),
+        config_name=f"api-test-{uuid.uuid4().hex}",
+        max_gpus=2,
+    )
+    _reset_databases()
+    with TestClient(app) as client:
+        body = _create_body(str(uuid.uuid4()), str(repo))
+        body["plan"]["gpus"] = 4
+        response = client.post("/v0/campaigns", json=body)
+        assert response.status_code == 422
+        assert "4 GPUs" in response.json()["detail"]
+        # At the cap, the campaign is accepted.
+        body = _create_body(str(uuid.uuid4()), str(repo))
+        body["plan"]["gpus"] = 2
+        assert client.post("/v0/campaigns", json=body).status_code == 201
+    DBOS.destroy()
 
 
 def test_get_unknown_campaign(api: ApiFixture):
