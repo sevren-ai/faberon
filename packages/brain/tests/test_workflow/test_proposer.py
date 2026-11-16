@@ -6,6 +6,8 @@ import uuid
 import pytest
 from pydantic_ai import ToolReturnPart, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 
 from faberon.schema import Actor, Event, EventType
@@ -101,7 +103,10 @@ def test_proposer_rejects_unchanged():
 
     proposer = AgentProposer(FakeEvents(), model, timeout=60.0)
     try:
-        with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
+        with pytest.raises(
+            UnexpectedModelBehavior,
+            match=r"maximum output retries \(1\): The replacement must change",
+        ):
             proposer.propose(
                 uuid.uuid4(),
                 make_plan(),
@@ -124,12 +129,51 @@ def test_proposer_rejects_unparseable():
 
     proposer = AgentProposer(FakeEvents(), model, timeout=60.0)
     try:
-        with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
+        with pytest.raises(
+            UnexpectedModelBehavior,
+            match=r"maximum output retries \(1\): The replacement is not valid Python",
+        ):
             proposer.propose(
                 uuid.uuid4(),
                 make_plan(),
                 "print('baseline')\n",
             )
+    finally:
+        proposer.close()
+
+
+def test_proposer_rejects_long_title():
+    model = TestModel(
+        custom_output_args={
+            "content": "print('new')\n",
+            "title": "t" * 60,
+            "rationale": "A rationale long enough to pass.",
+        }
+    )
+
+    proposer = AgentProposer(FakeEvents(), model, timeout=60.0)
+    try:
+        with pytest.raises(UnexpectedModelBehavior) as excinfo:
+            proposer.propose(uuid.uuid4(), make_plan(), "print('baseline')\n")
+    finally:
+        proposer.close()
+    assert str(excinfo.value) == (
+        "Exceeded maximum output retries (1): "
+        "title: String should have at most 55 characters"
+    )
+
+
+def test_proposer_rejects_text_response():
+    def text_only(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        return ModelResponse(parts=[TextPart("Lower the learning rate.")])
+
+    proposer = AgentProposer(FakeEvents(), FunctionModel(text_only), timeout=60.0)
+    try:
+        with pytest.raises(
+            UnexpectedModelBehavior,
+            match=r"maximum output retries \(1\): Invalid JSON",
+        ):
+            proposer.propose(uuid.uuid4(), make_plan(), "print('baseline')\n")
     finally:
         proposer.close()
 
