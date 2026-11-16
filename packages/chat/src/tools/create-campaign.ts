@@ -7,6 +7,7 @@ import { Type } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import type { FaberonClient } from "../api/client.js";
 import type { CampaignCreated } from "../api/types.js";
+import { confirmedByHuman } from "./confirm.js";
 
 /**
  * Render a created campaign for both the tool result and the slash command.
@@ -88,34 +89,30 @@ export function createCampaignTool(client: FaberonClient) {
     }),
     annotations: {},
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      /* Ask a human to confirm in interactive mode
-       . In non-interactive model (e.g. invoking the tool) there is already an explicit act.
-       */
-      if (ctx.hasUI) {
-        const plan = params.plan;
-        const confirmed = await ctx.ui.confirm(
-          "Submit this Faberon campaign?",
-          [
-            `Goal: ${plan.goal}`,
-            `Repo: ${params.repo_path}`,
-            `Command: ${plan.command}`,
-            `Budget: ${plan.budget_gpu_hours} GPU-hours, at most ${plan.max_experiments} experiments`,
-            "",
-            `Faberon starts a campaign that edits ${plan.target_file} and runs experiments until the budget is spent or a stop condition is met.`,
-          ].join("\n"),
-        );
-        if (!confirmed) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: "The human declined the submission. No campaign was created. Do not resubmit unless they ask.",
-              },
-            ],
-            details: undefined,
-            isError: true,
-          };
-        }
+      const plan = params.plan;
+      const confirmed = await confirmedByHuman(
+        ctx,
+        "Submit this Faberon campaign?",
+        [
+          `Goal: ${plan.goal}`,
+          `Repo: ${params.repo_path}`,
+          `Command: ${plan.command}`,
+          `Budget: ${plan.budget_gpu_hours} GPU-hours, at most ${plan.max_experiments} experiments`,
+          "",
+          `Faberon starts a campaign that edits ${plan.target_file} and runs experiments until the budget is spent or a stop condition is met.`,
+        ].join("\n"),
+      );
+      if (!confirmed) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "The human declined the submission. No campaign was created. Do not resubmit unless they ask.",
+            },
+          ],
+          details: undefined,
+          isError: true,
+        };
       }
       const created = await client.createCampaign({
         campaign_id: randomUUID(),
