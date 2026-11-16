@@ -105,7 +105,7 @@ def test_proposer_rejects_unchanged():
     try:
         with pytest.raises(
             UnexpectedModelBehavior,
-            match=r"maximum output retries \(1\): The replacement must change",
+            match=r"\(1\)\. Cause: The proposed file content is identical",
         ):
             proposer.propose(
                 uuid.uuid4(),
@@ -131,7 +131,7 @@ def test_proposer_rejects_unparseable():
     try:
         with pytest.raises(
             UnexpectedModelBehavior,
-            match=r"maximum output retries \(1\): The replacement is not valid Python",
+            match=r"\(1\)\. Cause: The proposed file content is not valid",
         ):
             proposer.propose(
                 uuid.uuid4(),
@@ -158,8 +158,8 @@ def test_proposer_rejects_long_title():
     finally:
         proposer.close()
     assert str(excinfo.value) == (
-        "Exceeded maximum output retries (1): "
-        "title: String should have at most 55 characters"
+        "Exceeded maximum output retries (1). Cause: "
+        "invalid title: String should have at most 55 characters"
     )
 
 
@@ -171,7 +171,7 @@ def test_proposer_rejects_text_response():
     try:
         with pytest.raises(
             UnexpectedModelBehavior,
-            match=r"maximum output retries \(1\): Invalid JSON",
+            match=r"maximum output retries \(1\)\. Cause: Invalid JSON",
         ):
             proposer.propose(uuid.uuid4(), make_plan(), "print('baseline')\n")
     finally:

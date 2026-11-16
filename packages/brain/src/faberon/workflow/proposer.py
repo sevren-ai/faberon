@@ -97,11 +97,15 @@ class AgentProposer:
             ctx: RunContext[ProposalContext], proposal: Proposal
         ) -> Proposal:
             if proposal.content == ctx.deps.current_content:
-                raise ModelRetry("The replacement must change the target file.")
+                raise ModelRetry(
+                    "The proposed file content is identical to the current target file."
+                )
             try:
                 ast.parse(proposal.content)
             except SyntaxError as e:
-                raise ModelRetry(f"The replacement is not valid Python: {e}") from e
+                raise ModelRetry(
+                    f"The proposed file content is not valid Python: {e}"
+                ) from e
             return proposal
 
     @classmethod
@@ -157,7 +161,9 @@ class AgentProposer:
             if e.__cause__ is None:
                 raise
             reason = _describe_rejection(e.__cause__)
-            raise UnexpectedModelBehavior(f"{e.message}: {reason}", e.body) from e
+            raise UnexpectedModelBehavior(
+                f"{e.message}. Cause: {reason}", e.body
+            ) from e
         return result.output
 
     def close(self) -> None:
@@ -176,7 +182,7 @@ def _describe_rejection(error: BaseException) -> str:
     if not isinstance(error, ValidationError):
         return str(error)
     return "; ".join(
-        f"{'.'.join(map(str, d['loc']))}: {d['msg']}" if d["loc"] else d["msg"]
+        f"invalid {'.'.join(map(str, d['loc']))}: {d['msg']}" if d["loc"] else d["msg"]
         for d in error.errors(include_url=False)
     )
 
