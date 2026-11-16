@@ -28,7 +28,12 @@ class Runtime:
 
     @DBOS.step()
     def submit_step(
-        self, command: str, submission_key: str, walltime: int, repo_path: str
+        self,
+        command: str,
+        submission_key: str,
+        walltime: int,
+        repo_path: str,
+        gpus: int,
     ) -> str:
         """Start the job on the cluster. Idempotent on submission_key."""
         output_path = _job_log_path(repo_path, submission_key)
@@ -37,6 +42,7 @@ class Runtime:
             command=command,
             submission_key=submission_key,
             walltime=walltime,
+            gpus=gpus,
             output_path=str(output_path),
             cwd=repo_path,
         )
@@ -88,7 +94,11 @@ class Runtime:
     def run_experiment(self, setup: ExperimentSetup) -> ExperimentResult:
         """Run one experiment durably: submit, poll, parse, judge, record."""
         job_id = self.submit_step(
-            setup.command, setup.submission_key, setup.walltime, setup.repo_path
+            setup.command,
+            setup.submission_key,
+            setup.walltime,
+            setup.repo_path,
+            setup.gpus,
         )
         self.record_event_step(
             Event(
@@ -134,6 +144,7 @@ class Runtime:
                     "state": info.state.value,
                     "exit_code": info.exit_code,
                     "elapsed_seconds": info.elapsed_seconds,
+                    "gpus": setup.gpus,
                 },
             )
         )

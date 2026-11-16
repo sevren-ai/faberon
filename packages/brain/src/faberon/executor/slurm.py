@@ -111,11 +111,11 @@ class SlurmExecutor:
         self,
         account: str,
         *,
-        gpus: int = 1,
+        max_gpus: int | None = None,
         max_walltime: int | None = None,
     ) -> None:
         self._account = account
-        self._gpus = gpus
+        self._max_gpus = max_gpus
         self._max_walltime = max_walltime
 
     def _effective_walltime(self, request: SubmitRequest) -> int:
@@ -123,6 +123,12 @@ class SlurmExecutor:
         if self._max_walltime is None:
             return request.walltime
         return min(request.walltime, self._max_walltime)
+
+    def _effective_gpus(self, request: SubmitRequest) -> int:
+        """Clamp the request's GPU count to the deployment-side cap, if set."""
+        if self._max_gpus is None:
+            return request.gpus
+        return min(request.gpus, self._max_gpus)
 
     def submit(self, request: SubmitRequest) -> str:
         job_name = JOB_NAME_PREFIX + request.submission_key
@@ -136,7 +142,7 @@ class SlurmExecutor:
                 request.argv,
                 cwd=request.cwd,
                 output=request.output_path,
-                gpus=self._gpus,
+                gpus=self._effective_gpus(request),
                 time_limit=self._effective_walltime(request),
             ),
             capture_output=True,

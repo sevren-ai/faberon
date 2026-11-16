@@ -92,6 +92,7 @@ def create_app(
     config_name: str = "default",
     auth_token: str | None = None,
     no_recover: bool = False,
+    max_gpus: int | None = None,
 ) -> FastAPI:
     """Build the Faberon HTTP app. Configures the process-global DBOS singleton."""
     config.apply_env()
@@ -141,6 +142,7 @@ def create_app(
         app.state.runtime = runtime
         app.state.runner = runner
         app.state.ledger = ledger
+        app.state.max_gpus = max_gpus
         app.state.sse_pool = sse_pool
         app.state.stop_sse = stop_sse
         try:
@@ -175,10 +177,12 @@ def create_app_slurm(*, no_recover: bool = False) -> FastAPI:
     gpus = config.slurm_gpus(raise_on_none=True)
     executor = SlurmExecutor(
         account=account,
-        gpus=gpus,
+        max_gpus=gpus,
         max_walltime=config.max_time(),
     )
-    return create_app(executor=executor, auth_token=token, no_recover=no_recover)
+    return create_app(
+        executor=executor, auth_token=token, no_recover=no_recover, max_gpus=gpus
+    )
 
 
 def create_app_local(*, no_recover: bool = False) -> FastAPI:
@@ -219,6 +223,17 @@ def _register_routes(app: FastAPI) -> None:
             resolve_target_in_repo(body.repo_path, body.plan.target_file)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
+
+        # A plan may not request more GPUs per job than the deployment allows.
+        cap: int | None = app.state.max_gpus
+        if cap is not None and body.plan.gpus > cap:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"plan requests {body.plan.gpus} GPUs per job, "
+                    f"but this deployment caps jobs at {cap} (slurm_gpus)"
+                ),
+            )
 
         # Record the repo state the campaign starts from. A detached HEAD
         # has no branch for the campaign to commit on.

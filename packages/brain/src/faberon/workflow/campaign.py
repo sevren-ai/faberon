@@ -37,12 +37,10 @@ class CampaignRunner:
         self,
         runtime: Runtime,
         proposer: ExperimentProposer,
-        gpus: int = 1,
     ) -> None:
         self.runtime = runtime
         self.config_name = runtime.config_name
         self.proposer = proposer
-        self.gpus = gpus
 
     # -- steps (checkpointed; replayed without re-execution) --
 
@@ -143,11 +141,12 @@ class CampaignRunner:
                     walltime=plan.walltime,
                     index=exp_done,
                     sha=result.sha,
+                    gpus=plan.gpus,
                 )
                 outcome = self.runtime.run_experiment(exp)
 
                 if outcome.job_info.state.is_terminal:
-                    gpu_h += _gpu_hours(outcome.job_info, self.gpus)
+                    gpu_h += _gpu_hours(outcome.job_info, plan.gpus)
                 if outcome.judgment == "keep":
                     best_metric = outcome.metric_value
                 else:

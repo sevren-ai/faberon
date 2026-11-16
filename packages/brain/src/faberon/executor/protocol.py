@@ -27,6 +27,7 @@ class SubmitRequest(BaseModel):
     command: str = Field(min_length=1)
     submission_key: str = Field(min_length=1)
     walltime: int = Field(gt=0)  # in minutes
+    gpus: int = Field(default=1, ge=1)
     output_path: str = Field(min_length=1)
     cwd: str = Field(min_length=1)
 

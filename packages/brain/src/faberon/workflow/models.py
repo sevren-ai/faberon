@@ -38,6 +38,7 @@ class ExperimentSetup(BaseModel):
     walltime: int = Field(gt=0)  # in minutes
     index: int = Field(ge=1)
     sha: str = Field(min_length=1)
+    gpus: int = Field(default=1, ge=1)
 
 
 class CampaignSetup(BaseModel):

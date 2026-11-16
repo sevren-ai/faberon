@@ -17,6 +17,7 @@ export function samplePlan(
     budget_gpu_hours: 10,
     max_experiments: 5,
     max_concurrency: 1,
+    gpus: 1,
     walltime: 30,
     stop_conditions: ["budget exhausted"],
     ...overrides,

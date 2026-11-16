@@ -54,6 +54,13 @@ const planSchema = Type.Object({
       minimum: 1,
     }),
   ),
+  gpus: Type.Optional(
+    Type.Integer({
+      description: "GPUs requested per job.",
+      default: 1,
+      minimum: 1,
+    }),
+  ),
   walltime: Type.Integer({
     description: "Per-job walltime in minutes.",
     exclusiveMinimum: 0,
@@ -90,7 +97,7 @@ export function createCampaignTool(client: FaberonClient) {
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       const created = await client.createCampaign({
         campaign_id: randomUUID(),
-        plan: { max_concurrency: 1, ...params.plan },
+        plan: { max_concurrency: 1, gpus: 1, ...params.plan },
         repo_path: params.repo_path,
         poll_interval_seconds: params.poll_interval_seconds ?? 30,
       });
