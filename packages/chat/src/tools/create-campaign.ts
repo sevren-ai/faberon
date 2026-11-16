@@ -88,6 +88,7 @@ export function createCampaignTool(client: FaberonClient) {
       ),
     }),
     annotations: {},
+    executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const plan = params.plan;
       const confirmed = await confirmedByHuman(

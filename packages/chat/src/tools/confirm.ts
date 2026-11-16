@@ -3,6 +3,11 @@
  * the tool asks the human to confirm before calling the API. In
  * non-interactive modes the call goes through directly: invoking the tool
  * there is already an explicit act.
+ *
+ * Tools using this gate must declare `executionMode: "sequential"`. Pi runs
+ * the tool calls of one turn concurrently by default, and the TUI shows only
+ * one extension dialog at a time: a second confirm would silently replace
+ * this one. Sequential execution keeps one dialog open at a time.
  */
 
 import type { ExtensionToolContext } from "@earendil-works/pi-coding-agent";

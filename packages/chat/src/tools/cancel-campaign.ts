@@ -25,6 +25,7 @@ export function cancelCampaignTool(client: FaberonClient) {
       }),
     }),
     annotations: { destructiveHint: true, idempotentHint: true },
+    executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const confirmed = await confirmedByHuman(
         ctx,

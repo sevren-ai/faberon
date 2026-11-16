@@ -103,4 +103,8 @@ describe("createCampaignTool", () => {
     expect(created).toHaveBeenCalledOnce();
     expect(result.isError).toBeUndefined();
   });
+
+  it("executes sequentially so its dialog cannot race another gated tool", () => {
+    expect(tool.executionMode).toBe("sequential");
+  });
 });
