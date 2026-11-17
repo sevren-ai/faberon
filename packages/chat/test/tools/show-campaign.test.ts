@@ -12,8 +12,16 @@ describe("formatCampaign", () => {
     expect(out).toContain("metric:   val_bpb");
     expect(out).toContain("budget:   10 gpu-hours");
     expect(out).toContain("max exp:  5");
+    expect(out).toContain("exp done: 2/5");
+    expect(out).toContain("burned:   0.05/10 gpu-hours");
+    expect(out).toContain("best:     1.23 -> 1.1");
     expect(out).toContain("status:   active");
     expect(out).not.toContain("reason:");
+  });
+
+  it("print the baseline when no experiment has been kept", () => {
+    const out = formatCampaign(makeInfo({ progress: { best_metric: null } }));
+    expect(out).toContain("best:     baseline:1.23");
   });
 
   it("names the stop reason of an ended campaign", () => {

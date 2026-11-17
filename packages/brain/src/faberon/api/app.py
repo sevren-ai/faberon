@@ -205,7 +205,7 @@ def _register_routes(app: FastAPI) -> None:
         if existing is None:
             # One active campaign per repo: a second one would interleave
             # commits on the same checkout.
-            for other in ledger.campaigns_on_repo(body.repo_path):
+            for other in ledger.get_campaigns_on_repo(body.repo_path):
                 if get_campaign_info(ledger, other).status.is_active:
                     raise HTTPException(
                         status_code=409,

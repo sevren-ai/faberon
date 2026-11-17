@@ -25,7 +25,7 @@ from .models import Proposal
 class CampaignEventReader(Protocol):
     """Source of campaign events for proposer context."""
 
-    def campaign_events(self, campaign_id: UUID) -> list[Event]: ...
+    def get_campaign_events(self, campaign_id: UUID) -> list[Event]: ...
 
 
 class ExperimentProposer(Protocol):
@@ -90,7 +90,7 @@ class AgentProposer:
         @self._agent.tool
         def read_experiment_history(ctx: RunContext[ProposalContext]) -> list[Event]:
             """Return every event of this campaign, oldest first."""
-            return ctx.deps.events.campaign_events(ctx.deps.campaign_id)
+            return ctx.deps.events.get_campaign_events(ctx.deps.campaign_id)
 
         @self._agent.output_validator
         def validate_content(
