@@ -36,8 +36,8 @@ from ..workflow import (
 )
 from ..workflow.tree import (
     branch_exists,
-    get_branch_tip,
     create_branch,
+    get_branch_tip,
     get_current_branch,
     get_current_head,
     get_uncommitted_changes,

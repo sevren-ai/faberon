@@ -179,7 +179,7 @@ def _private_dir(path: Path) -> None:
 
 
 def _git_exclude(repo_path: str, entry: str) -> None:
-    """Declare a repo-local path disposable through .git/info/exclude (e.g. Faberon's own run logs)."""
+    """Declare a repo-local path disposable through .git/info/exclude."""
     exclude = Path(repo_path) / ".git" / "info" / "exclude"
     exclude.parent.mkdir(parents=True, exist_ok=True)
     existing = exclude.read_text() if exclude.exists() else ""
