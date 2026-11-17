@@ -35,9 +35,19 @@ class Campaign(BaseModel):
     created_at: datetime
 
 
+class CampaignProgress(BaseModel):
+    """Live campaign progress derived from the ledger."""
+
+    experiments_done: int
+    gpu_hours_burned: float
+    baseline: float
+    best_metric: float | None
+
+
 class CampaignInfo(BaseModel):
     """A campaign plus its live status: the API's view of one campaign."""
 
     campaign: Campaign
     status: CampaignStatus
+    progress: CampaignProgress
     stop_reason: str | None = None
