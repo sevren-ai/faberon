@@ -56,7 +56,7 @@ def _wait_for_terminal(executor: SlurmExecutor, job_id: str) -> JobState:
     """Poll until the job reaches a terminal state, or time out."""
     deadline = time.monotonic() + _POLL_DEADLINE_S
     while time.monotonic() < deadline:
-        info = executor.status(job_id)
+        info = executor.get_status(job_id)
         if info.state in (JobState.COMPLETED, JobState.FAILED, JobState.CANCELLED):
             return info.state
         time.sleep(_POLL_INTERVAL_S)
@@ -84,14 +84,14 @@ def test_submit_success(executor: SlurmExecutor):
     key = f"test-true-{uuid.uuid4().hex[:8]}"
     job_id = executor.submit(_request("true", key))
     assert _wait_for_terminal(executor, job_id) == JobState.COMPLETED
-    assert executor.status(job_id).exit_code == 0
+    assert executor.get_status(job_id).exit_code == 0
 
 
 def test_submit_failure(executor: SlurmExecutor):
     key = f"test-false-{uuid.uuid4().hex[:8]}"
     job_id = executor.submit(_request("false", key))
     assert _wait_for_terminal(executor, job_id) == JobState.FAILED
-    assert executor.status(job_id).exit_code != 0
+    assert executor.get_status(job_id).exit_code != 0
 
 
 def test_terminal_jobs_report_elapsed(executor: SlurmExecutor):
@@ -99,7 +99,7 @@ def test_terminal_jobs_report_elapsed(executor: SlurmExecutor):
     key = f"test-elapsed-{uuid.uuid4().hex[:8]}"
     job_id = executor.submit(_request("sleep 2", key))
     _wait_for_terminal(executor, job_id)
-    info = executor.status(job_id)
+    info = executor.get_status(job_id)
     assert info.elapsed_seconds is not None
     assert info.elapsed_seconds >= 2.0
 
