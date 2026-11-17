@@ -2,11 +2,13 @@
 
 import json
 import socket
+import subprocess
 import threading
 import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx2
 import pytest
@@ -22,7 +24,7 @@ from faberon.schema import EventType
 from faberon.workflow import AgentProposer
 
 from .._fakes import FakeExecutor, FakeProposer
-from ..conftest import make_plan
+from ..conftest import make_plan, make_repo
 
 pytestmark = pytest.mark.postgres
 
@@ -121,6 +123,47 @@ def test_create_rejects_absolute_target(api: ApiFixture):
     assert "relative path" in response.json()["detail"]
 
 
+def test_create_rejects_non_repo(api: ApiFixture, tmp_path):
+    """A repo path that is not a git repository is rejected at creation."""
+    body = _create_body(str(uuid.uuid4()), str(tmp_path))
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 422
+
+
+def test_create_rejects_detached_head(api: ApiFixture):
+    """A repo on a detached HEAD has no branch for the campaign to commit on."""
+    subprocess.run(
+        ["git", "checkout", "HEAD~0"],
+        cwd=api.repo_path,
+        check=True,
+        capture_output=True,
+    )
+    body = _create_body(str(uuid.uuid4()), api.repo_path)
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 409
+    assert "detached" in response.json()["detail"]
+
+
+def test_create_records_branch_and_sha(api: ApiFixture):
+    """The campaign record carries the repo's branch and commit at creation."""
+    start_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=api.repo_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    body = _create_body(str(uuid.uuid4()), api.repo_path)
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 201
+    campaign_id = response.json()["campaign_id"]
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    info = api.client.get(f"/v0/campaigns/{campaign_id}").json()
+    assert info["campaign"]["branch"] == "main"
+    assert info["campaign"]["start_sha"] == start_sha
+
+
 def test_get_campaign(api: ApiFixture):
     body = _create_body(str(uuid.uuid4()), api.repo_path)
     response = api.client.post("/v0/campaigns", json=body)
@@ -153,6 +196,50 @@ def test_list_campaigns(api: ApiFixture):
     campaigns = response.json()
     assert [c["campaign"]["campaign_id"] for c in campaigns] == ids
     assert {c["status"] for c in campaigns} == {"ended"}
+    assert all("progress" in c for c in campaigns)
+
+
+def test_campaign_progress(api: ApiFixture):
+    """CampaignInfo carries live progress derived from the ledger."""
+    camp_id = str(uuid.uuid4())
+    log_dir = Path(api.repo_path) / ".faberon"
+    log_dir.mkdir()
+    # Experiments 1 and 3 keep; experiment 2 does not beat the new best.
+    (log_dir / f"{camp_id}:1.out").write_text("val_bpb: 1.10\n")
+    (log_dir / f"{camp_id}:2.out").write_text("val_bpb: 1.20\n")
+    (log_dir / f"{camp_id}:3.out").write_text("val_bpb: 1.00\n")
+    response = api.client.post(
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
+    )
+    assert response.status_code == 201
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    info = api.client.get(f"/v0/campaigns/{camp_id}").json()
+    progress = info["progress"]
+    assert progress["experiments_done"] == 3
+    # The fake executor reports 60 elapsed seconds per job.
+    assert progress["gpu_hours_burned"] == pytest.approx(3 * 60.0 / 3600.0)
+    assert progress["baseline"] == 1.23
+    assert progress["best_metric"] == 1.00
+
+
+def test_campaign_progress_without_keeps(api: ApiFixture):
+    """With no kept experiment, best_metric is null and baseline stands."""
+    camp_id = str(uuid.uuid4())
+    # The fake executor writes an empty log, so no metric parses and every
+    # experiment is discarded.
+    response = api.client.post(
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
+    )
+    assert response.status_code == 201
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    info = api.client.get(f"/v0/campaigns/{camp_id}").json()
+    progress = info["progress"]
+    assert progress["experiments_done"] == 3
+    assert progress["gpu_hours_burned"] == pytest.approx(3 * 60.0 / 3600.0)
+    assert progress["baseline"] == 1.23
+    assert progress["best_metric"] is None
 
 
 def test_get_unknown_campaign(api: ApiFixture):
@@ -366,7 +453,8 @@ def test_second_campaign_rejected(tmp_path, repo):
         assert first.json()["campaign_id"] in conflict.json()["detail"]
 
         # A different repo path is unaffected.
-        other = tmp_path / "other-repo"
+        (tmp_path / "other-repo").mkdir()
+        other = make_repo(tmp_path / "other-repo")
         accepted = client.post(
             "/v0/campaigns",
             json=_create_body(str(uuid.uuid4()), str(other)),

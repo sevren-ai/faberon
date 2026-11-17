@@ -9,6 +9,7 @@ import pytest
 import uvicorn
 from typer.testing import CliRunner
 
+import faberon
 from faberon import cli
 from faberon.api.app import (
     GRACEFUL_SHUTDOWN_TIMEOUT,
@@ -34,6 +35,13 @@ _PLAN = {
     "stop_conditions": ["n/a"],
 }
 
+_PROGRESS = {
+    "experiments_done": 2,
+    "gpu_hours_burned": 0.05,
+    "baseline": 1.42,
+    "best_metric": 1.1,
+}
+
 _CAMPAIGN_INFO = {
     "campaign": {
         "campaign_id": CAMPAIGN_ID,
@@ -44,6 +52,7 @@ _CAMPAIGN_INFO = {
         "created_at": "2026-10-01T03:42:22Z",
     },
     "status": "active",
+    "progress": _PROGRESS,
     "stop_reason": None,
 }
 
@@ -58,7 +67,7 @@ _EVENT = {
 }
 
 
-def _make_client(handler) -> httpx2.Client:
+def _client_from_handler(handler) -> httpx2.Client:
     return httpx2.Client(
         base_url="http://testserver",
         transport=httpx2.MockTransport(handler),
@@ -74,7 +83,7 @@ def api_client(monkeypatch: pytest.MonkeyPatch):
     def handler(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, json=responses[(request.method, request.url.path)])
 
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(handler))
+    monkeypatch.setattr(cli, "_make_client", lambda: _client_from_handler(handler))
     return responses
 
 
@@ -84,6 +93,13 @@ def test_bare_command_shows_help():
     assert "Usage" in result.output
     assert "serve" in result.output
     assert "list" in result.output
+
+
+def test_version_flag():
+    """`faberon --version` prints the package version and exits."""
+    result = runner.invoke(cli.app, ["--version"])
+    assert result.exit_code == 0
+    assert result.output.strip() == f"faberon {faberon.__version__}"
 
 
 def test_client_requires_token():
@@ -110,7 +126,7 @@ def test_api_error_is_friendly(monkeypatch: pytest.MonkeyPatch):
     def handler(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(404, json={"detail": "campaign not found"})
 
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(handler))
+    monkeypatch.setattr(cli, "_make_client", lambda: _client_from_handler(handler))
     result = runner.invoke(cli.app, ["show", CAMPAIGN_ID])
     assert result.exit_code == 1
     assert "campaign not found" in result.output
@@ -405,7 +421,7 @@ def test_init_creates_missing_database(tmp_path, monkeypatch: pytest.MonkeyPatch
     probed: dict[str, str | None] = {"err": "database missing"}
     calls = []
     monkeypatch.setattr(cli, "_probe_db", lambda url: probed["err"])
-    monkeypatch.setattr(cli, "_server_up", lambda url: None)
+    monkeypatch.setattr(cli, "_is_server_up", lambda url: None)
 
     def fake_create(url, pg_env):
         calls.append(url)
@@ -424,7 +440,7 @@ def test_init_requires_running_postgres(tmp_path, monkeypatch: pytest.MonkeyPatc
     """No server: init fails with guidance instead of writing anything."""
     config_file = _init_env(tmp_path, monkeypatch)
     monkeypatch.setattr(cli, "_probe_db", lambda url: "connection refused")
-    monkeypatch.setattr(cli, "_server_up", lambda url: "connection refused")
+    monkeypatch.setattr(cli, "_is_server_up", lambda url: "connection refused")
     # Postgres URL (default); init exits before further prompts.
     result = runner.invoke(cli.app, ["init"], input="\n")
     assert result.exit_code == 2
@@ -437,7 +453,7 @@ def test_init_fails_when_createdb_fails(tmp_path, monkeypatch: pytest.MonkeyPatc
     """Server up but the database still missing after createdb: init fails."""
     config_file = _init_env(tmp_path, monkeypatch)
     monkeypatch.setattr(cli, "_probe_db", lambda url: "database missing")
-    monkeypatch.setattr(cli, "_server_up", lambda url: None)
+    monkeypatch.setattr(cli, "_is_server_up", lambda url: None)
     monkeypatch.setattr(cli, "_create_db", lambda url, pg_env: None)
     result = runner.invoke(cli.app, ["init"], input="\n")
     assert result.exit_code == 2
@@ -455,12 +471,18 @@ def test_list(api_client):
     assert "CREATED" in result.output
     assert "STATUS" in result.output
     assert "METRIC" in result.output
+    assert "EXPS" in result.output
+    assert "GPU-H" in result.output
+    assert "BEST" in result.output
     assert "REPO" in result.output
 
-    # Row carries the campaign's id, status, metric, and repo path.
+    # Row carries the campaign's id, status, metric, progress, and repo path.
     assert CAMPAIGN_ID in result.output
     assert "active" in result.output
     assert "val_bpb" in result.output
+    assert "2/3" in result.output
+    assert "0.05/100" in result.output
+    assert "1.42->1.1" in result.output
     assert "/tmp/my_repo" in result.output
     assert "2026-10-01 03:42" in result.output
 
@@ -482,6 +504,32 @@ def test_show(api_client):
     assert "metric:   val_bpb" in result.output
     assert "budget:   100.0 gpu-hours" in result.output
     assert "max exp:  3" in result.output
+    assert "exp done: 2/3" in result.output
+    assert "burned:   0.05/100 gpu-hours" in result.output
+    assert "best:     1.42 -> 1.1" in result.output
+
+
+def _no_best_info() -> dict:
+    """The campaign fixture with no kept experiment yet."""
+    return {
+        **_CAMPAIGN_INFO,
+        "progress": {**_PROGRESS, "best_metric": None},
+    }
+
+
+def test_list_baseline(api_client):
+    api_client[("GET", "/v0/campaigns")] = [_no_best_info()]
+    result = runner.invoke(cli.app, ["list"])
+    assert result.exit_code == 0
+    assert "baseline:1.42" in result.output
+    assert "1.42->" not in result.output
+
+
+def test_show_baseline(api_client):
+    api_client[("GET", f"/v0/campaigns/{CAMPAIGN_ID}")] = _no_best_info()
+    result = runner.invoke(cli.app, ["show", CAMPAIGN_ID])
+    assert result.exit_code == 0
+    assert "best:     baseline:1.42" in result.output
 
 
 def test_show_json(api_client):
@@ -504,7 +552,9 @@ def _events_handler(request: httpx2.Request) -> httpx2.Response:
 
 
 def test_events(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(_events_handler))
+    monkeypatch.setattr(
+        cli, "_make_client", lambda: _client_from_handler(_events_handler)
+    )
     result = runner.invoke(cli.app, ["events", CAMPAIGN_ID])
     assert result.exit_code == 0
     assert "campaign.created" in result.output
@@ -514,7 +564,9 @@ def test_events(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_events_json(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(_events_handler))
+    monkeypatch.setattr(
+        cli, "_make_client", lambda: _client_from_handler(_events_handler)
+    )
     result = runner.invoke(cli.app, ["events", CAMPAIGN_ID, "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output.strip())
@@ -529,7 +581,7 @@ def test_events_after(monkeypatch: pytest.MonkeyPatch):
         captured["after"] = request.url.params["after"]
         return httpx2.Response(200, text=json.dumps(_EVENT) + "\n")
 
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(handler))
+    monkeypatch.setattr(cli, "_make_client", lambda: _client_from_handler(handler))
     result = runner.invoke(cli.app, ["events", CAMPAIGN_ID, "--after", "41"])
     assert result.exit_code == 0
     assert captured["after"] == "41"

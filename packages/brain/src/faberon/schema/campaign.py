@@ -29,8 +29,19 @@ class Campaign(BaseModel):
     workflow_id: str
     plan: ResearchPlan
     repo_path: str
+    branch: str
+    start_sha: str
     poll_interval_seconds: float
     created_at: datetime
+
+
+class CampaignProgress(BaseModel):
+    """Live campaign progress derived from the ledger."""
+
+    experiments_done: int
+    gpu_hours_burned: float
+    baseline: float
+    best_metric: float | None
 
 
 class CampaignInfo(BaseModel):
@@ -38,4 +49,5 @@ class CampaignInfo(BaseModel):
 
     campaign: Campaign
     status: CampaignStatus
+    progress: CampaignProgress
     stop_reason: str | None = None

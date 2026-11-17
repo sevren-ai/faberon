@@ -39,22 +39,19 @@ Issues and discussions that are adopted into the design docs, may be closed as t
 
 The two packages version independently; the design makes them independently replaceable. What keeps them compatible is the API contract version (`v0` today), not a shared release number. The tag names are asymmetric on purpose:
 
-- **Brain** (`packages/brain/`, the default artifact): tag `vX.Y.Z`, for example `v0.2.2`. Bare, no prefix, matching the tags that already exist. (cf. `packages/brain/pyproject.toml` and `faberon.__version__`)
-- **Faberon Chat** (`packages/chat/`): tag `chat-vX.Y.Z`, first release `chat-v0.1.0`. Prefixed so chat tags never collide with brain tags. (cf. `packages/chat/package.json`)
+- **Brain** (`packages/brain/`, the default artifact): tag `vX.Y.Z`, for example `v0.2.2`.
+- **Faberon Chat** (`packages/chat/`): tag `chat-vX.Y.Z`, first release `chat-v0.1.0`. Prefixed so chat tags never collide with brain tags.
 
-Cut a release by bumping the version and pushing the package's tag:
-
-```bash
-# brain
-git tag v0.3.0 && git push origin v0.3.0
-
-# chat
-git tag chat-v0.1.0 && git push origin chat-v0.1.0
-```
-
-GitHub Releases keys off the tag you push; each release notes which contract version it speaks. Both packages are also published to their registries: the brain to PyPI as `faberon` (`uv publish`, built from a worktree at the tag, never from a feature branch) and the chat interface to npm as `@faberon/chat` (`npm publish --access public`).
-
-After a release, the related `vX.Y.Z.md` (if it exists) is archived and becomes frozen.
+Steps to cut a release:
+- Bump the versions on a feature branch (`packages/brain/pyproject.toml`,  `packages/brain/src/faberon/__init__.py`, `packages/brain/uv.lock`, `packages/chat/package.json`)
+- Update the reference to the runbook in the readme to a new one (if any)
+- Archive the design doc (if any)
+- Merge the feature branch into `main`
+- `git tag vX.Y.Z`, then `git push origin vX.Y.Z`
+- `git tag chat-vX.Y.Z`, then `git push origin chat-vX.Y.Z`
+- Write up the release notes on Github using the brain's tag
+- Publish the brain to PyPI as `faberon` (`uv publish`, built from a worktree at the tag, never from a feature branch) 
+- Publish the chat interface to npm as `@faberon/chat` (`npm publish --access public`)
 
 ## Git and pull requests
 

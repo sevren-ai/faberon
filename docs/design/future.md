@@ -6,8 +6,9 @@ Add an item when something is worth remembering and clearly not in the current r
 
 ## Execution backends beyond Slurm
 
-Slurm is the primary path. The executor interface (`submit` / `status` / `cancel`) is the place other backends plug in. The local executor (subprocess on the machine hosting Faberon) is planned work: v0.3.0, see [roadmap.md](roadmap.md).
+Slurm is the primary path. The executor interface (`submit` / `status` / `cancel`) is the place other backends plug in. There is also a local executor for sequential experiments on a workstation.
 
+Executors planned in future work:
 - **Cloud batch**: adapters for cloud job APIs (for example AWS Batch, GCP Batch).
 - **Kubernetes**: Jobs/CronJobs as the execution tier.
 
