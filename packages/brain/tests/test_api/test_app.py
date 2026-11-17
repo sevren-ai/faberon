@@ -21,7 +21,7 @@ from faberon.ledger import Ledger
 from faberon.schema import EventType
 
 from .._fakes import FakeExecutor
-from .conftest import ApiFixture, _create_body, _reset_databases
+from .conftest import ApiFixture, _create_body, _git, _reset_databases
 
 pytestmark = pytest.mark.postgres
 
@@ -293,6 +293,14 @@ def test_upgrade_ends_outdated_campaign(tmp_path, repo):
             "/v0/campaigns", json=_create_body(str(uuid.uuid4()), str(repo))
         )
         assert conflict.status_code == 409
+
+        # Wait for the first experiment commit before: destroying DBOS
+        for _ in range(100):
+            if len(_git(str(repo), "log", "--oneline").splitlines()) > 1:
+                break
+            time.sleep(0.05)
+        else:
+            pytest.fail("campaign did not commit its first experiment in time")
     DBOS.destroy()
 
     # Set the campaign's application version to "fake_old"
