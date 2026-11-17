@@ -24,7 +24,7 @@ _DEAD: set[str] = {
 
 def get_campaign_info(ledger: Ledger, campaign: Campaign) -> CampaignInfo:
     """Return one campaign with its live status attached."""
-    events = ledger.campaign_events(campaign.campaign_id)
+    events = ledger.get_campaign_events(campaign.campaign_id)
     progress = _derive_progress(campaign, events)
     # If we find a campaign.ended event, we know it has ended
     ended = next(

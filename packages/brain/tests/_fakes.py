@@ -19,7 +19,7 @@ class FakeEvents:
     def __init__(self, events: list[Event] | None = None) -> None:
         self.events = events or []
 
-    def campaign_events(self, campaign_id: UUID) -> list[Event]:
+    def get_campaign_events(self, campaign_id: UUID) -> list[Event]:
         return [event for event in self.events if event.campaign_id == campaign_id]
 
 
@@ -70,7 +70,7 @@ class FakeExecutor:
             out.write_text("")
         return f"fake-{self.submit_count}"
 
-    def status(self, job_id: str) -> JobInfo:
+    def get_status(self, job_id: str) -> JobInfo:
         elapsed = self._elapsed_seconds if self._state.is_terminal else None
         return JobInfo(
             job_id=job_id,
@@ -104,7 +104,7 @@ class FakeFileExecutor:
         self._save(state)
         return job_id
 
-    def status(self, job_id: str) -> JobInfo:
+    def get_status(self, job_id: str) -> JobInfo:
         state = self._load()
         job = state["jobs"][job_id]
         state_val = JobState(job["state"])

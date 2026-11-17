@@ -21,17 +21,17 @@ def _git(repo: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def _head(repo: Path) -> str:
-    return tree.current_head(repo)
+def _get_head(repo: Path) -> str:
+    return tree.get_current_head(repo)
 
 
 def test_commit_file(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
-    baseline_sha = _head(repo)
+    baseline_sha = _get_head(repo)
     train_loc = repo / "train.py"
     train_loc.write_text("experiment A\n")
     result = tree.commit_file(repo, "train.py", "A fine experiment")
-    assert result.sha == _head(repo)
+    assert result.sha == _get_head(repo)
     assert result.parent_sha == baseline_sha
     assert result.sha != baseline_sha
 
@@ -53,7 +53,7 @@ def test_discard(tmp_path: Path) -> None:
     assert _BASELINE_EXPERIMENT not in train_loc.read_text()
 
     tree.reset_hard(repo, result.parent_sha)
-    assert _head(repo) == result.parent_sha
+    assert _get_head(repo) == result.parent_sha
     assert _BASELINE_EXPERIMENT in train_loc.read_text()
 
 
@@ -71,7 +71,7 @@ def test_keep_continue(tmp_path: Path) -> None:
 
 def test_discard_continue(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
-    baseline_sha = _head(repo)
+    baseline_sha = _get_head(repo)
     train_loc = repo / "train.py"
     train_loc.write_text("experiment 1\n")
     discarded = tree.commit_file(repo, "train.py", "My first experiment")

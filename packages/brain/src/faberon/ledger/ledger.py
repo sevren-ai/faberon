@@ -170,7 +170,7 @@ class Ledger:
         )
         return [_row_to_campaign(row) for row in rows]
 
-    def campaigns_on_repo(self, repo_path: str) -> list[Campaign]:
+    def get_campaigns_on_repo(self, repo_path: str) -> list[Campaign]:
         """Return all campaigns targeting ``repo_path``, oldest first."""
         rows = self._conn.execute(
             """
@@ -224,7 +224,7 @@ class Ledger:
         for row in rows:
             yield _row_to_event(row)
 
-    def campaign_events(self, campaign_id: UUID) -> list[Event]:
+    def get_campaign_events(self, campaign_id: UUID) -> list[Event]:
         """Return all events for one campaign, in seq order."""
         rows = self._conn.execute(
             """
