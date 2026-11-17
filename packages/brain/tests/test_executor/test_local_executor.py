@@ -14,7 +14,7 @@ import uuid
 import pytest
 
 from faberon.executor import JobState, SubmitRequest
-from faberon.executor.local import LocalExecutor, _pid_alive
+from faberon.executor.local import LocalExecutor, _is_pid_alive
 
 _POLL_DEADLINE_S = 10
 _POLL_INTERVAL_S = 0.05
@@ -55,7 +55,7 @@ def _expire_deadline(state_dir, job_id: str) -> None:
 def _wait_terminal(executor: LocalExecutor, job_id: str):
     deadline = time.monotonic() + _POLL_DEADLINE_S
     while time.monotonic() < deadline:
-        info = executor.status(job_id)
+        info = executor.get_status(job_id)
         if info.state.is_terminal:
             return info
         time.sleep(_POLL_INTERVAL_S)
@@ -66,7 +66,7 @@ def _wait_for_death(pid: int) -> bool:
     """Poll until the pid is gone; False if it survives the deadline."""
     deadline = time.monotonic() + _POLL_DEADLINE_S
     while time.monotonic() < deadline:
-        if not _pid_alive(pid):
+        if not _is_pid_alive(pid):
             return True
         time.sleep(_POLL_INTERVAL_S)
     return False
@@ -89,7 +89,7 @@ def _submit_orphaning_wrapper(executor: LocalExecutor, tmp_path) -> tuple[str, i
         _request(f"sh -c 'sleep 30 & echo $! > {pidfile}; wait'", _key())
     )
     child_pid = _wait_for_pidfile(pidfile)
-    assert _pid_alive(child_pid)
+    assert _is_pid_alive(child_pid)
     return job_id, child_pid
 
 
@@ -174,7 +174,7 @@ def test_runs_in_cwd(executor: LocalExecutor, tmp_path):
 def test_cancel(executor: LocalExecutor):
     job_id = executor.submit(_request("sleep 30", _key()))
     executor.cancel(job_id)
-    info = executor.status(job_id)
+    info = executor.get_status(job_id)
     assert info.state == JobState.CANCELLED
     assert info.elapsed_seconds is not None
 
@@ -188,7 +188,7 @@ def test_walltime_enforcement(executor: LocalExecutor, tmp_path):
     record = json.loads(record_path.read_text())
     assert 0 < record["deadline"] - time.time() <= 5 * 60
     _expire_deadline(tmp_path / "state", job_id)
-    info = executor.status(job_id)
+    info = executor.get_status(job_id)
     assert info.state == JobState.FAILED
     assert info.exit_code is not None and info.exit_code != 0
 
@@ -197,7 +197,7 @@ def test_walltime_kills_group(executor: LocalExecutor, tmp_path):
     """A walltime kill signals the whole group."""
     job_id, child_pid = _submit_orphaning_wrapper(executor, tmp_path)
     _expire_deadline(tmp_path / "state", job_id)
-    assert executor.status(job_id).state == JobState.FAILED
+    assert executor.get_status(job_id).state == JobState.FAILED
     assert _wait_for_death(child_pid)
 
 
@@ -205,7 +205,7 @@ def test_cancel_reaches_group(executor: LocalExecutor, tmp_path):
     """A cancel signals the whole group."""
     job_id, child_pid = _submit_orphaning_wrapper(executor, tmp_path)
     executor.cancel(job_id)
-    assert executor.status(job_id).state == JobState.CANCELLED
+    assert executor.get_status(job_id).state == JobState.CANCELLED
     assert _wait_for_death(child_pid)
 
 
@@ -230,7 +230,7 @@ def test_idempotency_survives_restart(executor: LocalExecutor, tmp_path):
 
 def test_status_unknown_job(executor: LocalExecutor):
     with pytest.raises(KeyError):
-        executor.status("no-such-job")
+        executor.get_status("no-such-job")
 
 
 def test_restart_recovers_running_job(tmp_path):
@@ -241,7 +241,7 @@ def test_restart_recovers_running_job(tmp_path):
 
     # Simulate a brain restart: a fresh executor on the same dir.
     restarted = _make_executor(state_dir)
-    assert restarted.status(job_id).state == JobState.RUNNING
+    assert restarted.get_status(job_id).state == JobState.RUNNING
     info = _wait_terminal(restarted, job_id)
     assert info.state == JobState.COMPLETED
 
@@ -253,7 +253,7 @@ def test_restart_recovers_finished_job(tmp_path):
     _wait_terminal(first, job_id)
 
     restarted = _make_executor(state_dir)
-    info = restarted.status(job_id)
+    info = restarted.get_status(job_id)
     assert info.state == JobState.COMPLETED
     assert info.exit_code == 0
 
@@ -270,4 +270,4 @@ def test_restart_recovers_finished_job(tmp_path):
 def test_effective_walltime(walltime, max_walltime, expected, tmp_path):
     executor = _make_executor(tmp_path / "state", max_walltime=max_walltime)
     request = _request("true", _key(), walltime=walltime)
-    assert executor._effective_walltime(request) == expected
+    assert executor._get_effective_walltime(request) == expected

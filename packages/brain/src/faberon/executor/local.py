@@ -27,7 +27,7 @@ def _sanitize_job_id(job_id: str) -> str:
     return _JOB_ID_SAFE.sub("_", job_id)
 
 
-def _pid_alive(pid: int) -> bool:
+def _is_pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -68,7 +68,7 @@ class LocalExecutor:
         self._dir.mkdir(parents=True, exist_ok=True)
         self._max_walltime = max_walltime
 
-    def _effective_walltime(self, request: SubmitRequest) -> int:
+    def _get_effective_walltime(self, request: SubmitRequest) -> int:
         """Clamp the request's walltime to the deployment-side cap, if set."""
         if self._max_walltime is None:
             return request.walltime
@@ -77,7 +77,7 @@ class LocalExecutor:
     def submit(self, request: SubmitRequest) -> str:
         """Start the job, or return the existing id for a duplicate key."""
         job_id = _sanitize_job_id(request.submission_key)
-        path = self._record_path(job_id)
+        path = self._get_record_path(job_id)
 
         # Serialize submitters so two concurrent submits of the same key
         # cannot both spawn a process.
@@ -94,19 +94,19 @@ class LocalExecutor:
             fcntl.flock(lock, fcntl.LOCK_UN)
             lock.close()
 
-    def status(self, job_id: str) -> JobInfo:
-        record = _read_record(self._record_path(job_id))
+    def get_status(self, job_id: str) -> JobInfo:
+        record = _read_record(self._get_record_path(job_id))
         if record is None:
             raise KeyError(job_id)
         return self._refresh(record)
 
     def cancel(self, job_id: str) -> None:
-        record = _read_record(self._record_path(job_id))
+        record = _read_record(self._get_record_path(job_id))
         if record is None:
             return
         pid = record.get("pid")
         if record.get("exit_code") is None and pid is not None:
-            if _pid_alive(pid):
+            if _is_pid_alive(pid):
                 _signal_tree(pid, signal.SIGTERM)
                 record = self._settle(record, cancelled=True)
         if record.get("exit_code") is not None:
@@ -115,7 +115,7 @@ class LocalExecutor:
 
     # Internal helpers -------------------------------------------------
 
-    def _record_path(self, job_id: str) -> Path:
+    def _get_record_path(self, job_id: str) -> Path:
         return self._dir / f"{job_id}.json"
 
     def _spawn(self, job_id: str, request: SubmitRequest) -> dict[str, Any]:
@@ -142,7 +142,7 @@ class LocalExecutor:
             "submission_key": request.submission_key,
             "pid": proc.pid,
             "start_time": start,
-            "deadline": start + self._effective_walltime(request) * 60,
+            "deadline": start + self._get_effective_walltime(request) * 60,
             "exit_code": None,
             "cancelled": False,
         }
@@ -177,7 +177,7 @@ class LocalExecutor:
         record = dict(record)
         record["exit_code"] = exit_code
         record["end_time"] = time.time()
-        self._write_record(self._record_path(record["job_id"]), record)
+        self._write_record(self._get_record_path(record["job_id"]), record)
         return record
 
     def _to_info(self, record: dict[str, Any]) -> JobInfo:
@@ -219,7 +219,7 @@ def _wait_pid(pid: int, timeout: float) -> int | None:
             return 0
         if wpid == pid:
             return _status_to_exit_code(status)
-        if not _pid_alive(pid):
+        if not _is_pid_alive(pid):
             # Gone but not waitable (e.g. reaped elsewhere).
             return 0
         if time.monotonic() >= deadline:

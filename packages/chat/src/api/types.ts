@@ -23,13 +23,23 @@ export interface Campaign {
   workflow_id: string;
   plan: ResearchPlan;
   repo_path: string;
+  branch: string;
+  start_sha: string;
   poll_interval_seconds: number;
   created_at: string;
+}
+
+export interface CampaignProgress {
+  experiments_done: number;
+  gpu_hours_burned: number;
+  baseline: number;
+  best_metric: number | null;
 }
 
 export interface CampaignInfo {
   campaign: Campaign;
   status: CampaignStatus;
+  progress: CampaignProgress;
   stop_reason?: string | null;
 }
 

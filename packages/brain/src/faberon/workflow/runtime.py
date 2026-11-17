@@ -31,7 +31,7 @@ class Runtime:
         self, command: str, submission_key: str, walltime: int, repo_path: str
     ) -> str:
         """Start the job on the cluster. Idempotent on submission_key."""
-        output_path = _job_log_path(repo_path, submission_key)
+        output_path = _get_job_log_path(repo_path, submission_key)
         _private_dir(output_path.parent)
         request = SubmitRequest(
             command=command,
@@ -45,7 +45,7 @@ class Runtime:
     @DBOS.step()
     def status_step(self, job_id: str) -> JobInfo:
         """Read the current status of the job from the cluster."""
-        return self.executor.status(job_id)
+        return self.executor.get_status(job_id)
 
     @DBOS.step()
     def parse_metric_step(
@@ -57,7 +57,7 @@ class Runtime:
         log is expected to print a line containing the metric name followed
         by a float, for example `val_bpb: 1.10`.
         """
-        log = _job_log_path(repo_path, submission_key)
+        log = _get_job_log_path(repo_path, submission_key)
         try:
             stdout = log.read_text()
         except OSError:
@@ -162,7 +162,7 @@ class Runtime:
         )
 
 
-def _job_log_path(repo_path: str, submission_key: str) -> Path:
+def _get_job_log_path(repo_path: str, submission_key: str) -> Path:
     """The job's log file: ``{repo}/.faberon/{submission_key}.out``.
 
     The metric command reads this file, so the path is stable and derived

@@ -34,6 +34,20 @@ def current_head(repo: Path) -> str:
     return _run(repo, "rev-parse", "HEAD")
 
 
+def current_branch(repo: Path) -> str | None:
+    """Return the current branch name, or None on a detached HEAD."""
+    result = subprocess.run(
+        ["git", "-C", str(repo), "symbolic-ref", "-q", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 1:
+        return None
+    if result.returncode != 0:
+        raise RuntimeError(f"git symbolic-ref failed: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
 def commit_file(repo: Path, path: str, message: str) -> CommitResult:
     """Stage and commit one file on top of the current head.
 
