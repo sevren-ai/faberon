@@ -130,6 +130,24 @@ def test_untracked_files(tmp_path: Path) -> None:
     assert tree.get_untracked_files(repo) == []
 
 
+def test_has_commits(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    assert not tree.has_commits(repo)
+
+    _git(repo, "config", "user.email", "smith@forge.com")
+    _git(repo, "config", "user.name", "Black")
+    (repo / "train.py").write_text("baseline\n")
+    _git(repo, "add", "train.py")
+    _git(repo, "commit", "-m", "baseline")
+    assert tree.has_commits(repo)
+
+    # Not a repo at all is an error, not an empty repo.
+    with pytest.raises(RuntimeError):
+        tree.has_commits(tmp_path)
+
+
 def test_branch_helpers(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     head = _head(repo)

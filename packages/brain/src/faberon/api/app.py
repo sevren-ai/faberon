@@ -44,6 +44,7 @@ from ..workflow.tree import (
     get_current_head,
     get_uncommitted_changes,
     get_untracked_files,
+    has_commits,
 )
 from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
 
@@ -234,9 +235,16 @@ def _register_routes(app: FastAPI) -> None:
         # Record the repo state the campaign starts from.
         repo = Path(body.repo_path)
         try:
-            start_sha = get_current_head(repo)
+            empty = not has_commits(repo)
         except RuntimeError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
+        # A repo without commits has no HEAD to anchor the campaign on.
+        if empty:
+            raise HTTPException(
+                status_code=409,
+                detail="repo has no commits, make an initial commit first",
+            )
+        start_sha = get_current_head(repo)
 
         # A repo with uncommited changes is not allowed
         dirty = get_uncommitted_changes(repo)

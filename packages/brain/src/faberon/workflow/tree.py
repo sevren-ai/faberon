@@ -34,6 +34,20 @@ def get_current_head(repo: Path) -> str:
     return _run(repo, "rev-parse", "HEAD")
 
 
+def has_commits(repo: Path) -> bool:
+    """Return whether the repo has at least one commit."""
+    result = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    raise RuntimeError(f"git rev-parse failed: {result.stderr.strip()}")
+
+
 def get_current_branch(repo: Path) -> str | None:
     """Return the current branch name, or None on a detached HEAD."""
     result = subprocess.run(

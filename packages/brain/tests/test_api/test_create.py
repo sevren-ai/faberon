@@ -82,6 +82,17 @@ def test_non_repo(api: ApiFixture, tmp_path):
     assert response.status_code == 422
 
 
+def test_empty_repo(api: ApiFixture, tmp_path):
+    """A repo without a single commit has no HEAD to start a campaign from."""
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    _git(str(empty), "init", "-b", "main")
+    body = _create_body(str(uuid.uuid4()), str(empty))
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 409
+    assert "no commits" in response.json()["detail"]
+
+
 def test_detached_head(api: ApiFixture):
     """A repo on a detached HEAD has no branch for the campaign to commit on."""
     subprocess.run(
