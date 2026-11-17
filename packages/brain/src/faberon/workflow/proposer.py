@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
+from pydantic import ValidationError
 from pydantic_ai import Agent, ModelRetry, RunContext
+from pydantic_ai.exceptions import ToolRetryError, UnexpectedModelBehavior
 from pydantic_ai.models import Model, infer_model
 from pydantic_ai.settings import ModelSettings
 
@@ -95,11 +97,15 @@ class AgentProposer:
             ctx: RunContext[ProposalContext], proposal: Proposal
         ) -> Proposal:
             if proposal.content == ctx.deps.current_content:
-                raise ModelRetry("The replacement must change the target file.")
+                raise ModelRetry(
+                    "The proposed file content is identical to the current target file."
+                )
             try:
                 ast.parse(proposal.content)
             except SyntaxError as e:
-                raise ModelRetry(f"The replacement is not valid Python: {e}") from e
+                raise ModelRetry(
+                    f"The proposed file content is not valid Python: {e}"
+                ) from e
             return proposal
 
     @classmethod
@@ -119,7 +125,9 @@ class AgentProposer:
     ) -> Proposal:
         """Propose one replacement using the plan and current campaign state.
 
-        Raises ``TimeoutError`` after ``timeout`` seconds.
+        Raises ``TimeoutError`` after ``timeout`` seconds. When the model's
+        output is rejected on every retry, raises ``UnexpectedModelBehavior``
+        whose message names the last rejection reason.
         """
         prompt = (
             f"Goal: {plan.goal}\n"
@@ -132,25 +140,51 @@ class AgentProposer:
         # Two layers of timeout.
         # 1. Via the model client's HTTP request (some providers ignore it)
         # 2. _run_with_timeout cancels the run and raises TimeoutError
-        result = _run_with_timeout(
-            self._loop,
-            self._timeout,
-            lambda: self._agent.run(
-                prompt,
-                model=self._model,
-                model_settings=ModelSettings(timeout=self._timeout),
-                deps=ProposalContext(
-                    events=self._events,
-                    campaign_id=campaign_id,
-                    current_content=current_content,
+        try:
+            result = _run_with_timeout(
+                self._loop,
+                self._timeout,
+                lambda: self._agent.run(
+                    prompt,
+                    model=self._model,
+                    model_settings=ModelSettings(timeout=self._timeout),
+                    deps=ProposalContext(
+                        events=self._events,
+                        campaign_id=campaign_id,
+                        current_content=current_content,
+                    ),
                 ),
-            ),
-        )
+            )
+        except UnexpectedModelBehavior as e:
+            # Pydantic AI's retry-exhaustion message omits why the output was
+            # rejected. The reason is only on the exception's cause.
+            if e.__cause__ is None:
+                raise
+            reason = _describe_rejection(e.__cause__)
+            raise UnexpectedModelBehavior(
+                f"{e.message}. Cause: {reason}", e.body
+            ) from e
         return result.output
 
     def close(self) -> None:
         """Shut the worker loop down. The proposer must not be used after."""
         self._loop.close()
+
+
+def _describe_rejection(error: BaseException) -> str:
+    """Return a one-line reason the model's output was rejected.
+
+    ``error`` is a schema ``ValidationError``, a ``ToolRetryError`` wrapping
+    one, or a ``ModelRetry`` from the output validator.
+    """
+    if isinstance(error, ToolRetryError) and error.__cause__ is not None:
+        error = error.__cause__
+    if not isinstance(error, ValidationError):
+        return str(error)
+    return "; ".join(
+        f"invalid {'.'.join(map(str, d['loc']))}: {d['msg']}" if d["loc"] else d["msg"]
+        for d in error.errors(include_url=False)
+    )
 
 
 class _ProposerLoop:
