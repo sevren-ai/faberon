@@ -97,6 +97,15 @@ def checkout(repo: Path, branch: str) -> None:
     _run(repo, "checkout", branch)
 
 
+def ensure_branch(repo: Path, branch: str) -> None:
+    """Raise when the repo is not on the given branch."""
+    actual = get_current_branch(repo) or "detached HEAD"
+    if actual != branch:
+        raise RuntimeError(
+            f"repo is on {actual}, not the campaign branch {branch}; refusing to write"
+        )
+
+
 def commit_file(repo: Path, path: str, message: str) -> CommitResult:
     """Stage and commit one file on top of the current head.
 

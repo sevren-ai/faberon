@@ -147,3 +147,17 @@ def test_branch_helpers(tmp_path: Path) -> None:
     assert tree.get_current_branch(repo) == "work"
     tree.checkout(repo, "main")
     assert tree.get_current_branch(repo) == "main"
+
+
+def test_ensure_branch(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    tree.ensure_branch(repo, "main")
+
+    _git(repo, "checkout", "-b", "other")
+    with pytest.raises(RuntimeError, match="not the campaign branch main"):
+        tree.ensure_branch(repo, "main")
+    tree.ensure_branch(repo, "other")
+
+    _git(repo, "checkout", "--detach", "HEAD")
+    with pytest.raises(RuntimeError, match="detached HEAD"):
+        tree.ensure_branch(repo, "main")

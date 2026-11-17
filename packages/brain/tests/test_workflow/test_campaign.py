@@ -41,6 +41,35 @@ def dbos() -> Iterator[None]:
     DBOS.destroy()
 
 
+def test_write_steps_refuse_wrong_branch(dbos, repo):
+    """Commit and discard refuse to write off the campaign branch."""
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(config.database_url()),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(runtime, proposer=FakeProposer())
+    head = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "-C", str(repo), "checkout", "-b", "other"],
+        check=True,
+        capture_output=True,
+    )
+    (repo / "train.py").write_text("experiment\n")
+    DBOS.launch()
+
+    with pytest.raises(RuntimeError, match="not the campaign branch main"):
+        runner.commit_step(repo, "main", "train.py", "exp 1: x")
+    with pytest.raises(RuntimeError, match="not the campaign branch main"):
+        runner.discard_step(repo, "main", head)
+
+
 def test_campaign_stops_on_max_experiments(dbos, repo):
     # Create runtime with fake executor
     runtime = Runtime(
