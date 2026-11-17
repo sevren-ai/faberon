@@ -37,6 +37,7 @@ from ..workflow import (
 from ..workflow.tree import (
     branch_exists,
     create_branch,
+    ensure_exclude,
     get_branch_tip,
     get_current_branch,
     get_current_head,
@@ -241,6 +242,10 @@ def _register_routes(app: FastAPI) -> None:
         if dirty:
             error = "repo has uncommitted changes, commit or stash them first"
             raise HTTPException(status_code=409, detail=error)
+
+        # Faberon's own run logs land in {repo}/.faberon; declare the
+        # directory disposable up front.
+        ensure_exclude(repo, ".faberon/")
 
         # Neither are untracked files outside .gitignore
         untracked = get_untracked_files(repo)

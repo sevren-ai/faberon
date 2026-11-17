@@ -97,6 +97,16 @@ def checkout(repo: Path, branch: str) -> None:
     _run(repo, "checkout", branch)
 
 
+def ensure_exclude(repo: Path, entry: str) -> None:
+    """Add entry to the repo's local exclude file (.git/info/exclude)."""
+    exclude = repo / ".git" / "info" / "exclude"
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    existing = exclude.read_text() if exclude.exists() else ""
+    if entry not in existing.splitlines():
+        with exclude.open("a") as f:
+            f.write(entry + "\n")
+
+
 def ensure_branch(repo: Path, branch: str) -> None:
     """Raise when the repo is not on the given branch."""
     actual = get_current_branch(repo) or "detached HEAD"

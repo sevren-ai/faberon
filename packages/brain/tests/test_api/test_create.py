@@ -117,6 +117,20 @@ def test_dirty_tree(api: ApiFixture):
     assert (Path(api.repo_path) / "notes.txt").exists()
 
 
+def test_faberon_logs(api: ApiFixture):
+    """Pre-existing .faberon run logs are declared disposable at creation."""
+    log_dir = Path(api.repo_path) / ".faberon"
+    log_dir.mkdir()
+    (log_dir / "old-campaign:1.out").write_text("val_bpb: 1.10\n")
+    response = api.client.post(
+        "/v0/campaigns", json=_create_body(str(uuid.uuid4()), api.repo_path)
+    )
+    assert response.status_code == 201
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+    exclude = Path(api.repo_path) / ".git" / "info" / "exclude"
+    assert ".faberon/" in exclude.read_text().splitlines()
+
+
 def test_untracked_tree(api: ApiFixture):
     """Untracked files not covered by .gitignore are rejected with guidance."""
     (Path(api.repo_path) / "helpers.py").write_text("x = 1\n")

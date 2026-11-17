@@ -10,6 +10,7 @@ from ..executor import Executor, JobInfo, JobState, SubmitRequest
 from ..ledger import Ledger
 from ..schema.events import Actor, Event, EventType
 from .models import ExperimentResult, ExperimentSetup
+from .tree import ensure_exclude
 
 
 @DBOS.dbos_class()
@@ -33,7 +34,7 @@ class Runtime:
         """Start the job on the cluster. Idempotent on submission_key."""
         output_path = _job_log_path(repo_path, submission_key)
         _private_dir(output_path.parent)
-        _git_exclude(repo_path, ".faberon/")
+        ensure_exclude(Path(repo_path), ".faberon/")
         request = SubmitRequest(
             command=command,
             submission_key=submission_key,
@@ -176,16 +177,6 @@ def _private_dir(path: Path) -> None:
     """Create a directory readable only by its owner."""
     path.mkdir(parents=True, exist_ok=True)
     os.chmod(path, 0o700)
-
-
-def _git_exclude(repo_path: str, entry: str) -> None:
-    """Declare a repo-local path disposable through .git/info/exclude."""
-    exclude = Path(repo_path) / ".git" / "info" / "exclude"
-    exclude.parent.mkdir(parents=True, exist_ok=True)
-    existing = exclude.read_text() if exclude.exists() else ""
-    if entry not in existing.splitlines():
-        with exclude.open("a") as f:
-            f.write(entry + "\n")
 
 
 # -XXX.YYe-Z

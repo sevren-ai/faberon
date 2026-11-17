@@ -149,6 +149,17 @@ def test_branch_helpers(tmp_path: Path) -> None:
     assert tree.get_current_branch(repo) == "main"
 
 
+def test_ensure_exclude(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    tree.ensure_exclude(repo, ".faberon/")
+    exclude = repo / ".git" / "info" / "exclude"
+    assert ".faberon/" in exclude.read_text().splitlines()
+
+    # Idempotent: no duplicate entry.
+    tree.ensure_exclude(repo, ".faberon/")
+    assert exclude.read_text().splitlines().count(".faberon/") == 1
+
+
 def test_ensure_branch(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     tree.ensure_branch(repo, "main")
