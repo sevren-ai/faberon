@@ -22,7 +22,7 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _get_head(repo: Path) -> str:
-    return tree.get_current_head(repo)
+    return tree.current_head(repo)
 
 
 def test_commit_file(tmp_path: Path) -> None:
