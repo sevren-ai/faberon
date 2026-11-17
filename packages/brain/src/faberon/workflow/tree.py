@@ -29,12 +29,12 @@ def _run(repo: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def current_head(repo: Path) -> str:
+def get_current_head(repo: Path) -> str:
     """Return the full sha of the current head commit."""
     return _run(repo, "rev-parse", "HEAD")
 
 
-def current_branch(repo: Path) -> str | None:
+def get_current_branch(repo: Path) -> str | None:
     """Return the current branch name, or None on a detached HEAD."""
     result = subprocess.run(
         ["git", "-C", str(repo), "symbolic-ref", "-q", "--short", "HEAD"],
@@ -48,13 +48,13 @@ def current_branch(repo: Path) -> str | None:
     return result.stdout.strip()
 
 
-def uncommitted_changes(repo: Path) -> list[str]:
+def get_uncommitted_changes(repo: Path) -> list[str]:
     """Return tracked files with uncommited changes"""
     out = _run(repo, "diff", "--name-only", "HEAD", "--")
     return out.splitlines()
 
 
-def untracked_files(repo: Path) -> list[str]:
+def get_untracked_files(repo: Path) -> list[str]:
     """Return untracked files that .gitignore or exclude does not cover."""
     out = _run(repo, "ls-files", "--others", "--exclude-standard")
     return out.splitlines()
@@ -82,7 +82,7 @@ def branch_exists(repo: Path, name: str) -> bool:
     raise RuntimeError(f"git rev-parse failed: {result.stderr.strip()}")
 
 
-def branch_tip(repo: Path, name: str) -> str:
+def get_branch_tip(repo: Path, name: str) -> str:
     """Return the full sha of the branch's tip commit."""
     return _run(repo, "rev-parse", f"refs/heads/{name}")
 
@@ -105,10 +105,10 @@ def commit_file(repo: Path, path: str, message: str) -> CommitResult:
       - The given file exists
       - The given file differs from the head's version
     """
-    parent_sha = current_head(repo)
+    parent_sha = get_current_head(repo)
     _run(repo, "add", path)
     _run(repo, "commit", "-m", message)
-    return CommitResult(sha=current_head(repo), parent_sha=parent_sha)
+    return CommitResult(sha=get_current_head(repo), parent_sha=parent_sha)
 
 
 def reset_hard(repo: Path, sha: str) -> None:

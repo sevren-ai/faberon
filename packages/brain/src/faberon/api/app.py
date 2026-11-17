@@ -36,12 +36,12 @@ from ..workflow import (
 )
 from ..workflow.tree import (
     branch_exists,
-    branch_tip,
+    get_branch_tip,
     create_branch,
-    current_branch,
-    current_head,
-    uncommitted_changes,
-    untracked_files,
+    get_current_branch,
+    get_current_head,
+    get_uncommitted_changes,
+    get_untracked_files,
 )
 from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
 
@@ -232,18 +232,18 @@ def _register_routes(app: FastAPI) -> None:
         # Record the repo state the campaign starts from.
         repo = Path(body.repo_path)
         try:
-            start_sha = current_head(repo)
+            start_sha = get_current_head(repo)
         except RuntimeError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
 
         # A repo with uncommited changes is not allowed
-        dirty = uncommitted_changes(repo)
+        dirty = get_uncommitted_changes(repo)
         if dirty:
             error = "repo has uncommitted changes, commit or stash them first"
             raise HTTPException(status_code=409, detail=error)
 
         # Neither are untracked files outside .gitignore
-        untracked = untracked_files(repo)
+        untracked = get_untracked_files(repo)
         if untracked:
             error = (
                 "repo has untracked files, commit them, "
@@ -254,7 +254,7 @@ def _register_routes(app: FastAPI) -> None:
         branch = body.branch
         if branch is None:
             # Default: repo's current branch
-            branch = current_branch(repo)
+            branch = get_current_branch(repo)
             if branch is None:
                 raise HTTPException(
                     status_code=409,
@@ -265,7 +265,7 @@ def _register_routes(app: FastAPI) -> None:
                 )
         elif branch_exists(repo, branch):
             # Adopt existing branch
-            start_sha = branch_tip(repo, branch)
+            start_sha = get_branch_tip(repo, branch)
         else:
             # Create named branch
             try:

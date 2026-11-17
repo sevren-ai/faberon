@@ -22,7 +22,7 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _head(repo: Path) -> str:
-    return tree.current_head(repo)
+    return tree.get_current_head(repo)
 
 
 def test_commit_file(tmp_path: Path) -> None:
@@ -100,34 +100,34 @@ def test_discard_uncommitted_changes(tmp_path: Path) -> None:
 
 def test_uncommitted_changes(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
-    assert tree.uncommitted_changes(repo) == []
+    assert tree.get_uncommitted_changes(repo) == []
 
     # Untracked files do not count.
     (repo / "notes.txt").write_text("scratch\n")
-    assert tree.uncommitted_changes(repo) == []
+    assert tree.get_uncommitted_changes(repo) == []
 
     # Modified and staged tracked files do.
     (repo / "train.py").write_text("work in progress\n")
-    assert tree.uncommitted_changes(repo) == ["train.py"]
+    assert tree.get_uncommitted_changes(repo) == ["train.py"]
     _git(repo, "add", "train.py")
-    assert tree.uncommitted_changes(repo) == ["train.py"]
+    assert tree.get_uncommitted_changes(repo) == ["train.py"]
 
 
 def test_untracked_files(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
-    assert tree.untracked_files(repo) == []
+    assert tree.get_untracked_files(repo) == []
 
     (repo / "helpers.py").write_text("x = 1\n")
-    assert tree.untracked_files(repo) == ["helpers.py"]
+    assert tree.get_untracked_files(repo) == ["helpers.py"]
 
     # Ignored files do not count.
     (repo / ".gitignore").write_text("helpers.py\noutputs/\n")
     (repo / "outputs").mkdir()
     (repo / "outputs" / "log.txt").write_text("run output\n")
-    assert tree.untracked_files(repo) == [".gitignore"]
+    assert tree.get_untracked_files(repo) == [".gitignore"]
     _git(repo, "add", ".gitignore")
     _git(repo, "commit", "-m", "ignore rules")
-    assert tree.untracked_files(repo) == []
+    assert tree.get_untracked_files(repo) == []
 
 
 def test_branch_helpers(tmp_path: Path) -> None:
@@ -135,15 +135,15 @@ def test_branch_helpers(tmp_path: Path) -> None:
     head = _head(repo)
     assert tree.branch_exists(repo, "main")
     assert not tree.branch_exists(repo, "work")
-    assert tree.branch_tip(repo, "main") == head
+    assert tree.get_branch_tip(repo, "main") == head
 
     tree.create_branch(repo, "work", head)
     assert tree.branch_exists(repo, "work")
-    assert tree.branch_tip(repo, "work") == head
+    assert tree.get_branch_tip(repo, "work") == head
     # Creating a branch does not move HEAD.
-    assert tree.current_branch(repo) == "main"
+    assert tree.get_current_branch(repo) == "main"
 
     tree.checkout(repo, "work")
-    assert tree.current_branch(repo) == "work"
+    assert tree.get_current_branch(repo) == "work"
     tree.checkout(repo, "main")
-    assert tree.current_branch(repo) == "main"
+    assert tree.get_current_branch(repo) == "main"

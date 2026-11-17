@@ -149,6 +149,7 @@ This runs `uv sync --locked`, `ruff format`, `ruff check --fix`, and `ty check` 
   - Do not add test-only defaults, flags, or branches that exist solely so a test can reach in.
 - Optional parameters (those with defaults) are typically keyword-only, separated from required parameters by `*` in the function declaration.
 - Do not use `from __future__ import annotations`. The project requires Python 3.14, so modern annotation syntax (`X | Y`, `list[str]`, etc.) works natively at runtime. Write annotations directly.
+- Functions are verb-named. Actions read as commands (`commit_file`, `reset_hard`, `create_branch`); accessors that return a value take a `get_` prefix (`get_current_head`, `get_branch_tip`).
 
 ### Imports
 
