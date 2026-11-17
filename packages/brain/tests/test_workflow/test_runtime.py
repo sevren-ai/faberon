@@ -2,7 +2,7 @@
 
 import pytest
 
-from faberon.workflow.runtime import _parse_metric, _private_dir
+from faberon.workflow.runtime import _git_exclude, _parse_metric, _private_dir
 
 
 @pytest.mark.parametrize(
@@ -29,3 +29,14 @@ def test_private_dir_tightens_existing_dir(tmp_path) -> None:
     path.mkdir(mode=0o755)
     _private_dir(path)
     assert path.stat().st_mode & 0o777 == 0o700
+
+
+def test_git_exclude(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    _git_exclude(str(repo), ".faberon/")
+    exclude = repo / ".git" / "info" / "exclude"
+    assert exclude.read_text() == ".faberon/\n"
+
+    # Idempotent: no duplicate entry.
+    _git_exclude(str(repo), ".faberon/")
+    assert exclude.read_text() == ".faberon/\n"

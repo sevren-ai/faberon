@@ -41,6 +41,7 @@ from ..workflow.tree import (
     current_branch,
     current_head,
     uncommitted_changes,
+    untracked_files,
 )
 from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
 
@@ -239,6 +240,15 @@ def _register_routes(app: FastAPI) -> None:
         dirty = uncommitted_changes(repo)
         if dirty:
             error = "repo has uncommitted changes, commit or stash them first"
+            raise HTTPException(status_code=409, detail=error)
+
+        # Neither are untracked files outside .gitignore
+        untracked = untracked_files(repo)
+        if untracked:
+            error = (
+                "repo has untracked files, commit them, "
+                "add them to .gitignore, or remove them first"
+            )
             raise HTTPException(status_code=409, detail=error)
 
         branch = body.branch

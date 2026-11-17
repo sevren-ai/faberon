@@ -113,6 +113,23 @@ def test_uncommitted_changes(tmp_path: Path) -> None:
     assert tree.uncommitted_changes(repo) == ["train.py"]
 
 
+def test_untracked_files(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    assert tree.untracked_files(repo) == []
+
+    (repo / "helpers.py").write_text("x = 1\n")
+    assert tree.untracked_files(repo) == ["helpers.py"]
+
+    # Ignored files do not count.
+    (repo / ".gitignore").write_text("helpers.py\noutputs/\n")
+    (repo / "outputs").mkdir()
+    (repo / "outputs" / "log.txt").write_text("run output\n")
+    assert tree.untracked_files(repo) == [".gitignore"]
+    _git(repo, "add", ".gitignore")
+    _git(repo, "commit", "-m", "ignore rules")
+    assert tree.untracked_files(repo) == []
+
+
 def test_branch_helpers(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     head = _head(repo)

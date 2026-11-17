@@ -104,14 +104,35 @@ def test_dirty_tree(api: ApiFixture):
     assert response.status_code == 409
     assert "commit or stash" in response.json()["detail"]
 
-    # Restore the tree; an untracked file may stay.
+    # Restore the tree; an ignored untracked file may stay.
     _git(api.repo_path, "checkout", "--", "train.py")
+    (Path(api.repo_path) / ".gitignore").write_text("notes.txt\n")
+    _git(api.repo_path, "add", ".gitignore")
+    _git(api.repo_path, "commit", "-m", "ignore notes")
     (Path(api.repo_path) / "notes.txt").write_text("scratch\n")
     response = api.client.post("/v0/campaigns", json=body)
     assert response.status_code == 201
     DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
-    # The campaign's discards (reset --hard) left the untracked file alone.
+    # The campaign's discards (reset --hard) left the ignored file alone.
     assert (Path(api.repo_path) / "notes.txt").exists()
+
+
+def test_untracked_tree(api: ApiFixture):
+    """Untracked files not covered by .gitignore are rejected with guidance."""
+    (Path(api.repo_path) / "helpers.py").write_text("x = 1\n")
+    body = _create_body(str(uuid.uuid4()), api.repo_path)
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 409
+    assert "untracked" in response.json()["detail"]
+
+    # Ignoring the file unblocks creation.
+    (Path(api.repo_path) / ".gitignore").write_text("helpers.py\n")
+    _git(api.repo_path, "add", ".gitignore")
+    # The .gitignore file must be committed
+    _git(api.repo_path, "commit", "-m", "ignore helpers")
+    response = api.client.post("/v0/campaigns", json=body)
+    assert response.status_code == 201
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
 
 
 def test_new_branch(api: ApiFixture):

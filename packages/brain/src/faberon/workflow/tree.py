@@ -54,6 +54,12 @@ def uncommitted_changes(repo: Path) -> list[str]:
     return out.splitlines()
 
 
+def untracked_files(repo: Path) -> list[str]:
+    """Return untracked files that .gitignore or exclude does not cover."""
+    out = _run(repo, "ls-files", "--others", "--exclude-standard")
+    return out.splitlines()
+
+
 def branch_exists(repo: Path, name: str) -> bool:
     """Return whether the repo has a local branch with that name."""
     result = subprocess.run(
