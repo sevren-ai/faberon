@@ -36,6 +36,7 @@ from ..workflow import (
 )
 from ..workflow.tree import (
     branch_exists,
+    checkout,
     create_branch,
     ensure_exclude,
     get_branch_tip,
@@ -277,6 +278,12 @@ def _register_routes(app: FastAPI) -> None:
                 create_branch(repo, branch, start_sha)
             except RuntimeError as e:
                 raise HTTPException(status_code=422, detail=str(e)) from e
+
+        # Fail early: a checkout failure rejects the request
+        try:
+            checkout(repo, branch)
+        except RuntimeError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
 
         setup = CampaignSetup(
             campaign_id=campaign_id,

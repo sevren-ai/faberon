@@ -207,6 +207,19 @@ def test_existing_branch(api: ApiFixture):
     assert _git(api.repo_path, "symbolic-ref", "--short", "HEAD") == "adopted"
 
 
+def test_checkout_failure(api: ApiFixture):
+    """A failed checkout rejects creation; no campaign is recorded."""
+    # A stale index lock passes the clean-tree checks but blocks checkout.
+    (Path(api.repo_path) / ".git" / "index.lock").write_text("")
+    camp_id = str(uuid.uuid4())
+    response = api.client.post(
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
+    )
+    assert response.status_code == 422
+    assert "index.lock" in response.json()["detail"]
+    assert api.client.get(f"/v0/campaigns/{camp_id}").status_code == 404
+
+
 def test_invalid_branch(api: ApiFixture):
     body = _create_body(str(uuid.uuid4()), api.repo_path)
     body["branch"] = "no..dots"

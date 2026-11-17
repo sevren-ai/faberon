@@ -106,6 +106,8 @@ class CampaignRunner:
         prop_fails = 0
 
         try:
+            # Creation already checked out; repeat so resume and recovery
+            # establish the branch before the loop commits.
             self.checkout_step(repo, setup.branch)
             while True:
                 # One check site, in precedence order: cancel, budget, cap.
