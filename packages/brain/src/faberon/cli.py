@@ -33,7 +33,7 @@ _INIT_DEFAULTS = {
 }
 
 
-def _chat_install_guidance() -> None:
+def _print_chat_install_guidance() -> None:
     """Explain how to install the chat interface, then exit."""
     echo("the chat interface is not available from this install", err=True)
     echo("install it into Pi with one of:", err=True)
@@ -69,7 +69,7 @@ def _main(
 
 
 @contextlib.contextmanager
-def _client() -> Iterator[httpx2.Client]:
+def _make_client() -> Iterator[httpx2.Client]:
     """Build an API client from the config file, or exit with guidance"""
     try:
         base_url = config.api_url()
@@ -153,7 +153,7 @@ def serve(
         raise typer.Exit(code=2)
     db_url = settings["database_url"]
     if err := _probe_db(db_url):
-        echo(f"cannot connect to Postgres at {_redacted(db_url)}: {err}", err=True)
+        echo(f"cannot connect to Postgres at {_redact(db_url)}: {err}", err=True)
         echo(
             "start Postgres first (install guide, step A1 or B1); on a login "
             "node, Postgres only runs on the node where you started it "
@@ -162,7 +162,7 @@ def serve(
         )
         raise typer.Exit(code=2)
     echo(f"executor: {name}")
-    echo(f"database: {_redacted(settings['database_url'])}")
+    echo(f"database: {_redact(settings['database_url'])}")
     echo(f"model:    {settings['model']}")
     uvicorn.run(
         functools.partial(factories[name], no_recover=no_recover),
@@ -173,7 +173,7 @@ def serve(
     )
 
 
-def _postgres_env() -> dict[str, str]:
+def _get_postgres_env() -> dict[str, str]:
     """The no-sudo Postgres settings (postgres.env), if any.
 
     The file has a fixed format written by install-postgres-no-sudo.sh:
@@ -193,7 +193,7 @@ def _postgres_env() -> dict[str, str]:
     return values
 
 
-def _redacted(url: str) -> str:
+def _redact(url: str) -> str:
     """The URL with any password masked, for display."""
     try:
         return make_url(url).render_as_string(hide_password=True)
@@ -224,7 +224,7 @@ def _probe_db(db_url: str) -> str | None:
         return " ".join(str(exc).split())
 
 
-def _server_up(db_url: str) -> str | None:
+def _is_server_up(db_url: str) -> str | None:
     """None when the Postgres server is running, else the connection error."""
     maintenance = (
         make_url(db_url).set(database="postgres").render_as_string(hide_password=False)
@@ -287,7 +287,7 @@ def init() -> None:
     if existing:
         echo(f"updating existing config at {path}")
     echo("press Enter to accept the proposed default shown in brackets []")
-    pg_env = _postgres_env()
+    pg_env = _get_postgres_env()
 
     db_default = (
         pg_env.get("FABERON_PG_URL")
@@ -296,14 +296,14 @@ def init() -> None:
     )
     db_url = (
         typer.prompt(
-            f"Postgres URL [{_redacted(db_default)}]", default="", show_default=False
+            f"Postgres URL [{_redact(db_default)}]", default="", show_default=False
         )
         or db_default
     )
     if _probe_db(db_url) is not None:
-        if (up_err := _server_up(db_url)) is not None:
+        if (up_err := _is_server_up(db_url)) is not None:
             echo(
-                f"cannot connect to Postgres at {_redacted(db_url)}: {up_err}",
+                f"cannot connect to Postgres at {_redact(db_url)}: {up_err}",
                 err=True,
             )
             echo(
@@ -313,7 +313,7 @@ def init() -> None:
                 err=True,
             )
             raise typer.Exit(code=2)
-        echo(f"creating database for {_redacted(db_url)}")
+        echo(f"creating database for {_redact(db_url)}")
         _create_db(db_url, pg_env)
         if (err := _probe_db(db_url)) is not None:
             echo(
@@ -439,7 +439,7 @@ def create_campaign(
     }
     if branch is not None:
         payload["branch"] = branch
-    with _client() as client:
+    with _make_client() as client:
         response = _check(client.post("/v0/campaigns", json=payload))
         created = response.json()
         echo(f"campaign: {created['campaign_id']}")
@@ -451,7 +451,7 @@ def list_campaigns(
     as_json: bool = Option(False, "--json", "-j", help="Emit machine-readable JSON."),
 ) -> None:
     """List all campaigns with their live status."""
-    with _client() as client:
+    with _make_client() as client:
         response = _check(client.get("/v0/campaigns"))
         infos = response.json()
         if as_json:
@@ -499,7 +499,7 @@ def show_campaign(
     as_json: bool = Option(False, "--json", "-j", help="Emit machine-readable JSON."),
 ) -> None:
     """Show one campaign's status and plan."""
-    with _client() as client:
+    with _make_client() as client:
         response = _check(client.get(f"/v0/campaigns/{campaign_id}"))
         info = response.json()
         if as_json:
@@ -548,7 +548,7 @@ def campaign_events(
     def _render(event: Event) -> str:
         return event.model_dump_json() if as_json else event.format(verbose=verbose)
 
-    with _client() as client:
+    with _make_client() as client:
         if not follow:
             response = _check(
                 client.get(
@@ -593,7 +593,7 @@ def cancel_campaign(
     elif not reason.strip():
         echo("reason must not be empty", err=True)
         raise typer.Exit(code=2)
-    with _client() as client:
+    with _make_client() as client:
         response = _check(
             client.post(
                 f"/v0/campaigns/{campaign_id}/cancel",
@@ -606,7 +606,7 @@ def cancel_campaign(
 @app.command("resume")
 def resume_campaign(campaign_id: UUID) -> None:
     """Resume a pending campaign from its last checkpoint."""
-    with _client() as client:
+    with _make_client() as client:
         response = _check(client.post(f"/v0/campaigns/{campaign_id}/resume"))
         echo(response.json()["status"])
 
@@ -630,7 +630,7 @@ def chat(ctx: typer.Context) -> None:
     shim = shutil.which("faberon-chat")
     if shim is not None:
         os.execvp(shim, [shim, *ctx.args])
-    _chat_install_guidance()
+    _print_chat_install_guidance()
 
 
 def main() -> None:

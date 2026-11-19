@@ -67,7 +67,7 @@ def test_effective_walltime(walltime, max_walltime, expected):
         output_path="/o",
         cwd="/r",
     )
-    assert executor._effective_walltime(request) == expected
+    assert executor._get_effective_walltime(request) == expected
 
 
 def test_effective_walltime_no_cap():
@@ -79,7 +79,7 @@ def test_effective_walltime_no_cap():
         output_path="/o",
         cwd="/r",
     )
-    assert executor._effective_walltime(request) == 90
+    assert executor._get_effective_walltime(request) == 90
 
 
 @pytest.mark.parametrize(

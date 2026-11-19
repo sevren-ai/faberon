@@ -67,7 +67,7 @@ _EVENT = {
 }
 
 
-def _make_client(handler) -> httpx2.Client:
+def _client_from_handler(handler) -> httpx2.Client:
     return httpx2.Client(
         base_url="http://testserver",
         transport=httpx2.MockTransport(handler),
@@ -83,7 +83,7 @@ def api_client(monkeypatch: pytest.MonkeyPatch):
     def handler(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, json=responses[(request.method, request.url.path)])
 
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(handler))
+    monkeypatch.setattr(cli, "_make_client", lambda: _client_from_handler(handler))
     return responses
 
 
@@ -126,7 +126,7 @@ def test_api_error_is_friendly(monkeypatch: pytest.MonkeyPatch):
     def handler(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(404, json={"detail": "campaign not found"})
 
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(handler))
+    monkeypatch.setattr(cli, "_make_client", lambda: _client_from_handler(handler))
     result = runner.invoke(cli.app, ["show", CAMPAIGN_ID])
     assert result.exit_code == 1
     assert "campaign not found" in result.output
@@ -421,7 +421,7 @@ def test_init_creates_missing_database(tmp_path, monkeypatch: pytest.MonkeyPatch
     probed: dict[str, str | None] = {"err": "database missing"}
     calls = []
     monkeypatch.setattr(cli, "_probe_db", lambda url: probed["err"])
-    monkeypatch.setattr(cli, "_server_up", lambda url: None)
+    monkeypatch.setattr(cli, "_is_server_up", lambda url: None)
 
     def fake_create(url, pg_env):
         calls.append(url)
@@ -440,7 +440,7 @@ def test_init_requires_running_postgres(tmp_path, monkeypatch: pytest.MonkeyPatc
     """No server: init fails with guidance instead of writing anything."""
     config_file = _init_env(tmp_path, monkeypatch)
     monkeypatch.setattr(cli, "_probe_db", lambda url: "connection refused")
-    monkeypatch.setattr(cli, "_server_up", lambda url: "connection refused")
+    monkeypatch.setattr(cli, "_is_server_up", lambda url: "connection refused")
     # Postgres URL (default); init exits before further prompts.
     result = runner.invoke(cli.app, ["init"], input="\n")
     assert result.exit_code == 2
@@ -453,7 +453,7 @@ def test_init_fails_when_createdb_fails(tmp_path, monkeypatch: pytest.MonkeyPatc
     """Server up but the database still missing after createdb: init fails."""
     config_file = _init_env(tmp_path, monkeypatch)
     monkeypatch.setattr(cli, "_probe_db", lambda url: "database missing")
-    monkeypatch.setattr(cli, "_server_up", lambda url: None)
+    monkeypatch.setattr(cli, "_is_server_up", lambda url: None)
     monkeypatch.setattr(cli, "_create_db", lambda url, pg_env: None)
     result = runner.invoke(cli.app, ["init"], input="\n")
     assert result.exit_code == 2
@@ -552,7 +552,9 @@ def _events_handler(request: httpx2.Request) -> httpx2.Response:
 
 
 def test_events(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(_events_handler))
+    monkeypatch.setattr(
+        cli, "_make_client", lambda: _client_from_handler(_events_handler)
+    )
     result = runner.invoke(cli.app, ["events", CAMPAIGN_ID])
     assert result.exit_code == 0
     assert "campaign.created" in result.output
@@ -562,7 +564,9 @@ def test_events(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_events_json(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(_events_handler))
+    monkeypatch.setattr(
+        cli, "_make_client", lambda: _client_from_handler(_events_handler)
+    )
     result = runner.invoke(cli.app, ["events", CAMPAIGN_ID, "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output.strip())
@@ -577,7 +581,7 @@ def test_events_after(monkeypatch: pytest.MonkeyPatch):
         captured["after"] = request.url.params["after"]
         return httpx2.Response(200, text=json.dumps(_EVENT) + "\n")
 
-    monkeypatch.setattr(cli, "_client", lambda: _make_client(handler))
+    monkeypatch.setattr(cli, "_make_client", lambda: _client_from_handler(handler))
     result = runner.invoke(cli.app, ["events", CAMPAIGN_ID, "--after", "41"])
     assert result.exit_code == 0
     assert captured["after"] == "41"

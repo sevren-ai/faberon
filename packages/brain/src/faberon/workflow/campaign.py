@@ -22,7 +22,7 @@ from .tree import CommitResult, checkout, commit_file, ensure_branch, reset_hard
 MAX_PROP_FAILS = 5
 
 
-def _gpu_hours(info: JobInfo, gpus: int) -> float:
+def _get_gpu_hours(info: JobInfo, gpus: int) -> float:
     """GPU-hours burned by one terminal job"""
     sec = info.elapsed_seconds
     assert sec is not None
@@ -161,7 +161,7 @@ class CampaignRunner:
                 outcome = self.runtime.run_experiment(exp)
 
                 if outcome.job_info.state.is_terminal:
-                    gpu_h += _gpu_hours(outcome.job_info, self.gpus)
+                    gpu_h += _get_gpu_hours(outcome.job_info, self.gpus)
                 if outcome.judgment == "keep":
                     best_metric = outcome.metric_value
                 else:
