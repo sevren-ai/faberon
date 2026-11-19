@@ -387,6 +387,7 @@ def test_campaign_gpu_budget(dbos, repo):
         plan=make_plan(budget_gpu_hours=10.0, max_experiments=10, gpus=4),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
+        branch="main",
     )
     DBOS.launch()
 
