@@ -38,7 +38,8 @@ class SubmitRequest(BaseModel):
 
 
 class SubmitResult(BaseModel):
-    """What a submit actually started: the job id and the values in effect (after potential clamping)."""
+    """What a submit actually started: the job id and the values in effect
+    (after potential clamping)."""
 
     job_id: str = Field(min_length=1)
     gpus: int = Field(ge=1)
