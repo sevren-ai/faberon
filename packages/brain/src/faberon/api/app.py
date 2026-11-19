@@ -34,7 +34,18 @@ from ..workflow import (
     end_outdated_campaigns,
     get_campaign_info,
 )
-from ..workflow.tree import current_branch, current_head
+from ..workflow.tree import (
+    branch_exists,
+    checkout,
+    create_branch,
+    ensure_exclude,
+    get_branch_tip,
+    get_current_branch,
+    get_current_head,
+    get_uncommitted_changes,
+    get_untracked_files,
+    has_commits,
+)
 from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
 
 _HEALTHZ_PATH = "/healthz"
@@ -51,6 +62,7 @@ def _rebuild_setup(campaign: Campaign) -> CampaignSetup:
         campaign_id=campaign.campaign_id,
         plan=campaign.plan,
         repo_path=campaign.repo_path,
+        branch=campaign.branch,
         poll_interval_seconds=campaign.poll_interval_seconds,
     )
 
@@ -220,23 +232,72 @@ def _register_routes(app: FastAPI) -> None:
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
 
-        # Record the repo state the campaign starts from. A detached HEAD
-        # has no branch for the campaign to commit on.
+        # Record the repo state the campaign starts from.
+        repo = Path(body.repo_path)
         try:
-            start_sha = current_head(Path(body.repo_path))
+            empty = not has_commits(repo)
         except RuntimeError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
-        branch = current_branch(Path(body.repo_path))
-        if branch is None:
+        # A repo without commits has no HEAD to anchor the campaign on.
+        if empty:
             raise HTTPException(
                 status_code=409,
-                detail="repo is on a detached HEAD; check out a branch first",
+                detail="repo has no commits, make an initial commit first",
             )
+        start_sha = get_current_head(repo)
+
+        # A repo with uncommited changes is not allowed
+        dirty = get_uncommitted_changes(repo)
+        if dirty:
+            error = "repo has uncommitted changes, commit or stash them first"
+            raise HTTPException(status_code=409, detail=error)
+
+        # Faberon's own run logs land in {repo}/.faberon; declare the
+        # directory disposable up front.
+        ensure_exclude(repo, ".faberon/")
+
+        # Neither are untracked files outside .gitignore
+        untracked = get_untracked_files(repo)
+        if untracked:
+            error = (
+                "repo has untracked files, commit them, "
+                "add them to .gitignore, or remove them first"
+            )
+            raise HTTPException(status_code=409, detail=error)
+
+        branch = body.branch
+        if branch is None:
+            # Default: repo's current branch
+            branch = get_current_branch(repo)
+            if branch is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "repo is on a detached HEAD; check out a branch first "
+                        "or name one in the `branch` field"
+                    ),
+                )
+        elif branch_exists(repo, branch):
+            # Adopt existing branch
+            start_sha = get_branch_tip(repo, branch)
+        else:
+            # Create named branch
+            try:
+                create_branch(repo, branch, start_sha)
+            except RuntimeError as e:
+                raise HTTPException(status_code=422, detail=str(e)) from e
+
+        # Fail early: a checkout failure rejects the request
+        try:
+            checkout(repo, branch)
+        except RuntimeError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
 
         setup = CampaignSetup(
             campaign_id=campaign_id,
             plan=body.plan,
             repo_path=body.repo_path,
+            branch=branch,
             poll_interval_seconds=body.poll_interval_seconds,
         )
         # Idempotent: DBOS dedupes on workflow id, the ledger dedupes on
