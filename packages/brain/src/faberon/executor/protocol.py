@@ -37,6 +37,14 @@ class SubmitRequest(BaseModel):
         return shlex.split(self.command)
 
 
+class SubmitResult(BaseModel):
+    """What a submit actually started: the job id and the values in effect (after potential clamping)."""
+
+    job_id: str = Field(min_length=1)
+    gpus: int = Field(ge=1)
+    walltime: int = Field(gt=0)  # in minutes
+
+
 class JobInfo(BaseModel):
     """All current info of a certain job."""
 
@@ -54,8 +62,8 @@ class JobInfo(BaseModel):
 
 
 class Executor(Protocol):
-    def submit(self, request: SubmitRequest) -> str:
-        """Start a job. Returns a job id. Same submission_key returns the same id."""
+    def submit(self, request: SubmitRequest) -> SubmitResult:
+        """Start a job. Same submission_key returns the same result."""
 
     def get_status(self, job_id: str) -> JobInfo:
         """Return the current status of a job."""

@@ -4,7 +4,7 @@ import shlex
 import subprocess
 from collections.abc import Sequence
 
-from .protocol import JobInfo, JobState, SubmitRequest
+from .protocol import JobInfo, JobState, SubmitRequest, SubmitResult
 
 # Prefix keeps Faberon job names apart from unrelated jobs on a shared cluster
 JOB_NAME_PREFIX = "faberon:"
@@ -130,11 +130,13 @@ class SlurmExecutor:
             return request.gpus
         return min(request.gpus, self._max_gpus)
 
-    def submit(self, request: SubmitRequest) -> str:
+    def submit(self, request: SubmitRequest) -> SubmitResult:
         job_name = JOB_NAME_PREFIX + request.submission_key
+        gpus = self._effective_gpus(request)
+        walltime = self._get_effective_walltime(request)
         existing = self._find_job_by_name(job_name)
         if existing is not None:
-            return existing
+            return SubmitResult(job_id=existing, gpus=gpus, walltime=walltime)
         result = subprocess.run(
             _render_sbatch(
                 job_name,
@@ -142,8 +144,8 @@ class SlurmExecutor:
                 request.argv,
                 cwd=request.cwd,
                 output=request.output_path,
-                gpus=self._effective_gpus(request),
-                time_limit=self._get_effective_walltime(request),
+                gpus=gpus,
+                time_limit=walltime,
             ),
             capture_output=True,
             text=True,
@@ -153,7 +155,7 @@ class SlurmExecutor:
         job_id = result.stdout.strip()
         if not job_id:
             raise RuntimeError("sbatch returned no job id")
-        return job_id
+        return SubmitResult(job_id=job_id, gpus=gpus, walltime=walltime)
 
     def get_status(self, job_id: str) -> JobInfo:
         live = self._get_squeue_state(job_id)

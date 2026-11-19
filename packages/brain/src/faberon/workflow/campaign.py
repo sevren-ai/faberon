@@ -160,7 +160,7 @@ class CampaignRunner:
                 outcome = self.runtime.run_experiment(exp)
 
                 if outcome.job_info.state.is_terminal:
-                    gpu_h += _get_gpu_hours(outcome.job_info, plan.gpus)
+                    gpu_h += _get_gpu_hours(outcome.job_info, outcome.submitted.gpus)
                 if outcome.judgment == "keep":
                     best_metric = outcome.metric_value
                 else:

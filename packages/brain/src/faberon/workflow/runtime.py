@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dbos import DBOS
 
-from ..executor import Executor, JobInfo, JobState, SubmitRequest
+from ..executor import Executor, JobInfo, JobState, SubmitRequest, SubmitResult
 from ..ledger import Ledger
 from ..schema.events import Actor, Event, EventType
 from .models import ExperimentResult, ExperimentSetup
@@ -35,7 +35,7 @@ class Runtime:
         walltime: int,
         repo_path: str,
         gpus: int,
-    ) -> str:
+    ) -> SubmitResult:
         """Start the job on the cluster. Idempotent on submission_key."""
         output_path = _get_job_log_path(repo_path, submission_key)
         _private_dir(output_path.parent)
@@ -95,13 +95,14 @@ class Runtime:
     @DBOS.workflow()
     def run_experiment(self, setup: ExperimentSetup) -> ExperimentResult:
         """Run one experiment durably: submit, poll, parse, judge, record."""
-        job_id = self.submit_step(
+        submitted = self.submit_step(
             setup.command,
             setup.submission_key,
             setup.walltime,
             setup.repo_path,
             setup.gpus,
         )
+        job_id = submitted.job_id
         self.record_event_step(
             Event(
                 campaign_id=setup.campaign_id,
@@ -146,7 +147,8 @@ class Runtime:
                     "state": info.state.value,
                     "exit_code": info.exit_code,
                     "elapsed_seconds": info.elapsed_seconds,
-                    "gpus": setup.gpus,
+                    "gpus": submitted.gpus,
+                    "walltime": submitted.walltime,
                 },
             )
         )
@@ -171,7 +173,10 @@ class Runtime:
             )
         )
         return ExperimentResult(
-            judgment=judgment, metric_value=metric_value, job_info=info
+            judgment=judgment,
+            metric_value=metric_value,
+            submitted=submitted,
+            job_info=info,
         )
 
 

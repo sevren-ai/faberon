@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..executor import JobInfo
+from ..executor import JobInfo, SubmitResult
 from ..schema.constants import MIN_PROSE_LENGTH
 from ..schema.plan import ResearchPlan
 
@@ -18,10 +18,11 @@ class Proposal(BaseModel):
 
 
 class ExperimentResult(BaseModel):
-    """Outcome of one experiment: judgment, metric, and the final job info."""
+    """Outcome of one experiment: what was submitted, how it ended, the verdict."""
 
     judgment: str
     metric_value: float | None
+    submitted: SubmitResult
     job_info: JobInfo
 
 
