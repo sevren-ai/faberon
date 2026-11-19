@@ -5,6 +5,7 @@
 import { Type } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import type { FaberonClient } from "../api/client.js";
+import { confirmedByHuman } from "./confirm.js";
 
 export function cancelCampaignTool(client: FaberonClient) {
   return defineTool({
@@ -24,7 +25,30 @@ export function cancelCampaignTool(client: FaberonClient) {
       }),
     }),
     annotations: { destructiveHint: true, idempotentHint: true },
-    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      const confirmed = await confirmedByHuman(
+        ctx,
+        "Cancel this Faberon campaign?",
+        [
+          `Campaign: ${params.campaign_id}`,
+          `Reason: ${params.reason}`,
+          "",
+          "The campaign ends early and cannot be resumed.",
+        ].join("\n"),
+      );
+      if (!confirmed) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "The human declined the cancellation. The campaign keeps running. Do not cancel it unless they ask.",
+            },
+          ],
+          details: undefined,
+          isError: true,
+        };
+      }
       const result = await client.cancelCampaign(
         params.campaign_id,
         params.reason,
