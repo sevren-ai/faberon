@@ -118,7 +118,7 @@ class SlurmExecutor:
         self._max_gpus = max_gpus
         self._max_walltime = max_walltime
 
-    def _effective_walltime(self, request: SubmitRequest) -> int:
+    def _get_effective_walltime(self, request: SubmitRequest) -> int:
         """Clamp the request's walltime to the deployment-side cap, if set."""
         if self._max_walltime is None:
             return request.walltime
@@ -143,7 +143,7 @@ class SlurmExecutor:
                 cwd=request.cwd,
                 output=request.output_path,
                 gpus=self._effective_gpus(request),
-                time_limit=self._effective_walltime(request),
+                time_limit=self._get_effective_walltime(request),
             ),
             capture_output=True,
             text=True,
@@ -155,11 +155,11 @@ class SlurmExecutor:
             raise RuntimeError("sbatch returned no job id")
         return job_id
 
-    def status(self, job_id: str) -> JobInfo:
-        live = self._squeue_state(job_id)
+    def get_status(self, job_id: str) -> JobInfo:
+        live = self._get_squeue_state(job_id)
         if live is not None:
             return live
-        return self._sacct_state(job_id)
+        return self._get_sacct_state(job_id)
 
     def cancel(self, job_id: str) -> None:
         result = subprocess.run(["scancel", job_id], capture_output=True, text=True)
@@ -168,7 +168,7 @@ class SlurmExecutor:
         # Nonzero usually means the job already finished. Confirm via status;
         # if it is still live, the cancel genuinely failed.
         try:
-            info = self.status(job_id)
+            info = self.get_status(job_id)
         except KeyError:
             return
         if info.state == JobState.RUNNING:
@@ -194,7 +194,7 @@ class SlurmExecutor:
             return done[0]
         return None
 
-    def _squeue_state(self, job_id: str) -> JobInfo | None:
+    def _get_squeue_state(self, job_id: str) -> JobInfo | None:
         result = subprocess.run(
             ["squeue", "-h", "-j", job_id, "-o", "%T"], capture_output=True, text=True
         )
@@ -202,7 +202,7 @@ class SlurmExecutor:
             return None
         return JobInfo(job_id=job_id, state=JobState.RUNNING, exit_code=None)
 
-    def _sacct_state(self, job_id: str) -> JobInfo:
+    def _get_sacct_state(self, job_id: str) -> JobInfo:
         result = subprocess.run(
             [
                 "sacct",

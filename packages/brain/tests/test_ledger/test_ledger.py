@@ -129,15 +129,15 @@ def test_create_campaign_idempotent(ledger):
 
 def test_campaigns_on_repo(ledger):
     repo = "/repo/a"
-    assert ledger.campaigns_on_repo(repo) == []
+    assert ledger.get_campaigns_on_repo(repo) == []
 
     camp_id = uuid.uuid4()
     ledger.create_campaign(
         camp_id, str(camp_id), make_plan(), repo, 30.0, branch="main", start_sha="a"
     )
     # A different repo is not affected.
-    assert ledger.campaigns_on_repo("/repo/other") == []
-    campaigns = ledger.campaigns_on_repo(repo)
+    assert ledger.get_campaigns_on_repo("/repo/other") == []
+    campaigns = ledger.get_campaigns_on_repo(repo)
     assert [c.campaign_id for c in campaigns] == [camp_id]
 
 
@@ -148,8 +148,8 @@ def test_campaign_events(ledger):
     ledger.append(_event(campaign_id=camp_b))
     ledger.append(_event(campaign_id=camp_a))
 
-    a_events = ledger.campaign_events(camp_a)
+    a_events = ledger.get_campaign_events(camp_a)
     assert [e.campaign_id for e in a_events] == [camp_a, camp_a]
     assert [e.seq for e in a_events] == [1, 3]
-    assert len(ledger.campaign_events(camp_b)) == 1
-    assert ledger.campaign_events(uuid.uuid4()) == []
+    assert len(ledger.get_campaign_events(camp_b)) == 1
+    assert ledger.get_campaign_events(uuid.uuid4()) == []

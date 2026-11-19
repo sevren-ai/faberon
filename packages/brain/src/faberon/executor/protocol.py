@@ -57,7 +57,7 @@ class Executor(Protocol):
     def submit(self, request: SubmitRequest) -> str:
         """Start a job. Returns a job id. Same submission_key returns the same id."""
 
-    def status(self, job_id: str) -> JobInfo:
+    def get_status(self, job_id: str) -> JobInfo:
         """Return the current status of a job."""
 
     def cancel(self, job_id: str) -> None:
