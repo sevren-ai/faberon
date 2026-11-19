@@ -10,6 +10,7 @@ from ..executor import Executor, JobInfo, JobState, SubmitRequest
 from ..ledger import Ledger
 from ..schema.events import Actor, Event, EventType
 from .models import ExperimentResult, ExperimentSetup
+from .tree import ensure_exclude
 
 
 @DBOS.dbos_class()
@@ -33,6 +34,7 @@ class Runtime:
         """Start the job on the cluster. Idempotent on submission_key."""
         output_path = _get_job_log_path(repo_path, submission_key)
         _private_dir(output_path.parent)
+        ensure_exclude(Path(repo_path), ".faberon/")
         request = SubmitRequest(
             command=command,
             submission_key=submission_key,

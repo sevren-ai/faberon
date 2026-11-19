@@ -16,7 +16,7 @@ from ..schema.plan import resolve_target_in_repo
 from .models import CampaignSetup, ExperimentSetup, Proposal
 from .proposer import ExperimentProposer
 from .runtime import Runtime
-from .tree import CommitResult, commit_file, reset_hard
+from .tree import CommitResult, checkout, commit_file, ensure_branch, reset_hard
 
 # Consecutive propose-step failures that end the campaign
 MAX_PROP_FAILS = 5
@@ -52,13 +52,22 @@ class CampaignRunner:
         return self.proposer.propose(setup.campaign_id, setup.plan, current)
 
     @DBOS.step()
-    def commit_step(self, repo: Path, target_file: str, message: str) -> CommitResult:
-        """Commit the proposed edit to the target repo."""
+    def checkout_step(self, repo: Path, branch: str) -> None:
+        """Put the working tree on the campaign's branch."""
+        checkout(repo, branch)
+
+    @DBOS.step()
+    def commit_step(
+        self, repo: Path, branch: str, target_file: str, message: str
+    ) -> CommitResult:
+        """Commit the proposed edit to the target repo"""
+        ensure_branch(repo, branch)
         return commit_file(repo, target_file, message)
 
     @DBOS.step()
-    def discard_step(self, repo: Path, parent_sha: str) -> None:
-        """Revert the working tree to the parent commit."""
+    def discard_step(self, repo: Path, branch: str, parent_sha: str) -> None:
+        """Revert the working tree to the parent commit"""
+        ensure_branch(repo, branch)
         reset_hard(repo, parent_sha)
 
     @DBOS.step()
@@ -97,6 +106,9 @@ class CampaignRunner:
         prop_fails = 0
 
         try:
+            # Creation already checked out; repeat so resume and recovery
+            # establish the branch before the loop commits.
+            self.checkout_step(repo, setup.branch)
             while True:
                 # One check site, in precedence order: cancel, budget, cap.
                 if self._cancel_received():
@@ -129,7 +141,9 @@ class CampaignRunner:
                 exp_done += 1
                 self.write_target_step(repo, plan.target_file, proposal.content)
                 commit_msg = f"exp {exp_done}: {proposal.title}"
-                result = self.commit_step(repo, plan.target_file, commit_msg)
+                result = self.commit_step(
+                    repo, setup.branch, plan.target_file, commit_msg
+                )
                 self._record_proposal(setup, exp_done, result, proposal)
 
                 exp = ExperimentSetup(
@@ -151,7 +165,7 @@ class CampaignRunner:
                 if outcome.judgment == "keep":
                     best_metric = outcome.metric_value
                 else:
-                    self.discard_step(repo, result.parent_sha)
+                    self.discard_step(repo, setup.branch, result.parent_sha)
         except Exception as e:
             # Record the crash, then let the workflow fail so DBOS marks it ERROR
             self._record_crash(setup, e)
