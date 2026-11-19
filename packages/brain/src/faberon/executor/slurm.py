@@ -1,5 +1,6 @@
 """Slurm executor: real sbatch/sacct/scancel adapter."""
 
+import logging
 import shlex
 import subprocess
 from collections.abc import Sequence
@@ -8,6 +9,8 @@ from .protocol import JobInfo, JobState, SubmitRequest, SubmitResult
 
 # Prefix keeps Faberon job names apart from unrelated jobs on a shared cluster
 JOB_NAME_PREFIX = "faberon:"
+
+logger = logging.getLogger(__name__)
 
 # Slurm states grouped by how they map onto JobState
 _LIVE_STATES = {
@@ -122,12 +125,26 @@ class SlurmExecutor:
         """Clamp the request's walltime to the deployment-side cap, if set."""
         if self._max_walltime is None:
             return request.walltime
+        if request.walltime > self._max_walltime:
+            logger.warning(
+                "job %s requested %d min, clamped to the deployment cap of %d",
+                request.submission_key,
+                request.walltime,
+                self._max_walltime,
+            )
         return min(request.walltime, self._max_walltime)
 
     def _effective_gpus(self, request: SubmitRequest) -> int:
         """Clamp the request's GPU count to the deployment-side cap, if set."""
         if self._max_gpus is None:
             return request.gpus
+        if request.gpus > self._max_gpus:
+            logger.warning(
+                "job %s requested %d GPUs, clamped to the deployment cap of %d",
+                request.submission_key,
+                request.gpus,
+                self._max_gpus,
+            )
         return min(request.gpus, self._max_gpus)
 
     def submit(self, request: SubmitRequest) -> SubmitResult:

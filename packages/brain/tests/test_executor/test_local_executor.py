@@ -8,6 +8,7 @@ minute-scale sleeps.
 """
 
 import json
+import logging
 import time
 import uuid
 
@@ -271,3 +272,11 @@ def test_effective_walltime(walltime, max_walltime, expected, tmp_path):
     executor = _make_executor(tmp_path / "state", max_walltime=max_walltime)
     request = _request("true", _key(), walltime=walltime)
     assert executor._get_effective_walltime(request) == expected
+
+
+def test_walltime_clamp_warning(caplog, tmp_path):
+    executor = _make_executor(tmp_path / "state", max_walltime=1)
+    with caplog.at_level(logging.WARNING, logger="faberon.executor.local"):
+        result = executor.submit(_request("true", _key(), walltime=5))
+    assert result.walltime == 1
+    assert "requested 5 min, clamped to the deployment cap of 1" in caplog.text

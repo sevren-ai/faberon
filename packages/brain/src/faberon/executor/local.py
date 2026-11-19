@@ -72,6 +72,13 @@ class LocalExecutor:
         """Clamp the request's walltime to the deployment-side cap, if set."""
         if self._max_walltime is None:
             return request.walltime
+        if request.walltime > self._max_walltime:
+            logger.warning(
+                "job %s requested %d min, clamped to the deployment cap of %d",
+                request.submission_key,
+                request.walltime,
+                self._max_walltime,
+            )
         return min(request.walltime, self._max_walltime)
 
     def submit(self, request: SubmitRequest) -> SubmitResult:
