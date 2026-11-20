@@ -1,8 +1,8 @@
-"""Experiment tree: commit and reset operations on the target repo.
+"""Experiment tree: commit, tag, and reset operations on the target repo.
 
-One experiment is one commit. ``commit_file`` records sha and parent sha in
-the ledger; discard is ``reset_hard`` to the parent, leaving the commit
-dangling but recoverable by sha. Assumes sequential checkouts.
+One experiment is one commit, tagged ``faberon/<campaign_id>/exp-<N>`` right
+after ``commit_file``. Discard is ``reset_hard`` to the parent; the tag
+keeps the discarded commit reachable. Assumes sequential checkouts.
 """
 
 import subprocess
@@ -29,12 +29,26 @@ def _run(repo: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def current_head(repo: Path) -> str:
+def get_current_head(repo: Path) -> str:
     """Return the full sha of the current head commit."""
     return _run(repo, "rev-parse", "HEAD")
 
 
-def current_branch(repo: Path) -> str | None:
+def has_commits(repo: Path) -> bool:
+    """Return whether the repo has at least one commit."""
+    result = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    raise RuntimeError(f"git rev-parse failed: {result.stderr.strip()}")
+
+
+def get_current_branch(repo: Path) -> str | None:
     """Return the current branch name, or None on a detached HEAD."""
     result = subprocess.run(
         ["git", "-C", str(repo), "symbolic-ref", "-q", "--short", "HEAD"],
@@ -48,6 +62,74 @@ def current_branch(repo: Path) -> str | None:
     return result.stdout.strip()
 
 
+def get_uncommitted_changes(repo: Path) -> list[str]:
+    """Return tracked files with uncommited changes"""
+    out = _run(repo, "diff", "--name-only", "HEAD", "--")
+    return out.splitlines()
+
+
+def get_untracked_files(repo: Path) -> list[str]:
+    """Return untracked files that .gitignore or exclude does not cover."""
+    out = _run(repo, "ls-files", "--others", "--exclude-standard")
+    return out.splitlines()
+
+
+def branch_exists(repo: Path, name: str) -> bool:
+    """Return whether the repo has a local branch with that name."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            f"refs/heads/{name}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    raise RuntimeError(f"git rev-parse failed: {result.stderr.strip()}")
+
+
+def get_branch_tip(repo: Path, name: str) -> str:
+    """Return the full sha of the branch's tip commit."""
+    return _run(repo, "rev-parse", f"refs/heads/{name}")
+
+
+def create_branch(repo: Path, name: str, sha: str) -> None:
+    """Create a branch pointing at the given commit."""
+    _run(repo, "branch", name, sha)
+
+
+def checkout(repo: Path, branch: str) -> None:
+    """Switch the working tree to the given branch."""
+    _run(repo, "checkout", branch)
+
+
+def ensure_exclude(repo: Path, entry: str) -> None:
+    """Add entry to the repo's local exclude file (.git/info/exclude)."""
+    exclude = repo / ".git" / "info" / "exclude"
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    existing = exclude.read_text() if exclude.exists() else ""
+    if entry not in existing.splitlines():
+        with exclude.open("a") as f:
+            f.write(entry + "\n")
+
+
+def ensure_branch(repo: Path, branch: str) -> None:
+    """Raise when the repo is not on the given branch."""
+    actual = get_current_branch(repo) or "detached HEAD"
+    if actual != branch:
+        raise RuntimeError(
+            f"repo is on {actual}, not the campaign branch {branch}; refusing to write"
+        )
+
+
 def commit_file(repo: Path, path: str, message: str) -> CommitResult:
     """Stage and commit one file on top of the current head.
 
@@ -56,10 +138,15 @@ def commit_file(repo: Path, path: str, message: str) -> CommitResult:
       - The given file exists
       - The given file differs from the head's version
     """
-    parent_sha = current_head(repo)
+    parent_sha = get_current_head(repo)
     _run(repo, "add", path)
     _run(repo, "commit", "-m", message)
-    return CommitResult(sha=current_head(repo), parent_sha=parent_sha)
+    return CommitResult(sha=get_current_head(repo), parent_sha=parent_sha)
+
+
+def create_tag(repo: Path, name: str, sha: str) -> None:
+    """Tag the given commit with a lightweight tag."""
+    _run(repo, "tag", name, sha)
 
 
 def reset_hard(repo: Path, sha: str) -> None:

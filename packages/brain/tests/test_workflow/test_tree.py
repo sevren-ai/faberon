@@ -22,7 +22,7 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _get_head(repo: Path) -> str:
-    return tree.current_head(repo)
+    return tree.get_current_head(repo)
 
 
 def test_commit_file(tmp_path: Path) -> None:
@@ -86,6 +86,28 @@ def test_discard_continue(tmp_path: Path) -> None:
     assert _git(repo, "cat-file", "-t", discarded.sha) == "commit"
 
 
+def test_create_tag(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    head = _get_head(repo)
+    tree.create_tag(repo, "faberon/some-campaign/exp-1", head)
+    assert _git(repo, "rev-parse", "faberon/some-campaign/exp-1") == head
+    # Creating a tag does not move HEAD.
+    assert _get_head(repo) == head
+
+
+def test_tagged_discard_stays_reachable(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    train_loc = repo / "train.py"
+    train_loc.write_text("experiment 1\n")
+    discarded = tree.commit_file(repo, "train.py", "My first experiment")
+    tree.create_tag(repo, "faberon/some-campaign/exp-1", discarded.sha)
+
+    tree.reset_hard(repo, discarded.parent_sha)
+
+    assert discarded.sha not in _git(repo, "log", "--format=%H")
+    assert _git(repo, "rev-parse", "faberon/some-campaign/exp-1") == discarded.sha
+
+
 def test_discard_uncommitted_changes(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     train_loc = repo / "train.py"
@@ -96,3 +118,97 @@ def test_discard_uncommitted_changes(tmp_path: Path) -> None:
     assert _BASELINE_EXPERIMENT not in train_loc.read_text()
     tree.reset_hard(repo, result.parent_sha)
     assert _BASELINE_EXPERIMENT in train_loc.read_text()
+
+
+def test_uncommitted_changes(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    assert tree.get_uncommitted_changes(repo) == []
+
+    # Untracked files do not count.
+    (repo / "notes.txt").write_text("scratch\n")
+    assert tree.get_uncommitted_changes(repo) == []
+
+    # Modified and staged tracked files do.
+    (repo / "train.py").write_text("work in progress\n")
+    assert tree.get_uncommitted_changes(repo) == ["train.py"]
+    _git(repo, "add", "train.py")
+    assert tree.get_uncommitted_changes(repo) == ["train.py"]
+
+
+def test_untracked_files(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    assert tree.get_untracked_files(repo) == []
+
+    (repo / "helpers.py").write_text("x = 1\n")
+    assert tree.get_untracked_files(repo) == ["helpers.py"]
+
+    # Ignored files do not count.
+    (repo / ".gitignore").write_text("helpers.py\noutputs/\n")
+    (repo / "outputs").mkdir()
+    (repo / "outputs" / "log.txt").write_text("run output\n")
+    assert tree.get_untracked_files(repo) == [".gitignore"]
+    _git(repo, "add", ".gitignore")
+    _git(repo, "commit", "-m", "ignore rules")
+    assert tree.get_untracked_files(repo) == []
+
+
+def test_has_commits(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    assert not tree.has_commits(repo)
+
+    _git(repo, "config", "user.email", "smith@forge.com")
+    _git(repo, "config", "user.name", "Black")
+    (repo / "train.py").write_text("baseline\n")
+    _git(repo, "add", "train.py")
+    _git(repo, "commit", "-m", "baseline")
+    assert tree.has_commits(repo)
+
+    # Not a repo at all is an error, not an empty repo.
+    with pytest.raises(RuntimeError):
+        tree.has_commits(tmp_path)
+
+
+def test_branch_helpers(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    head = _get_head(repo)
+    assert tree.branch_exists(repo, "main")
+    assert not tree.branch_exists(repo, "work")
+    assert tree.get_branch_tip(repo, "main") == head
+
+    tree.create_branch(repo, "work", head)
+    assert tree.branch_exists(repo, "work")
+    assert tree.get_branch_tip(repo, "work") == head
+    # Creating a branch does not move HEAD.
+    assert tree.get_current_branch(repo) == "main"
+
+    tree.checkout(repo, "work")
+    assert tree.get_current_branch(repo) == "work"
+    tree.checkout(repo, "main")
+    assert tree.get_current_branch(repo) == "main"
+
+
+def test_ensure_exclude(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    tree.ensure_exclude(repo, ".faberon/")
+    exclude = repo / ".git" / "info" / "exclude"
+    assert ".faberon/" in exclude.read_text().splitlines()
+
+    # Idempotent: no duplicate entry.
+    tree.ensure_exclude(repo, ".faberon/")
+    assert exclude.read_text().splitlines().count(".faberon/") == 1
+
+
+def test_ensure_branch(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    tree.ensure_branch(repo, "main")
+
+    _git(repo, "checkout", "-b", "other")
+    with pytest.raises(RuntimeError, match="not the campaign branch main"):
+        tree.ensure_branch(repo, "main")
+    tree.ensure_branch(repo, "other")
+
+    _git(repo, "checkout", "--detach", "HEAD")
+    with pytest.raises(RuntimeError, match="detached HEAD"):
+        tree.ensure_branch(repo, "main")

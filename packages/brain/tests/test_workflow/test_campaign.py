@@ -41,6 +41,35 @@ def dbos() -> Iterator[None]:
     DBOS.destroy()
 
 
+def test_write_steps_refuse_wrong_branch(dbos, repo):
+    """Commit and discard refuse to write off the campaign branch."""
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(config.database_url()),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(runtime, proposer=FakeProposer())
+    head = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "-C", str(repo), "checkout", "-b", "other"],
+        check=True,
+        capture_output=True,
+    )
+    (repo / "train.py").write_text("experiment\n")
+    DBOS.launch()
+
+    with pytest.raises(RuntimeError, match="not the campaign branch main"):
+        runner.commit_step(repo, "main", "train.py", "exp 1: x")
+    with pytest.raises(RuntimeError, match="not the campaign branch main"):
+        runner.discard_step(repo, "main", head)
+
+
 def test_campaign_stops_on_max_experiments(dbos, repo):
     # Create runtime with fake executor
     runtime = Runtime(
@@ -59,6 +88,7 @@ def test_campaign_stops_on_max_experiments(dbos, repo):
         plan=plan,
         poll_interval_seconds=0.05,
         repo_path=str(repo),
+        branch="main",
     )
     DBOS.launch()
 
@@ -92,8 +122,8 @@ def test_campaign_stops_on_max_experiments(dbos, repo):
     assert ended.payload["stop_reason"] == "max_experiments"
 
 
-def test_campaign_commit_msg(dbos, repo, tmp_path):
-    """Experiment commits are titled ``exp N: <proposal title>``."""
+def test_campaign_commits(dbos, repo, tmp_path):
+    """The loop checks out the campaign's branch and commits there."""
     # One job log per experiment, each better than the last, so both
     # experiments keep and their commits stay on the branch.
     campaign_id = uuid.uuid4()
@@ -101,6 +131,14 @@ def test_campaign_commit_msg(dbos, repo, tmp_path):
     log_dir.mkdir()
     (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.10\n")
     (log_dir / f"{campaign_id}:2.out").write_text("val_bpb: 1.00\n")
+    main_sha = subprocess.run(
+        ["git", "rev-parse", "main"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(["git", "branch", "work"], cwd=repo, check=True, capture_output=True)
     runtime = Runtime(
         FakeExecutor(),
         Ledger(config.database_url()),
@@ -116,22 +154,87 @@ def test_campaign_commit_msg(dbos, repo, tmp_path):
         plan=make_plan(max_experiments=2),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
+        branch="work",
     )
     DBOS.launch()
 
     stop_reason = runner.run_campaign(setup)
 
     assert stop_reason == StopReason.MAX_EXPERIMENTS.value
-    log = subprocess.run(
-        ["git", "log", "--format=%s"],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
     # Newest first; both experiments keep, so nothing is reset away.
+    log = git("log", "--format=%s", "work").splitlines()
     assert log[0] == "exp 2: test proposal 2"
     assert log[1] == "exp 1: test proposal 1"
+    assert git("symbolic-ref", "--short", "HEAD") == "work"
+    # The kept experiment commits are on the working branch; main did not move.
+    assert git("rev-parse", "main") == main_sha
+    assert git("rev-parse", "work~2") == main_sha
+
+
+def test_experiment_tags(dbos, repo):
+    """Every experiment commit is tagged, kept or discarded."""
+    campaign_id = uuid.uuid4()
+    log_dir = repo / ".faberon"
+    log_dir.mkdir()
+    # Experiment 1 does not beat the baseline and is discarded; 2 is kept.
+    (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.50\n")
+    (log_dir / f"{campaign_id}:2.out").write_text("val_bpb: 1.10\n")
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(config.database_url()),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(
+        runtime,
+        proposer=FakeProposer(),
+    )
+    setup = CampaignSetup(
+        campaign_id=campaign_id,
+        plan=make_plan(max_experiments=2),
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        branch="main",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
+    ledger = Ledger(config.database_url())
+    events = list(ledger.tail(campaign_id))
+    ledger.close()
+    proposed = {
+        e.payload["index"]: e.payload["sha"]
+        for e in events
+        if e.type == EventType.EXPERIMENT_PROPOSED
+    }
+    assert sorted(proposed) == [1, 2]
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    # Both tags resolve to the commits the ledger recorded.
+    for index, sha in proposed.items():
+        assert git("rev-parse", f"faberon/{campaign_id}/exp-{index}") == sha
+    # The discarded commit left the branch but stays reachable through its tag.
+    log = git("log", "--format=%H")
+    assert proposed[1] not in log
+    assert proposed[2] in log
 
 
 def test_proposal_title_max_length():
@@ -181,6 +284,7 @@ def test_campaign_survives_failed_proposer(dbos, repo, tmp_path):
         plan=make_plan(max_experiments=2),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
+        branch="main",
     )
     DBOS.launch()
 
@@ -232,6 +336,7 @@ def test_campaign_ends_max_propose_failure(dbos, repo, tmp_path):
         plan=make_plan(),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
+        branch="main",
     )
     DBOS.launch()
 
@@ -276,6 +381,7 @@ def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
         plan=make_plan(max_experiments=1),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
+        branch="main",
     )
     DBOS.launch()
 
@@ -308,6 +414,7 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
         plan=make_plan(budget_gpu_hours=7.0, max_experiments=10),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
+        branch="main",
     )
     DBOS.launch()
 
@@ -346,6 +453,7 @@ def test_campaign_reads_metric_from_job_log(dbos, repo, tmp_path):
         plan=make_plan(max_experiments=1),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
+        branch="main",
     )
     DBOS.launch()
 
@@ -383,6 +491,7 @@ def test_campaign_ends_on_cancel(dbos, repo):
         plan=make_plan(),
         poll_interval_seconds=0.05,
         repo_path=str(repo),
+        branch="main",
     )
     DBOS.launch()
 
