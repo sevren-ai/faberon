@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Feature request
+    url: https://github.com/sevren-ai/faberon/discussions/categories/feature-requests
+    about: Feature requests go in Discussions, not issues.
+  - name: Troubleshooting guide
+    url: https://github.com/sevren-ai/faberon/blob/main/docs/troubleshooting.md
+    about: Check here first for common install and runtime problems.
