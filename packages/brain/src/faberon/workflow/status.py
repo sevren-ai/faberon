@@ -74,8 +74,8 @@ def _derive_progress(campaign: Campaign, events: list[Event]) -> CampaignProgres
 
 
 def get_best_kept_sha(ledger: Ledger, campaign: Campaign) -> str:
-    """Return the campaign's best kept commit: the sha of its last keep (or if None, its start commit).
-    """
+    """Return the campaign's best kept commit: the sha of its last keep (or if
+    None, its start commit)."""
     sha = campaign.start_sha
     for event in ledger.get_campaign_events(campaign.campaign_id):
         if event.type != EventType.EXPERIMENT_JUDGED:
