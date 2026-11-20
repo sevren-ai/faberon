@@ -1,8 +1,8 @@
-"""Experiment tree: commit and reset operations on the target repo.
+"""Experiment tree: commit, tag, and reset operations on the target repo.
 
-One experiment is one commit. ``commit_file`` records sha and parent sha in
-the ledger; discard is ``reset_hard`` to the parent, leaving the commit
-dangling but recoverable by sha. Assumes sequential checkouts.
+One experiment is one commit, tagged ``faberon/<campaign_id>/exp-<N>`` right
+after ``commit_file``. Discard is ``reset_hard`` to the parent; the tag
+keeps the discarded commit reachable. Assumes sequential checkouts.
 """
 
 import subprocess
@@ -142,6 +142,11 @@ def commit_file(repo: Path, path: str, message: str) -> CommitResult:
     _run(repo, "add", path)
     _run(repo, "commit", "-m", message)
     return CommitResult(sha=get_current_head(repo), parent_sha=parent_sha)
+
+
+def create_tag(repo: Path, name: str, sha: str) -> None:
+    """Tag the given commit with a lightweight tag."""
+    _run(repo, "tag", name, sha)
 
 
 def reset_hard(repo: Path, sha: str) -> None:

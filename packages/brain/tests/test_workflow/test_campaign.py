@@ -180,6 +180,63 @@ def test_campaign_commits(dbos, repo, tmp_path):
     assert git("rev-parse", "work~2") == main_sha
 
 
+def test_experiment_tags(dbos, repo):
+    """Every experiment commit is tagged, kept or discarded."""
+    campaign_id = uuid.uuid4()
+    log_dir = repo / ".faberon"
+    log_dir.mkdir()
+    # Experiment 1 does not beat the baseline and is discarded; 2 is kept.
+    (log_dir / f"{campaign_id}:1.out").write_text("val_bpb: 1.50\n")
+    (log_dir / f"{campaign_id}:2.out").write_text("val_bpb: 1.10\n")
+    runtime = Runtime(
+        FakeExecutor(),
+        Ledger(config.database_url()),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(
+        runtime,
+        proposer=FakeProposer(),
+    )
+    setup = CampaignSetup(
+        campaign_id=campaign_id,
+        plan=make_plan(max_experiments=2),
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        branch="main",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.MAX_EXPERIMENTS.value
+    ledger = Ledger(config.database_url())
+    events = list(ledger.tail(campaign_id))
+    ledger.close()
+    proposed = {
+        e.payload["index"]: e.payload["sha"]
+        for e in events
+        if e.type == EventType.EXPERIMENT_PROPOSED
+    }
+    assert sorted(proposed) == [1, 2]
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    # Both tags resolve to the commits the ledger recorded.
+    for index, sha in proposed.items():
+        assert git("rev-parse", f"faberon/{campaign_id}/exp-{index}") == sha
+    # The discarded commit left the branch but stays reachable through its tag.
+    log = git("log", "--format=%H")
+    assert proposed[1] not in log
+    assert proposed[2] in log
+
+
 def test_proposal_title_max_length():
     """A title over 55 characters is rejected at the model boundary."""
     with pytest.raises(ValidationError):

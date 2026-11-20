@@ -193,6 +193,18 @@ def test_walltime_enforcement(executor: LocalExecutor, tmp_path):
     assert info.exit_code is not None and info.exit_code != 0
 
 
+def test_walltime_grace_lets_job_clean_up(executor: LocalExecutor, tmp_path):
+    """A job past its deadline gets SIGTERM first and can clean up."""
+    ready, cleaned = tmp_path / "ready", tmp_path / "cleaned"
+    script = f"trap 'touch {cleaned}; exit 0' TERM; echo $$ > {ready}; sleep 30 & wait"
+    job_id = executor.submit(_request(f'sh -c "{script}"', _key()))
+    _wait_for_pidfile(ready)
+    _expire_deadline(tmp_path / "state", job_id)
+    # The clean exit on SIGTERM is still a walltime failure.
+    assert executor.get_status(job_id).state == JobState.FAILED
+    assert cleaned.exists()
+
+
 def test_walltime_kills_group(executor: LocalExecutor, tmp_path):
     """A walltime kill signals the whole group."""
     job_id, child_pid = _submit_orphaning_wrapper(executor, tmp_path)
