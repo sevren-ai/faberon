@@ -230,7 +230,8 @@ def _wait_pid(pid: int, timeout: float) -> int | None:
         try:
             wpid, status = os.waitpid(pid, os.WNOHANG)
         except ChildProcessError:
-            return 0
+            # The job may still be running.
+            wpid, status = 0, 0
         if wpid == pid:
             return _status_to_exit_code(status)
         if not _is_pid_alive(pid):

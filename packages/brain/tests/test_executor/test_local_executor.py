@@ -8,6 +8,7 @@ minute-scale sleeps.
 """
 
 import json
+import os
 import time
 import uuid
 
@@ -256,6 +257,23 @@ def test_restart_recovers_running_job(tmp_path):
     assert restarted.get_status(job_id).state == JobState.RUNNING
     info = _wait_terminal(restarted, job_id)
     assert info.state == JobState.COMPLETED
+
+
+def test_restart_in_new_process_recovers_running_job(tmp_path):
+    """A job submitted by another process stays running until it exits."""
+    state_dir, key = tmp_path / "state", _key()
+    # Submit from a process that then exits, like a brain before a restart.
+    submitter = os.fork()
+    if submitter == 0:
+        try:
+            _make_executor(state_dir).submit(_request("sleep 2", key))
+        finally:
+            os._exit(0)
+    os.waitpid(submitter, 0)
+
+    restarted = _make_executor(state_dir)
+    assert restarted.get_status(key).state == JobState.RUNNING
+    assert _wait_terminal(restarted, key).state == JobState.COMPLETED
 
 
 def test_restart_recovers_finished_job(tmp_path):
