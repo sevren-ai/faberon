@@ -86,6 +86,28 @@ def test_discard_continue(tmp_path: Path) -> None:
     assert _git(repo, "cat-file", "-t", discarded.sha) == "commit"
 
 
+def test_create_tag(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    head = _get_head(repo)
+    tree.create_tag(repo, "faberon/some-campaign/exp-1", head)
+    assert _git(repo, "rev-parse", "faberon/some-campaign/exp-1") == head
+    # Creating a tag does not move HEAD.
+    assert _get_head(repo) == head
+
+
+def test_tagged_discard_stays_reachable(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
+    train_loc = repo / "train.py"
+    train_loc.write_text("experiment 1\n")
+    discarded = tree.commit_file(repo, "train.py", "My first experiment")
+    tree.create_tag(repo, "faberon/some-campaign/exp-1", discarded.sha)
+
+    tree.reset_hard(repo, discarded.parent_sha)
+
+    assert discarded.sha not in _git(repo, "log", "--format=%H")
+    assert _git(repo, "rev-parse", "faberon/some-campaign/exp-1") == discarded.sha
+
+
 def test_discard_uncommitted_changes(tmp_path: Path) -> None:
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     train_loc = repo / "train.py"
