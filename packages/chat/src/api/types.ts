@@ -12,6 +12,7 @@ export interface ResearchPlan {
   budget_gpu_hours: number;
   max_experiments: number;
   max_concurrency: number;
+  gpus: number;
   walltime: number;
   stop_conditions: string[];
 }
