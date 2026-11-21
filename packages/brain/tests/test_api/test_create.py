@@ -425,6 +425,7 @@ def test_successor_limits(api: ApiFixture):
 
 
 def test_predecessor_unknown(api: ApiFixture):
+    """Check that a successor call with an unknown predecessor ID fails."""
     response = api.client.post(
         f"/v0/campaigns/{uuid.uuid4()}/successor", json=_successor_body()
     )

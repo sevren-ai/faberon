@@ -128,6 +128,7 @@ def test_create_campaign_idempotent(ledger):
 
 
 def test_predecessor_is_recorded(ledger):
+    """Check that campaign.created records the predecessor's campaign ID and sha."""
     camp_id = uuid.uuid4()
     pred_id = uuid.uuid4()
     plan = make_plan()
