@@ -94,7 +94,7 @@ This runs `uv sync --locked` and `uv run pytest` in `packages/brain/`, mirroring
 
 - Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
 - Keep tests small and focused. One behaviour per test when practical.
-- Give each Python test a docstring (preferably single-sentence) that states the behaviour it protects.
+- Give each Python test a docstring (preferably on a single line) that states the behaviour it protects.
 - Roughly one test file per Python module, mirroring the package layout (for example `schema/plan.py` → `tests/test_schema/test_plan.py`).
 - Every test should protect a behaviour we care about. Prefer a few meaningful tests over many trivial ones that only restate the implementation.
 - Tests that start DBOS workflows must wait for them to finish before DBOS teardown. A running parent can otherwise remain blocked on a child workflow during Python shutdown.
