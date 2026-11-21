@@ -1,8 +1,9 @@
 """Durable campaign workflow: the autonomous propose-run-judge loop.
 
-Each iteration proposes an edit, commits it, runs one job, then keeps the
-commit or resets to the parent. Stop conditions are checked at the top of
-the loop in precedence order; the signal name for cancel is ``cancel``.
+Each iteration proposes an edit, commits and tags it, runs one job, then
+keeps the commit or resets to the parent. Stop conditions are checked at the
+top of the loop in precedence order; the signal name for cancel is
+``cancel``.
 """
 
 from pathlib import Path
@@ -16,7 +17,14 @@ from ..schema.plan import resolve_target_in_repo
 from .models import CampaignSetup, ExperimentSetup, Proposal
 from .proposer import ExperimentProposer
 from .runtime import Runtime
-from .tree import CommitResult, checkout, commit_file, ensure_branch, reset_hard
+from .tree import (
+    CommitResult,
+    checkout,
+    commit_file,
+    create_tag,
+    ensure_branch,
+    reset_hard,
+)
 
 # Consecutive propose-step failures that end the campaign
 MAX_PROP_FAILS = 5
@@ -61,6 +69,11 @@ class CampaignRunner:
         """Commit the proposed edit to the target repo"""
         ensure_branch(repo, branch)
         return commit_file(repo, target_file, message)
+
+    @DBOS.step()
+    def tag_step(self, repo: Path, name: str, sha: str) -> None:
+        """Tag one experiment commit so the commit never dangles."""
+        create_tag(repo, name, sha)
 
     @DBOS.step()
     def discard_step(self, repo: Path, branch: str, parent_sha: str) -> None:
@@ -142,6 +155,8 @@ class CampaignRunner:
                 result = self.commit_step(
                     repo, setup.branch, plan.target_file, commit_msg
                 )
+                tag = f"faberon/{setup.campaign_id}/exp-{exp_done}"
+                self.tag_step(repo, tag, result.sha)
                 self._record_proposal(setup, exp_done, result, proposal)
 
                 exp = ExperimentSetup(

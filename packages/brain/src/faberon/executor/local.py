@@ -19,6 +19,7 @@ from .protocol import JobInfo, JobState, SubmitRequest, SubmitResult
 
 _JOB_ID_SAFE = re.compile(r"[^A-Za-z0-9._-]")
 _WAIT_EXIT_TIMEOUT_S = 1.0
+_TERM_GRACE_S = 10.0
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,7 @@ class LocalExecutor:
             "deadline": start + walltime * 60,
             "exit_code": None,
             "cancelled": False,
+            "timed_out": False,
         }
 
     def _refresh(self, record: dict[str, Any]) -> JobInfo:
@@ -169,9 +171,19 @@ class LocalExecutor:
         if rc is not None:
             return self._finalize(record, rc)
         if time.time() >= record["deadline"]:
-            _signal_tree(pid, signal.SIGKILL)
-            return self._settle(record, cancelled=False)
+            return self._expire(record)
         return record
+
+    def _expire(self, record: dict[str, Any]) -> dict[str, Any]:
+        """End a job past its walltime: SIGTERM, a grace period to clean up, SIGKILL."""
+        pid = record["pid"]
+        record = {**record, "timed_out": True}
+        _signal_tree(pid, signal.SIGTERM)
+        rc = _wait_pid(pid, timeout=_TERM_GRACE_S)
+        _signal_tree(pid, signal.SIGKILL)
+        if rc is None:
+            rc = _wait_pid(pid, timeout=_WAIT_EXIT_TIMEOUT_S)
+        return self._finalize(record, rc)
 
     def _settle(self, record: dict[str, Any], *, cancelled: bool) -> dict[str, Any]:
         """Reap a process we just signalled and finalize its record."""
@@ -202,7 +214,9 @@ class LocalExecutor:
                 exit_code=None,
                 elapsed_seconds=elapsed,
             )
-        state = JobState.COMPLETED if exit_code == 0 else JobState.FAILED
+        # A timed-out job always counts as failed.
+        succeeded = exit_code == 0 and not record.get("timed_out")
+        state = JobState.COMPLETED if succeeded else JobState.FAILED
         return JobInfo(
             job_id=job_id, state=state, exit_code=exit_code, elapsed_seconds=elapsed
         )
