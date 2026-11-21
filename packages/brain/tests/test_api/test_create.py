@@ -341,7 +341,6 @@ def _successor_body(**overrides) -> dict:
         "campaign_id": str(uuid.uuid4()),
         "budget_gpu_hours": 5.0,
         "max_experiments": 2,
-        "poll_interval_seconds": 0.05,
     }
     body.update(overrides)
     return body
@@ -375,6 +374,7 @@ def test_successor(api: ApiFixture):
     assert plan["budget_gpu_hours"] == 5.0
     assert plan["max_experiments"] == 2
     assert plan["baseline"] == 1.10
+    assert info["campaign"]["poll_interval_seconds"] == 0.05
     # Only the derived limits ran: 3 predecessor + 2 successor experiments.
     assert api.executor.submit_count == 5
     # The successor's experiments all discarded: the branch rests at the

@@ -111,6 +111,7 @@ class Ledger:
         """
         plan_json = plan.model_dump(mode="json")
         if predecessor is not None:
+            # record both the campaign ID and the best-metric sha
             plan_json["predecessor"] = predecessor.model_dump(mode="json")
         with self._conn.transaction():
             row = self._conn.execute(
