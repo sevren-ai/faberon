@@ -198,7 +198,7 @@ def test_walltime_grace_lets_job_clean_up(executor: LocalExecutor, tmp_path):
     """A job past its deadline gets SIGTERM first and can clean up."""
     ready, cleaned = tmp_path / "ready", tmp_path / "cleaned"
     script = f"trap 'touch {cleaned}; exit 0' TERM; echo $$ > {ready}; sleep 30 & wait"
-    job_id = executor.submit(_request(f'sh -c "{script}"', _key()))
+    job_id = executor.submit(_request(f'sh -c "{script}"', _key())).job_id
     _wait_for_pidfile(ready)
     _expire_deadline(tmp_path / "state", job_id)
     # The clean exit on SIGTERM is still a walltime failure.
