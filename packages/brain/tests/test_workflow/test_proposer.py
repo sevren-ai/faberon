@@ -19,6 +19,7 @@ from ..conftest import make_plan
 
 
 def test_proposer():
+    """The proposer returns a typed proposal and scopes the history to its campaign."""
     campaign_id = uuid.uuid4()
     other_campaign_id = uuid.uuid4()
     judged = [
@@ -92,6 +93,7 @@ def test_proposer():
 
 
 def test_proposer_rejects_unchanged():
+    """Content identical to the current file is rejected with a retry."""
     content = "print('baseline')\n"
     model = TestModel(
         custom_output_args={
@@ -117,6 +119,7 @@ def test_proposer_rejects_unchanged():
 
 
 def test_proposer_rejects_unparseable():
+    """Broken Python is rejected with a retry instead of corrupting the file."""
     # A model that emits broken Python (e.g. newlines collapsed by the
     # structured-output path) gets a retry instead of corrupting train.py.
     model = TestModel(
@@ -143,6 +146,7 @@ def test_proposer_rejects_unparseable():
 
 
 def test_proposer_rejects_long_title():
+    """A title over 55 characters is rejected."""
     model = TestModel(
         custom_output_args={
             "content": "print('new')\n",
@@ -164,6 +168,8 @@ def test_proposer_rejects_long_title():
 
 
 def test_proposer_rejects_text_response():
+    """A plain-text model response is rejected."""
+
     def text_only(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         return ModelResponse(parts=[TextPart("Lower the learning rate.")])
 
@@ -190,6 +196,7 @@ async def _value(proposal: Proposal) -> Proposal:
 
 
 def test_run_with_timeout_returns():
+    """A call under the deadline returns its value."""
     loop = _ProposerLoop()
     try:
         proposal = Proposal(
@@ -201,6 +208,8 @@ def test_run_with_timeout_returns():
 
 
 def test_run_with_timeout_raises():
+    """A call past the deadline raises TimeoutError."""
+
     async def hang() -> Proposal:
         # The sleep wedges the worker loop; close() pays it when joining.
         time.sleep(2)
@@ -215,6 +224,8 @@ def test_run_with_timeout_raises():
 
 
 def test_run_with_timeout_reraises():
+    """An exception inside the call propagates unchanged."""
+
     async def boom() -> Proposal:
         raise ValueError("model broke")
 

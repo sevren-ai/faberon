@@ -11,6 +11,7 @@ from faberon.schema import Actor, CampaignStatus, EventType, StopReason
 
 
 def test_event_type_vocabulary():
+    """The persisted EventType strings match the contract exactly."""
     assert {t.name: t.value for t in EventType} == {
         "CAMPAIGN_CREATED": "campaign.created",
         "CAMPAIGN_ENDED": "campaign.ended",
@@ -27,6 +28,7 @@ def test_event_type_vocabulary():
 
 
 def test_actor_vocabulary():
+    """The persisted Actor strings match the contract exactly."""
     assert {a.name: a.value for a in Actor} == {
         "AGENT": "agent",
         "HUMAN": "human",
@@ -34,6 +36,7 @@ def test_actor_vocabulary():
 
 
 def test_stop_reason_vocabulary():
+    """The persisted StopReason strings match the contract exactly."""
     assert {r.name: r.value for r in StopReason} == {
         "CANCELLED": "cancelled",
         "BUDGET_EXHAUSTED": "budget_exhausted",
@@ -43,6 +46,7 @@ def test_stop_reason_vocabulary():
 
 
 def test_campaign_status_vocabulary():
+    """The persisted CampaignStatus strings match the contract exactly."""
     assert {s.name: s.value for s in CampaignStatus} == {
         "ACTIVE": "active",
         "ENDED": "ended",
