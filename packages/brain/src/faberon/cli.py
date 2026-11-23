@@ -449,6 +449,41 @@ def create_campaign(
         echo(f"workflow: {created['workflow_id']}")
 
 
+@app.command("successor")
+def create_successor(
+    campaign_id: UUID,
+    budget_gpu_hours: float = Option(
+        ..., "--budget-gpu-hours", help="Fresh GPU-hour budget for the successor."
+    ),
+    max_experiments: int = Option(
+        ..., "--max-experiments", help="Fresh experiment cap for the successor."
+    ),
+    branch: str | None = Option(
+        None,
+        "--branch",
+        "-b",
+        help=(
+            "Working branch for the successor. Defaults to a fresh faberon/<short-id> branch."
+        ),
+    ),
+) -> None:
+    """Start a successor from a finished campaign's best kept commit."""
+    payload: dict[str, object] = {
+        "campaign_id": str(uuid4()),
+        "budget_gpu_hours": budget_gpu_hours,
+        "max_experiments": max_experiments,
+    }
+    if branch is not None:
+        payload["branch"] = branch
+    with _make_client() as client:
+        response = _check(
+            client.post(f"/v0/campaigns/{campaign_id}/successor", json=payload)
+        )
+        created = response.json()
+        echo(f"campaign: {created['campaign_id']}")
+        echo(f"workflow: {created['workflow_id']}")
+
+
 @app.command("list")
 def list_campaigns(
     as_json: bool = Option(False, "--json", "-j", help="Emit machine-readable JSON."),

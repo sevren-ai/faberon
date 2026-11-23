@@ -55,6 +55,8 @@ faberon list                      # list all campaigns with their live status
 faberon show <id>                 # show the details of one particular campaign
 faberon events <id> -f            # stream the events of one particular campaign
 faberon cancel <id>               # cancel one particular campaign
+faberon successor <id> --budget-gpu-hours 2 --max-experiments 10
+                                  # continue a finished campaign from its best kept commit
 ```
 
 Or do the same from a Pi chat session with the Faberon Chat extension loaded: ask it to list campaigns, inject an idea, draft a plan, etc.
