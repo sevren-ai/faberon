@@ -4,9 +4,17 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .plan import ResearchPlan
+
+
+class Predecessor(BaseModel):
+    """The succession record: the campaign a new campaign follows, and the
+    commit it starts from."""
+
+    campaign_id: UUID
+    sha: str = Field(min_length=1)
 
 
 class CampaignStatus(StrEnum):

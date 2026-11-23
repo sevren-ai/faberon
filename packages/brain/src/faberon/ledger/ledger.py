@@ -22,7 +22,7 @@ from psycopg.types.json import Jsonb
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ..schema.campaign import Campaign
+from ..schema.campaign import Campaign, Predecessor
 from ..schema.events import Actor, Event, EventType
 from ..schema.plan import ResearchPlan
 
@@ -102,6 +102,7 @@ class Ledger:
         *,
         branch: str,
         start_sha: str,
+        predecessor: Predecessor | None = None,
     ) -> bool:
         """Atomically insert a campaign row and the ``campaign.created`` event.
 
@@ -109,6 +110,9 @@ class Ledger:
         existed (idempotent retry).
         """
         plan_json = plan.model_dump(mode="json")
+        if predecessor is not None:
+            # record both the campaign ID and the best-metric sha
+            plan_json["predecessor"] = predecessor.model_dump(mode="json")
         with self._conn.transaction():
             row = self._conn.execute(
                 """
