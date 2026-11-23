@@ -463,7 +463,8 @@ def create_successor(
         "--branch",
         "-b",
         help=(
-            "Working branch for the successor. Defaults to a fresh faberon/<short-id> branch."
+            "Working branch for the successor."
+            " Defaults to a fresh faberon/<short-id> branch."
         ),
     ),
 ) -> None:
