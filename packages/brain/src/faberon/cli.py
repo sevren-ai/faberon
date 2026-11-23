@@ -413,7 +413,10 @@ def create_campaign(
         None,
         "--branch",
         "-b",
-        help="Working branch to adopt or create; defaults to the current branch.",
+        help=(
+            "Working branch to adopt or create. "
+            "Defaults to a fresh faberon/<id> branch."
+        ),
     ),
 ) -> None:
     """Submit a new campaign from a research plan."""

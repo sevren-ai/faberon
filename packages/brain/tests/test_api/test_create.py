@@ -45,10 +45,11 @@ def test_create_campaign(api: ApiFixture):
     assert stop_reason == "max_experiments"
     assert api.executor.submit_count == 3
 
-    # The campaign record carries the repo's branch and commit at creation.
+    # The campaign commits on its own fresh branch.
     info = api.client.get(f"/v0/campaigns/{camp_id}").json()
-    assert info["campaign"]["branch"] == "main"
+    assert info["campaign"]["branch"] == f"faberon/{camp_id[:8]}"
     assert info["campaign"]["start_sha"] == start_sha
+    assert _git(api.repo_path, "rev-parse", "main") == start_sha
 
     response = api.client.get(f"/v0/campaigns/{body['campaign_id']}/events.jsonl")
     types = [json.loads(line)["type"] for line in response.text.splitlines()]
@@ -94,17 +95,19 @@ def test_empty_repo(api: ApiFixture, tmp_path):
 
 
 def test_detached_head(api: ApiFixture):
-    """A repo on a detached HEAD has no branch for the campaign to commit on."""
-    subprocess.run(
-        ["git", "checkout", "HEAD~0"],
-        cwd=api.repo_path,
-        check=True,
-        capture_output=True,
+    """On a detached HEAD, the default branch is created at the current commit."""
+    head = _git(api.repo_path, "rev-parse", "HEAD")
+    _git(api.repo_path, "checkout", "HEAD~0")
+    camp_id = str(uuid.uuid4())
+    response = api.client.post(
+        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
     )
-    body = _create_body(str(uuid.uuid4()), api.repo_path)
-    response = api.client.post("/v0/campaigns", json=body)
-    assert response.status_code == 409
-    assert "detached" in response.json()["detail"]
+    assert response.status_code == 201
+    DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
+
+    info = api.client.get(f"/v0/campaigns/{camp_id}").json()
+    assert info["campaign"]["branch"] == f"faberon/{camp_id[:8]}"
+    assert info["campaign"]["start_sha"] == head
 
 
 def test_dirty_tree(api: ApiFixture):
@@ -359,12 +362,13 @@ def test_successor(api: ApiFixture):
     """A successor starts at the predecessor's best kept commit."""
     pred_id = str(uuid.uuid4())
     _run_campaign(api, pred_id, keep_metric="1.10")
-    # Experiments 2 and 3 discarded, so main rests at the kept commit.
-    keep_sha = _git(api.repo_path, "rev-parse", "main")
+    # Experiments 2 and 3 discarded, so the predecessor's branch rests at the
+    # kept commit.
+    keep_sha = _git(api.repo_path, "rev-parse", f"faberon/{pred_id[:8]}")
 
     camp_id = _create_successor(api, pred_id)
 
-    branch = f"faberon/{camp_id}"
+    branch = f"faberon/{camp_id[:8]}"
     info = api.client.get(f"/v0/campaigns/{camp_id}").json()
     assert info["campaign"]["branch"] == branch
     assert info["campaign"]["start_sha"] == keep_sha
@@ -469,7 +473,7 @@ def test_successor_branches(api: ApiFixture):
     """Branch handling for successors: create, reject strays, adopt at sha."""
     pred_id = str(uuid.uuid4())
     _run_campaign(api, pred_id, keep_metric="1.10")
-    keep_sha = _git(api.repo_path, "rev-parse", "main")
+    keep_sha = _git(api.repo_path, "rev-parse", f"faberon/{pred_id[:8]}")
 
     # A named branch that does not exist is created at the succession sha.
     camp_id = _create_successor(api, pred_id, branch="successor-work")
@@ -480,7 +484,7 @@ def test_successor_branches(api: ApiFixture):
 
     # An existing branch at another commit is rejected: adopting it would
     # strand commits.
-    _git(api.repo_path, "branch", "stray", "main~1")
+    _git(api.repo_path, "branch", "stray", "main")
     body = _successor_body(branch="stray")
     response = api.client.post(f"/v0/campaigns/{pred_id}/successor", json=body)
     assert response.status_code == 409

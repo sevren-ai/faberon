@@ -23,7 +23,7 @@ from ..executor import Executor
 from ..executor.local import LocalExecutor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
-from ..schema.campaign import Campaign, CampaignInfo, Predecessor
+from ..schema.campaign import Campaign, CampaignInfo, Predecessor, get_default_branch
 from ..schema.events import Actor, Event, EventType
 from ..schema.plan import ResearchPlan, resolve_target_in_repo
 from ..workflow import (
@@ -41,7 +41,6 @@ from ..workflow.tree import (
     create_branch,
     ensure_exclude,
     get_branch_tip,
-    get_current_branch,
     get_current_head,
     get_uncommitted_changes,
     get_untracked_files,
@@ -193,20 +192,9 @@ def _launch_campaign(
         raise HTTPException(status_code=409, detail=error)
 
     if branch is None:
-        if succession_sha is not None:
-            # A successor commits on its own fresh branch
-            branch = f"faberon/{campaign_id}"
-        else:
-            # Default: repo's current branch
-            branch = get_current_branch(repo)
-            if branch is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "repo is on a detached HEAD; check out a branch first "
-                        "or name one in the `branch` field"
-                    ),
-                )
+        # Every campaign commits on its own fresh branch, so it never
+        # resets a branch it does not own.
+        branch = get_default_branch(campaign_id)
     if branch_exists(repo, branch):
         tip = get_branch_tip(repo, branch)
         if succession_sha is None:
