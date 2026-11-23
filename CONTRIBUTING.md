@@ -110,7 +110,7 @@ They are included in the local tests, but skip themselves when Postgres is unrea
 bash scripts/test/cluster.sh
 ```
 
-Run this on a Slurm login node before every PR. It runs what CI cannot: the Slurm job-submission tests, the LLM tests, and the CLI tests that need `sbatch` on `PATH` (the `sbatch` marker; they submit nothing). The script requires `slurm_account` and `model` in the Faberon config file, plus the provider key in its `[env]` table.
+Run this on a Slurm login node before every PR. It runs what CI cannot: the Slurm job-submission tests, the LLM tests, and the CLI tests that need `sbatch` on `PATH` (the `sbatch` marker; they submit nothing). The script requires `slurm_account` and `model` in the Faberon config file, plus the provider key in its `[env]` table. When the node has the no-sudo Postgres install, the script starts it first (idempotent), so the postgres-marked tests run instead of skipping.
 
 To iterate on one area, run pytest directly:
 
