@@ -58,6 +58,14 @@ export interface CampaignCreated {
   workflow_id: string;
 }
 
+/** POST /v0/campaigns/{id}/successor body. */
+export interface SuccessorCreate {
+  campaign_id: string;
+  branch?: string;
+  budget_gpu_hours: number;
+  max_experiments: number;
+}
+
 /** Status body returned by the write endpoints. */
 export interface StatusResponse {
   campaign_id: string;
