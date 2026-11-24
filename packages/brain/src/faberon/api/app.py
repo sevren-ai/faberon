@@ -130,6 +130,7 @@ def _launch_campaign(
     plan: ResearchPlan,
     repo_path: str,
     branch: str | None,
+    max_gpus: int | None,
     poll_interval_seconds: float,
     succession_sha: str | None,
     lineage: Predecessor | None,
@@ -155,6 +156,16 @@ def _launch_campaign(
         resolve_target_in_repo(repo_path, plan.target_file)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
+    # A plan may not request more GPUs per job than the deployment allows.
+    if max_gpus is not None and plan.gpus > max_gpus:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"plan requests {plan.gpus} GPUs per job, "
+                f"but this deployment caps jobs at {max_gpus} (slurm_gpus)"
+            ),
+        )
 
     # Record the repo state the campaign starts from.
     repo = Path(repo_path)
@@ -288,6 +299,7 @@ def create_app(
     config_name: str = "default",
     auth_token: str | None = None,
     no_recover: bool = False,
+    max_gpus: int | None = None,
 ) -> FastAPI:
     """Build the Faberon HTTP app. Configures the process-global DBOS singleton."""
     config.apply_env()
@@ -337,6 +349,7 @@ def create_app(
         app.state.runtime = runtime
         app.state.runner = runner
         app.state.ledger = ledger
+        app.state.max_gpus = max_gpus
         app.state.sse_pool = sse_pool
         app.state.stop_sse = stop_sse
         try:
@@ -371,10 +384,12 @@ def create_app_slurm(*, no_recover: bool = False) -> FastAPI:
     gpus = config.slurm_gpus(raise_on_none=True)
     executor = SlurmExecutor(
         account=account,
-        gpus=gpus,
+        max_gpus=gpus,
         max_walltime=config.max_time(),
     )
-    return create_app(executor=executor, auth_token=token, no_recover=no_recover)
+    return create_app(
+        executor=executor, auth_token=token, no_recover=no_recover, max_gpus=gpus
+    )
 
 
 def create_app_local(*, no_recover: bool = False) -> FastAPI:
@@ -399,6 +414,7 @@ def _register_routes(app: FastAPI) -> None:
             plan=body.plan,
             repo_path=body.repo_path,
             branch=body.branch,
+            max_gpus=app.state.max_gpus,
             poll_interval_seconds=body.poll_interval_seconds,
             succession_sha=None,
             lineage=None,
@@ -429,6 +445,7 @@ def _register_routes(app: FastAPI) -> None:
             plan=plan,
             repo_path=predecessor.repo_path,
             branch=body.branch,
+            max_gpus=app.state.max_gpus,
             poll_interval_seconds=predecessor.poll_interval_seconds,
             succession_sha=succession_sha,
             lineage=lineage,
