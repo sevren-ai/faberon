@@ -431,6 +431,74 @@ def test_campaign_stops_on_budget(dbos, repo, tmp_path):
     assert ended.payload["experiments_done"] == 4
 
 
+def test_campaign_gpu_budget(dbos, repo):
+    runtime = Runtime(
+        FakeExecutor(elapsed_seconds=3600.0),  # 1 wall-clock hour per job
+        Ledger(config.database_url()),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(runtime, proposer=FakeProposer())
+    setup = CampaignSetup(
+        campaign_id=uuid.uuid4(),
+        plan=make_plan(budget_gpu_hours=10.0, max_experiments=10, gpus=4),
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        branch="main",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.BUDGET_EXHAUSTED.value
+    ledger = Ledger(config.database_url())
+    events = list(ledger.tail(setup.campaign_id))
+    ledger.close()
+    ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
+    # Each job burns 4 GPU-hours (3600 s x 4 GPUs). After experiment 3 the
+    # total is 12 >= budget 10, so the loop ends the campaign before the 4th.
+    assert ended.payload["experiments_done"] == 3
+    assert ended.payload["gpu_hours_burned"] == pytest.approx(12.0)
+    completed = [e for e in events if e.type == EventType.EXPERIMENT_COMPLETED]
+    assert [e.payload["gpus"] for e in completed] == [4, 4, 4]
+
+
+def test_ledger_clamped_gpu(dbos, repo):
+    """When the executor clamps the GPU count, the ledger records the
+    effective count and the budget uses it."""
+    runtime = Runtime(
+        FakeExecutor(elapsed_seconds=3600.0, max_gpus=2),  # clamps 4 -> 2
+        Ledger(config.database_url()),
+        config_name=f"campaign-{uuid.uuid4().hex}",
+    )
+    DBOS.register_instance(runtime)
+    runner = CampaignRunner(runtime, proposer=FakeProposer())
+    setup = CampaignSetup(
+        campaign_id=uuid.uuid4(),
+        plan=make_plan(budget_gpu_hours=10.0, max_experiments=10, gpus=4),
+        poll_interval_seconds=0.05,
+        repo_path=str(repo),
+        branch="main",
+    )
+    DBOS.launch()
+
+    stop_reason = runner.run_campaign(setup)
+
+    assert stop_reason == StopReason.BUDGET_EXHAUSTED.value
+    ledger = Ledger(config.database_url())
+    events = list(ledger.tail(setup.campaign_id))
+    ledger.close()
+    ended = next(e for e in events if e.type == EventType.CAMPAIGN_ENDED)
+    # Each job burns 2 GPU-hours (3600 s x 2 GPUs after clamping). After
+    # experiment 5 the total is 10 >= budget 10, so the loop ends the
+    # campaign before the 6th. Unclamped accounting would stop after 3.
+    assert ended.payload["experiments_done"] == 5
+    assert ended.payload["gpu_hours_burned"] == pytest.approx(10.0)
+    completed = [e for e in events if e.type == EventType.EXPERIMENT_COMPLETED]
+    assert [e.payload["gpus"] for e in completed] == [2, 2, 2, 2, 2]
+    assert [e.payload["walltime"] for e in completed] == [10, 10, 10, 10, 10]
+
+
 def test_campaign_reads_metric_from_job_log(dbos, repo, tmp_path):
     # The metric is parsed from the job log the executor writes:
     # {repo}/.faberon/{submission_key}.out.

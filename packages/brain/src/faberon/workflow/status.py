@@ -52,7 +52,7 @@ def get_campaign_info(ledger: Ledger, campaign: Campaign) -> CampaignInfo:
 def _derive_progress(campaign: Campaign, events: list[Event]) -> CampaignProgress:
     """Derive live progress from the ledger."""
     gpu_seconds = sum(
-        float(e.payload["elapsed_seconds"])
+        float(e.payload["elapsed_seconds"]) * int(e.payload["gpus"])
         for e in events
         if e.type == EventType.EXPERIMENT_COMPLETED
         and e.payload.get("elapsed_seconds") is not None
