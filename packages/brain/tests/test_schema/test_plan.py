@@ -56,6 +56,15 @@ def test_plan_rejects_non_positive_max_experiments():
         _minimal_plan(max_experiments=0)
 
 
+def test_plan_gpus_defaults_to_one():
+    assert _minimal_plan().gpus == 1
+
+
+def test_plan_rejects_non_positive_gpus():
+    with pytest.raises(ValidationError):
+        _minimal_plan(gpus=0)
+
+
 def test_plan_requires_target_file():
     """The plan names the file the proposer edits; there is no hidden default."""
     data = _minimal_plan().model_dump(mode="json")

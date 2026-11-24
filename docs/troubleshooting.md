@@ -58,4 +58,4 @@ After every upgrade, re-run `faberon init` to review your settings: it shows eve
 
 Be careful when upgrading Faberon while you have an active campaign running. DBOS won't be able to recover the old workflow, and the campaign won't resume after starting the new version of Faberon.
 
-Instead, such outdated campaigns will be forcefully ended with a stop reason `error`, naming the upgrade as the reason. The repo is then free for a new campaign right away: you can continue the research with a follow-up or a re-seed/resume from the campaign's best metric and head sha.
+Instead, such outdated campaigns will be forcefully ended with a stop reason `error`, naming the upgrade as the reason. The repo is then free for a new campaign right away: you can continue the research with a successor or an entire new campaign, starting from the best metric and head sha of the previous one.

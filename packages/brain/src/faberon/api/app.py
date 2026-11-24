@@ -23,15 +23,16 @@ from ..executor import Executor
 from ..executor.local import LocalExecutor
 from ..executor.slurm import SlurmExecutor
 from ..ledger import Ledger
-from ..schema.campaign import Campaign, CampaignInfo
+from ..schema.campaign import Campaign, CampaignInfo, Predecessor
 from ..schema.events import Actor, Event, EventType
-from ..schema.plan import resolve_target_in_repo
+from ..schema.plan import ResearchPlan, resolve_target_in_repo
 from ..workflow import (
     AgentProposer,
     CampaignRunner,
     CampaignSetup,
     Runtime,
     end_outdated_campaigns,
+    get_best_kept_sha,
     get_campaign_info,
 )
 from ..workflow.tree import (
@@ -46,7 +47,13 @@ from ..workflow.tree import (
     get_untracked_files,
     has_commits,
 )
-from .models import CampaignCreate, CampaignCreated, CancelCampaign, InjectIdea
+from .models import (
+    CampaignCreate,
+    CampaignCreated,
+    CancelCampaign,
+    InjectIdea,
+    SuccessorCreate,
+)
 
 _HEALTHZ_PATH = "/healthz"
 RequestResponseEndpoint = Callable[[StarletteRequest], Awaitable[Response]]
@@ -79,6 +86,194 @@ def _get_active_campaign(ledger: Ledger, campaign_id: UUID) -> Campaign:
     return campaign
 
 
+def _get_predecessor(
+    ledger: Ledger, campaign_id: UUID, *, raise_when_active: bool = False
+) -> tuple[Campaign, CampaignInfo]:
+    """Return the predecessor row and its live info.
+
+    Raises 404 if the campaign is unknown. With ``raise_when_active``,
+    raises 409 if the campaign is still active.
+    """
+    predecessor = ledger.get_campaign(campaign_id)
+    if predecessor is None:
+        raise HTTPException(status_code=404, detail="campaign not found")
+    info = get_campaign_info(ledger, predecessor)
+    if raise_when_active and info.status.is_active:
+        raise HTTPException(
+            status_code=409,
+            detail="campaign is still active; let it end or cancel it first",
+        )
+    return predecessor, info
+
+
+def _derive_successor_plan(
+    info: CampaignInfo, *, budget_gpu_hours: float, max_experiments: int
+) -> ResearchPlan:
+    """The successor's plan: the predecessor's plan with fresh budget and
+    limits, its baseline reseeded from the best kept metric."""
+    plan = info.campaign.plan
+    best_metric = info.progress.best_metric
+    return plan.model_copy(
+        update={
+            "budget_gpu_hours": budget_gpu_hours,
+            "max_experiments": max_experiments,
+            "baseline": best_metric if best_metric is not None else plan.baseline,
+        }
+    )
+
+
+def _launch_campaign(
+    runner: CampaignRunner,
+    ledger: Ledger,
+    *,
+    campaign_id: UUID,
+    plan: ResearchPlan,
+    repo_path: str,
+    branch: str | None,
+    max_gpus: int | None,
+    poll_interval_seconds: float,
+    succession_sha: str | None,
+    lineage: Predecessor | None,
+) -> CampaignCreated:
+    """Validate the target repo and start the campaign workflow."""
+    workflow_id = str(campaign_id)
+
+    existing = ledger.get_campaign(campaign_id)
+    if existing is None:
+        # One active campaign per repo: a second one would interleave
+        # commits on the same checkout.
+        for other in ledger.get_campaigns_on_repo(repo_path):
+            if get_campaign_info(ledger, other).status.is_active:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"repo already has an active campaign: {other.campaign_id}"
+                    ),
+                )
+
+    # Reject a target file that escapes the repo before starting anything.
+    try:
+        resolve_target_in_repo(repo_path, plan.target_file)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    # A plan may not request more GPUs per job than the deployment allows.
+    if max_gpus is not None and plan.gpus > max_gpus:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"plan requests {plan.gpus} GPUs per job, "
+                f"but this deployment caps jobs at {max_gpus} (slurm_gpus)"
+            ),
+        )
+
+    # Record the repo state the campaign starts from.
+    repo = Path(repo_path)
+    try:
+        empty = not has_commits(repo)
+    except RuntimeError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    # A repo without commits has no HEAD to anchor the campaign on.
+    if empty:
+        raise HTTPException(
+            status_code=409,
+            detail="repo has no commits, make an initial commit first",
+        )
+    if succession_sha is not None:
+        start_sha = succession_sha
+    else:
+        start_sha = get_current_head(repo)
+
+    # A repo with uncommited changes is not allowed
+    dirty = get_uncommitted_changes(repo)
+    if dirty:
+        error = "repo has uncommitted changes, commit or stash them first"
+        raise HTTPException(status_code=409, detail=error)
+
+    # Faberon's own run logs land in {repo}/.faberon; declare the
+    # directory disposable up front.
+    ensure_exclude(repo, ".faberon/")
+
+    # Neither are untracked files outside .gitignore
+    untracked = get_untracked_files(repo)
+    if untracked:
+        error = (
+            "repo has untracked files, commit them, "
+            "add them to .gitignore, or remove them first"
+        )
+        raise HTTPException(status_code=409, detail=error)
+
+    if branch is None:
+        if succession_sha is not None:
+            # A successor commits on its own fresh branch
+            branch = f"faberon/{campaign_id}"
+        else:
+            # Default: repo's current branch
+            branch = get_current_branch(repo)
+            if branch is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "repo is on a detached HEAD; check out a branch first "
+                        "or name one in the `branch` field"
+                    ),
+                )
+    if branch_exists(repo, branch):
+        tip = get_branch_tip(repo, branch)
+        if succession_sha is None:
+            # Adopt existing branch
+            start_sha = tip
+        elif tip != succession_sha:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"branch {branch} already exists at {tip[:12]}; a "
+                    "successor starts at the predecessor's best kept "
+                    f"commit {succession_sha[:12]}, so adopting it would "
+                    "strand commits. Delete the branch or pick another name"
+                ),
+            )
+    else:
+        # Create named branch
+        try:
+            create_branch(repo, branch, start_sha)
+        except RuntimeError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+
+    # Fail early: a checkout failure rejects the request
+    try:
+        checkout(repo, branch)
+    except RuntimeError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    setup = CampaignSetup(
+        campaign_id=campaign_id,
+        plan=plan,
+        repo_path=repo_path,
+        branch=branch,
+        poll_interval_seconds=poll_interval_seconds,
+    )
+    # Idempotent: DBOS dedupes on workflow id, the ledger dedupes on
+    # the campaigns row. A retry with the same campaign_id returns the
+    # existing campaign instead of creating a new one.
+    with SetWorkflowID(workflow_id):
+        handle = DBOS.start_workflow(runner.run_campaign, setup)
+    ledger.create_campaign(
+        campaign_id,
+        workflow_id,
+        plan,
+        repo_path,
+        poll_interval_seconds,
+        branch=branch,
+        start_sha=start_sha,
+        predecessor=lineage,
+    )
+    return CampaignCreated(
+        campaign_id=campaign_id,
+        workflow_id=handle.workflow_id,
+    )
+
+
 class BearerAuthMiddleware(BaseHTTPMiddleware):
     """Reject requests missing the expected bearer token."""
 
@@ -104,6 +299,7 @@ def create_app(
     config_name: str = "default",
     auth_token: str | None = None,
     no_recover: bool = False,
+    max_gpus: int | None = None,
 ) -> FastAPI:
     """Build the Faberon HTTP app. Configures the process-global DBOS singleton."""
     config.apply_env()
@@ -153,6 +349,7 @@ def create_app(
         app.state.runtime = runtime
         app.state.runner = runner
         app.state.ledger = ledger
+        app.state.max_gpus = max_gpus
         app.state.sse_pool = sse_pool
         app.state.stop_sse = stop_sse
         try:
@@ -187,10 +384,12 @@ def create_app_slurm(*, no_recover: bool = False) -> FastAPI:
     gpus = config.slurm_gpus(raise_on_none=True)
     executor = SlurmExecutor(
         account=account,
-        gpus=gpus,
+        max_gpus=gpus,
         max_walltime=config.max_time(),
     )
-    return create_app(executor=executor, auth_token=token, no_recover=no_recover)
+    return create_app(
+        executor=executor, auth_token=token, no_recover=no_recover, max_gpus=gpus
+    )
 
 
 def create_app_local(*, no_recover: bool = False) -> FastAPI:
@@ -208,115 +407,48 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.post("/v0/campaigns", response_model=CampaignCreated, status_code=201)
     def create_campaign(body: CampaignCreate) -> CampaignCreated:
-        runner: CampaignRunner = app.state.runner
-        ledger: Ledger = app.state.ledger
-        campaign_id = body.campaign_id
-        workflow_id = str(campaign_id)
-
-        existing = ledger.get_campaign(campaign_id)
-        if existing is None:
-            # One active campaign per repo: a second one would interleave
-            # commits on the same checkout.
-            for other in ledger.get_campaigns_on_repo(body.repo_path):
-                if get_campaign_info(ledger, other).status.is_active:
-                    raise HTTPException(
-                        status_code=409,
-                        detail=(
-                            f"repo already has an active campaign: {other.campaign_id}"
-                        ),
-                    )
-
-        # Reject a target file that escapes the repo before starting anything.
-        try:
-            resolve_target_in_repo(body.repo_path, body.plan.target_file)
-        except ValueError as e:
-            raise HTTPException(status_code=422, detail=str(e)) from e
-
-        # Record the repo state the campaign starts from.
-        repo = Path(body.repo_path)
-        try:
-            empty = not has_commits(repo)
-        except RuntimeError as e:
-            raise HTTPException(status_code=422, detail=str(e)) from e
-        # A repo without commits has no HEAD to anchor the campaign on.
-        if empty:
-            raise HTTPException(
-                status_code=409,
-                detail="repo has no commits, make an initial commit first",
-            )
-        start_sha = get_current_head(repo)
-
-        # A repo with uncommited changes is not allowed
-        dirty = get_uncommitted_changes(repo)
-        if dirty:
-            error = "repo has uncommitted changes, commit or stash them first"
-            raise HTTPException(status_code=409, detail=error)
-
-        # Faberon's own run logs land in {repo}/.faberon; declare the
-        # directory disposable up front.
-        ensure_exclude(repo, ".faberon/")
-
-        # Neither are untracked files outside .gitignore
-        untracked = get_untracked_files(repo)
-        if untracked:
-            error = (
-                "repo has untracked files, commit them, "
-                "add them to .gitignore, or remove them first"
-            )
-            raise HTTPException(status_code=409, detail=error)
-
-        branch = body.branch
-        if branch is None:
-            # Default: repo's current branch
-            branch = get_current_branch(repo)
-            if branch is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "repo is on a detached HEAD; check out a branch first "
-                        "or name one in the `branch` field"
-                    ),
-                )
-        elif branch_exists(repo, branch):
-            # Adopt existing branch
-            start_sha = get_branch_tip(repo, branch)
-        else:
-            # Create named branch
-            try:
-                create_branch(repo, branch, start_sha)
-            except RuntimeError as e:
-                raise HTTPException(status_code=422, detail=str(e)) from e
-
-        # Fail early: a checkout failure rejects the request
-        try:
-            checkout(repo, branch)
-        except RuntimeError as e:
-            raise HTTPException(status_code=422, detail=str(e)) from e
-
-        setup = CampaignSetup(
-            campaign_id=campaign_id,
+        return _launch_campaign(
+            app.state.runner,
+            app.state.ledger,
+            campaign_id=body.campaign_id,
             plan=body.plan,
             repo_path=body.repo_path,
-            branch=branch,
+            branch=body.branch,
+            max_gpus=app.state.max_gpus,
             poll_interval_seconds=body.poll_interval_seconds,
+            succession_sha=None,
+            lineage=None,
         )
-        # Idempotent: DBOS dedupes on workflow id, the ledger dedupes on
-        # the campaigns row. A retry with the same campaign_id returns the
-        # existing campaign instead of creating a new one.
-        with SetWorkflowID(workflow_id):
-            handle = DBOS.start_workflow(runner.run_campaign, setup)
-        ledger.create_campaign(
-            campaign_id,
-            workflow_id,
-            body.plan,
-            body.repo_path,
-            body.poll_interval_seconds,
-            branch=branch,
-            start_sha=start_sha,
+
+    @app.post(
+        "/v0/campaigns/{campaign_id}/successor",
+        response_model=CampaignCreated,
+        status_code=201,
+    )
+    def create_successor(campaign_id: UUID, body: SuccessorCreate) -> CampaignCreated:
+        """Create the successor campaign from this one's best kept commit."""
+        ledger: Ledger = app.state.ledger
+        predecessor, info = _get_predecessor(
+            ledger, campaign_id, raise_when_active=True
         )
-        return CampaignCreated(
-            campaign_id=campaign_id,
-            workflow_id=handle.workflow_id,
+        plan = _derive_successor_plan(
+            info,
+            budget_gpu_hours=body.budget_gpu_hours,
+            max_experiments=body.max_experiments,
+        )
+        succession_sha = get_best_kept_sha(ledger, predecessor)
+        lineage = Predecessor(campaign_id=campaign_id, sha=succession_sha)
+        return _launch_campaign(
+            app.state.runner,
+            ledger,
+            campaign_id=body.campaign_id,
+            plan=plan,
+            repo_path=predecessor.repo_path,
+            branch=body.branch,
+            max_gpus=app.state.max_gpus,
+            poll_interval_seconds=predecessor.poll_interval_seconds,
+            succession_sha=succession_sha,
+            lineage=lineage,
         )
 
     @app.get("/v0/campaigns")

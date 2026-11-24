@@ -7,6 +7,8 @@ not tested here; it is verified on-cluster by
 test_slurm_integration.py.
 """
 
+import logging
+
 import pytest
 
 from faberon.executor import JobState
@@ -84,6 +86,58 @@ def test_effective_walltime_no_cap():
         cwd="/r",
     )
     assert executor._get_effective_walltime(request) == 90
+
+
+@pytest.mark.parametrize(
+    "gpus,max_gpus,expected",
+    [
+        (4, None, 4),  # no cap set: request passes through
+        (2, 4, 2),  # under the cap: unchanged
+        (8, 4, 4),  # over the cap: clamped
+        (4, 4, 4),  # exactly at the cap: unchanged
+        (1, 1, 1),  # smallest valid values
+    ],
+)
+def test_effective_gpus(gpus, max_gpus, expected):
+    executor = SlurmExecutor("minerva", max_gpus=max_gpus)
+    request = SubmitRequest(
+        command="echo hello",
+        submission_key="k",
+        walltime=90,
+        gpus=gpus,
+        output_path="/o",
+        cwd="/r",
+    )
+    assert executor._effective_gpus(request) == expected
+
+
+def test_gpu_clamp_warning(caplog):
+    executor = SlurmExecutor("minerva", max_gpus=4)
+    request = SubmitRequest(
+        command="echo hello",
+        submission_key="k",
+        walltime=90,
+        gpus=8,
+        output_path="/o",
+        cwd="/r",
+    )
+    with caplog.at_level(logging.WARNING, logger="faberon.executor.slurm"):
+        assert executor._effective_gpus(request) == 4
+    assert "requested 8 GPUs, clamped to the deployment cap of 4" in caplog.text
+
+
+def test_walltime_clamp_warning(caplog):
+    executor = SlurmExecutor("minerva", max_walltime=60)
+    request = SubmitRequest(
+        command="echo hello",
+        submission_key="k",
+        walltime=90,
+        output_path="/o",
+        cwd="/r",
+    )
+    with caplog.at_level(logging.WARNING, logger="faberon.executor.slurm"):
+        assert executor._get_effective_walltime(request) == 60
+    assert "requested 90 min, clamped to the deployment cap of 60" in caplog.text
 
 
 @pytest.mark.parametrize(

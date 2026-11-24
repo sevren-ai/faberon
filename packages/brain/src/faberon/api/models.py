@@ -17,6 +17,15 @@ class CampaignCreate(BaseModel):
     poll_interval_seconds: float = Field(default=30.0, gt=0)
 
 
+class SuccessorCreate(BaseModel):
+    """POST /v0/campaigns/{id}/successor body."""
+
+    campaign_id: UUID
+    branch: str | None = Field(default=None, min_length=1)
+    budget_gpu_hours: float = Field(gt=0)
+    max_experiments: int = Field(ge=1)
+
+
 class CancelCampaign(BaseModel):
     """POST /v0/campaigns/{id}/cancel body."""
 

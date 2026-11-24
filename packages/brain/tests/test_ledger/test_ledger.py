@@ -7,7 +7,7 @@ import pytest
 
 from faberon import config
 from faberon.ledger import Ledger
-from faberon.schema import Actor, Event, EventType
+from faberon.schema import Actor, Event, EventType, Predecessor
 
 from ..conftest import make_plan
 
@@ -133,6 +133,31 @@ def test_create_campaign_idempotent(ledger):
     events = list(ledger.tail(camp_id))
     assert len(events) == 1
     assert events[0].type == EventType.CAMPAIGN_CREATED
+
+
+def test_predecessor_is_recorded(ledger):
+    """Check that campaign.created records the predecessor's campaign ID and sha."""
+    camp_id = uuid.uuid4()
+    pred_id = uuid.uuid4()
+    plan = make_plan()
+    ledger.create_campaign(
+        camp_id,
+        str(camp_id),
+        plan,
+        "/repo/a",
+        30.0,
+        branch="main",
+        start_sha="a",
+        predecessor=Predecessor(campaign_id=pred_id, sha="abc123"),
+    )
+    events = list(ledger.tail(camp_id))
+    assert len(events) == 1
+    assert events[0].payload["predecessor"] == {
+        "campaign_id": str(pred_id),
+        "sha": "abc123",
+    }
+    # The payload still carries the plan itself.
+    assert events[0].payload["goal"] == plan.goal
 
 
 def test_campaigns_on_repo(ledger):
