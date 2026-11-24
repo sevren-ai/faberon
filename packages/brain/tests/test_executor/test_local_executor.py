@@ -8,8 +8,8 @@ minute-scale sleeps.
 """
 
 import json
-import os
 import logging
+import os
 import time
 import uuid
 
