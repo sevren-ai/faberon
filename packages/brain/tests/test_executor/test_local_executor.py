@@ -95,6 +95,7 @@ def _submit_orphaning_wrapper(executor: LocalExecutor, tmp_path) -> tuple[str, i
 
 
 def test_success(executor: LocalExecutor):
+    """A successful command completes with exit code 0."""
     job_id = executor.submit(_request("true", _key())).job_id
     info = _wait_terminal(executor, job_id)
     assert info.state == JobState.COMPLETED
@@ -102,6 +103,7 @@ def test_success(executor: LocalExecutor):
 
 
 def test_failure(executor: LocalExecutor):
+    """A failing command returns a nonzero exit code."""
     job_id = executor.submit(_request("false", _key())).job_id
     info = _wait_terminal(executor, job_id)
     assert info.state == JobState.FAILED
@@ -124,6 +126,7 @@ def test_log_file_is_owner_only(executor: LocalExecutor, tmp_path):
 
 
 def test_nonzero_exit(executor: LocalExecutor):
+    """The job's own exit code is reported."""
     job_id = executor.submit(_request("sh -c 'exit 3'", _key())).job_id
     info = _wait_terminal(executor, job_id)
     assert info.state == JobState.FAILED
@@ -131,6 +134,7 @@ def test_nonzero_exit(executor: LocalExecutor):
 
 
 def test_terminal_reports_elapsed(executor: LocalExecutor):
+    """Ensure that elapsed_seconds is recorded properly."""
     job_id = executor.submit(_request("sleep 0.2", _key())).job_id
     info = _wait_terminal(executor, job_id)
     assert info.elapsed_seconds is not None
@@ -173,6 +177,7 @@ def test_runs_in_cwd(executor: LocalExecutor, tmp_path):
 
 
 def test_cancel(executor: LocalExecutor):
+    """A cancelled job reports CANCELLED with elapsed seconds."""
     job_id = executor.submit(_request("sleep 30", _key())).job_id
     executor.cancel(job_id)
     info = executor.get_status(job_id)
@@ -223,6 +228,7 @@ def test_cancel_reaches_group(executor: LocalExecutor, tmp_path):
 
 
 def test_same_key_returns_same_id(executor: LocalExecutor):
+    """A duplicate submission key returns the same job and starts no second process."""
     key = _key()
     first = executor.submit(_request("sleep 0.2", key))
     second = executor.submit(_request("echo other", key))
@@ -242,6 +248,7 @@ def test_idempotency_survives_restart(executor: LocalExecutor, tmp_path):
 
 
 def test_status_unknown_job(executor: LocalExecutor):
+    """Status for an unknown job raises KeyError."""
     with pytest.raises(KeyError):
         executor.get_status("no-such-job")
 
@@ -260,6 +267,7 @@ def test_restart_recovers_running_job(tmp_path):
 
 
 def test_restart_recovers_finished_job(tmp_path):
+    """A job finished before a restart still reads its final state after."""
     state_dir = tmp_path / "state"
     first = _make_executor(state_dir)
     job_id = first.submit(_request("true", _key())).job_id
@@ -281,6 +289,7 @@ def test_restart_recovers_finished_job(tmp_path):
     ],
 )
 def test_effective_walltime(walltime, max_walltime, expected, tmp_path):
+    """The walltime is clamped to the configured cap, unchanged at or under it."""
     executor = _make_executor(tmp_path / "state", max_walltime=max_walltime)
     request = _request("true", _key(), walltime=walltime)
     assert executor._get_effective_walltime(request) == expected

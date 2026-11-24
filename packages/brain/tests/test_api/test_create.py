@@ -24,6 +24,7 @@ pytestmark = pytest.mark.postgres
 
 
 def test_create_campaign(api: ApiFixture):
+    """A created campaign is capped to max_experiments."""
     camp_id = str(uuid.uuid4())
     start_sha = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -232,6 +233,7 @@ def test_checkout_failure(api: ApiFixture):
 
 
 def test_invalid_branch(api: ApiFixture):
+    """A branch name git rejects is a 422."""
     body = _create_body(str(uuid.uuid4()), api.repo_path)
     body["branch"] = "no..dots"
     response = api.client.post("/v0/campaigns", json=body)
@@ -239,6 +241,7 @@ def test_invalid_branch(api: ApiFixture):
 
 
 def test_create_campaign_idempotent(api: ApiFixture):
+    """Retrying a create with the same campaign_id is idempotent."""
     camp_id = str(uuid.uuid4())
     body = _create_body(camp_id, api.repo_path)
     first = api.client.post("/v0/campaigns", json=body)

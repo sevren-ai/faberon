@@ -71,6 +71,7 @@ def test_write_steps_refuse_wrong_branch(dbos, repo):
 
 
 def test_campaign_stops_on_max_experiments(dbos, repo):
+    """The loop stops at max_experiments and records each experiment's events."""
     # Create runtime with fake executor
     runtime = Runtime(
         FakeExecutor(elapsed_seconds=3600.0),
@@ -399,6 +400,7 @@ def test_campaign_dies_on_misconfiguration(dbos, repo, tmp_path):
 
 
 def test_campaign_stops_on_budget(dbos, repo, tmp_path):
+    """The loop stops once burned GPU-hours reach the budget."""
     runtime = Runtime(
         FakeExecutor(elapsed_seconds=7200.0),  # 2 GPU-hours per job
         Ledger(config.database_url()),
@@ -500,6 +502,7 @@ def test_ledger_clamped_gpu(dbos, repo):
 
 
 def test_campaign_reads_metric_from_job_log(dbos, repo, tmp_path):
+    """The judgment parses the metric from the job log the executor wrote."""
     # The metric is parsed from the job log the executor writes:
     # {repo}/.faberon/{submission_key}.out.
     campaign_id = uuid.uuid4()

@@ -54,6 +54,7 @@ def _run(
 
 
 def test_restart_after_kill(tmp_path):
+    """A brain killed mid-poll recovers without resubmitting."""
     wf_id = f"exp-{int(time.time() * 1000)}"
     campaign_id = "88888888-4444-4444-4444-121212121212"
     env = _env(tmp_path, wf_id, campaign_id)

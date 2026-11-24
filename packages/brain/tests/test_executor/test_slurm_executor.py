@@ -24,12 +24,14 @@ from faberon.executor.slurm import (
 
 
 def test_render_script():
+    """The batch script is a strict sh script that execs the quoted command."""
     script = _render_script(["echo", "a b", "$X"])
     assert script.startswith("#!/bin/sh\nset -eu\nexec ")
     assert "echo 'a b' '$X'" in script
 
 
 def test_render_sbatch():
+    """The sbatch argv carries job name, account, GPU, time limit, cwd, and script."""
     args = _render_sbatch(
         "faberon:exp-1",
         "minerva",
@@ -61,6 +63,7 @@ def test_render_sbatch():
     ],
 )
 def test_effective_walltime(walltime, max_walltime, expected):
+    """The walltime is clamped to the configured cap, unchanged at or under it."""
     executor = SlurmExecutor("minerva", max_walltime=max_walltime)
     request = SubmitRequest(
         command="echo hello",
@@ -73,6 +76,7 @@ def test_effective_walltime(walltime, max_walltime, expected):
 
 
 def test_effective_walltime_no_cap():
+    """Without a configured cap, the requested walltime passes through."""
     executor = SlurmExecutor("minerva")
     request = SubmitRequest(
         command="echo hello",
@@ -147,6 +151,7 @@ def test_walltime_clamp_warning(caplog):
     ],
 )
 def test_parse_exit_code(exit_string, expected):
+    """sacct's exit string parses to an int or None."""
     assert _parse_exit_code(exit_string) == expected
 
 
@@ -162,6 +167,7 @@ def test_parse_exit_code(exit_string, expected):
     ],
 )
 def test_parse_sacct_line(line, expected):
+    """A sacct line splits into state, exit code, and elapsed seconds."""
     assert _parse_sacct_line(line) == expected
 
 
@@ -180,6 +186,7 @@ def test_parse_sacct_line(line, expected):
     ],
 )
 def test_map_state(slurm_state, exit_string, expected_state, expected_exit):
+    """Slurm states map to job states, with elapsed only for terminal jobs."""
     assert _map_state(slurm_state, exit_string, 60.0) == (
         expected_state,
         expected_exit,
@@ -188,15 +195,18 @@ def test_map_state(slurm_state, exit_string, expected_state, expected_exit):
 
 
 def test_map_state_unknown_raises():
+    """An unmapped Slurm state raises an error."""
     with pytest.raises(ValueError):
         _map_state("UNKNOWN_ISSUE", "0:0")
 
 
 def test_jobinfo_terminal_requires_elapsed():
+    """A terminal JobInfo without elapsed seconds is invalid."""
     with pytest.raises(ValueError, match="elapsed_seconds"):
         JobInfo(job_id="j1", state=JobState.COMPLETED, elapsed_seconds=None)
 
 
 def test_jobinfo_running_allows_no_elapsed():
+    """A running JobInfo lacks info on elapsed seconds."""
     info = JobInfo(job_id="j1", state=JobState.RUNNING, elapsed_seconds=None)
     assert info.elapsed_seconds is None

@@ -24,12 +24,14 @@ def _minimal_plan(**overrides) -> ResearchPlan:
 
 
 def test_plan_round_trip():
+    """A plan is unchanged after a JSON round trip."""
     plan = _minimal_plan()
     restored = ResearchPlan.model_validate_json(plan.model_dump_json())
     assert restored == plan
 
 
 def test_plan_rejects_blank_goal():
+    """An empty goal is rejected."""
     with pytest.raises(ValidationError):
         _minimal_plan(goal="")
 
@@ -43,11 +45,13 @@ def test_plan_goal_min_length():
 
 
 def test_plan_rejects_non_positive_budget():
+    """A zero budget is rejected."""
     with pytest.raises(ValidationError):
         _minimal_plan(budget_gpu_hours=0)
 
 
 def test_plan_rejects_non_positive_max_experiments():
+    """Zero max_experiments is rejected."""
     with pytest.raises(ValidationError):
         _minimal_plan(max_experiments=0)
 
@@ -86,6 +90,7 @@ def test_resolve_target_in_repo_accepts_nested(tmp_path):
 
 
 def test_resolve_target_in_repo_rejects_absolute(tmp_path):
+    """An absolute target path is rejected."""
     with pytest.raises(ValueError, match="relative path"):
         resolve_target_in_repo(str(tmp_path), "/etc/passwd")
 
