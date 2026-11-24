@@ -386,7 +386,7 @@ def init() -> None:
             default=existing.get("slurm_account"),
         )
         values["slurm_gpus"] = typer.prompt(
-            "GPUs per job", type=int, default=int(existing.get("slurm_gpus", 1))
+            "Max GPUs per job", type=int, default=int(existing.get("slurm_gpus", 1))
         )
     else:
         values.pop("slurm_account", None)

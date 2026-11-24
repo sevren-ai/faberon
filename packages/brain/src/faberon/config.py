@@ -125,7 +125,7 @@ def slurm_gpus(raise_on_none: bool = False) -> int | None: ...
 
 
 def slurm_gpus(raise_on_none: bool = False) -> int | None:
-    """GPU count per Slurm job, or None for the local executor."""
+    """Max GPUs per Slurm job (deployment-side cap), or None for the local executor."""
     value = _get("slurm_gpus", raise_on_none=raise_on_none)
     return int(value) if value is not None else None
 

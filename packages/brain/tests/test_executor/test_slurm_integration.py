@@ -81,15 +81,17 @@ def _request(command: str, key: str) -> SubmitRequest:
 
 
 def test_submit_success(executor: SlurmExecutor):
+    """A submitted job completes on the cluster with exit code 0."""
     key = f"test-true-{uuid.uuid4().hex[:8]}"
-    job_id = executor.submit(_request("true", key))
+    job_id = executor.submit(_request("true", key)).job_id
     assert _wait_for_terminal(executor, job_id) == JobState.COMPLETED
     assert executor.get_status(job_id).exit_code == 0
 
 
 def test_submit_failure(executor: SlurmExecutor):
+    """A failing job returns with a nonzero exit code."""
     key = f"test-false-{uuid.uuid4().hex[:8]}"
-    job_id = executor.submit(_request("false", key))
+    job_id = executor.submit(_request("false", key)).job_id
     assert _wait_for_terminal(executor, job_id) == JobState.FAILED
     assert executor.get_status(job_id).exit_code != 0
 
@@ -97,7 +99,7 @@ def test_submit_failure(executor: SlurmExecutor):
 def test_terminal_jobs_report_elapsed(executor: SlurmExecutor):
     """Terminal status carries ElapsedRaw seconds; the budget depends on it."""
     key = f"test-elapsed-{uuid.uuid4().hex[:8]}"
-    job_id = executor.submit(_request("sleep 2", key))
+    job_id = executor.submit(_request("sleep 2", key)).job_id
     _wait_for_terminal(executor, job_id)
     info = executor.get_status(job_id)
     assert info.elapsed_seconds is not None
@@ -105,13 +107,15 @@ def test_terminal_jobs_report_elapsed(executor: SlurmExecutor):
 
 
 def test_cancel(executor: SlurmExecutor):
+    """Ensure that a cancellation request goes through correctly."""
     key = f"test-sleep-{uuid.uuid4().hex[:8]}"
-    job_id = executor.submit(_request("sleep 300", key))
+    job_id = executor.submit(_request("sleep 300", key)).job_id
     executor.cancel(job_id)
     assert _wait_for_terminal(executor, job_id) == JobState.CANCELLED
 
 
 def test_submit_same_key(executor: SlurmExecutor):
+    """A duplicate submission key returns the same Slurm job id."""
     key = f"test-idem-{uuid.uuid4().hex[:8]}"
     first = executor.submit(_request("echo hello", key))
     second = executor.submit(_request("echo hello", key))

@@ -42,6 +42,7 @@ def train():
 
 
 def test_proposer_with_llm():
+    """The configured model proposes parseable Python after reading its tools."""
     campaign_id = uuid.uuid4()
     events = FakeEvents(
         [

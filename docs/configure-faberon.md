@@ -19,7 +19,7 @@ If you want to change the location of this file, you can set an env var `FABERON
 | `model` | LLM for the proposer, for example `openrouter:<provider>/<model>`. |
 | `executor` | `slurm` or `local`. Default: `slurm` when `sbatch` is on `PATH`, else `local`. |
 | `slurm_account` | Slurm account to bill jobs to. Required with the Slurm executor. |
-| `slurm_gpus` | GPU count per job (default 1). Slurm executor only. |
+| `slurm_gpus` | Max GPUs per job (default 1). Plans request GPUs per job via their `gpus` field; requests above this cap are rejected at campaign creation. Slurm executor only. |
 | `host` | Address `faberon serve` binds to (default `127.0.0.1`). |
 | `port` | Port `faberon serve` binds to (default `8000`). |
 | `api_url` | Where clients reach the server. Default: derived from `host` and `port`, so it cannot drift from them. Only set it for remote access. |

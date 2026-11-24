@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from uuid import UUID
 
-from faberon.executor import JobInfo, JobState, SubmitRequest
+from faberon.executor import JobInfo, JobState, SubmitRequest, SubmitResult
 from faberon.schema import Event, ResearchPlan
 from faberon.workflow.models import Proposal
 
@@ -55,20 +55,27 @@ class FakeExecutor:
         *,
         exit_code: int | None = 0,
         elapsed_seconds: float = 60.0,
+        max_gpus: int | None = None,
     ) -> None:
         self._state = state
         self._exit_code = exit_code
         self._elapsed_seconds = elapsed_seconds
+        self._max_gpus = max_gpus
         self.submit_count = 0
 
-    def submit(self, request: SubmitRequest) -> str:
+    def submit(self, request: SubmitRequest) -> SubmitResult:
         self.submit_count += 1
         # Create a dummy stdout/stderr file if a test didn't pre-write one.
         out = Path(request.output_path)
         if not out.exists():
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text("")
-        return f"fake-{self.submit_count}"
+        gpus = request.gpus
+        if self._max_gpus is not None:
+            gpus = min(gpus, self._max_gpus)
+        return SubmitResult(
+            job_id=f"fake-{self.submit_count}", gpus=gpus, walltime=request.walltime
+        )
 
     def get_status(self, job_id: str) -> JobInfo:
         elapsed = self._elapsed_seconds if self._state.is_terminal else None
@@ -91,18 +98,20 @@ class FakeFileExecutor:
         if not os.path.exists(self._path):
             self._save({"jobs": {}, "by_key": {}, "next_id": 1, "submit_count": 0})
 
-    def submit(self, request: SubmitRequest) -> str:
+    def submit(self, request: SubmitRequest) -> SubmitResult:
         state = self._load()
         existing = state["by_key"].get(request.submission_key)
         if existing is not None:
-            return existing
+            return SubmitResult(
+                job_id=existing, gpus=request.gpus, walltime=request.walltime
+            )
         job_id = f"fake-{state['next_id']}"
         state["next_id"] += 1
         state["submit_count"] += 1
         state["by_key"][request.submission_key] = job_id
         state["jobs"][job_id] = {"state": JobState.RUNNING.value, "exit_code": None}
         self._save(state)
-        return job_id
+        return SubmitResult(job_id=job_id, gpus=request.gpus, walltime=request.walltime)
 
     def get_status(self, job_id: str) -> JobInfo:
         state = self._load()

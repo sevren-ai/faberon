@@ -28,6 +28,7 @@ pytestmark = pytest.mark.postgres
 
 
 def test_get_campaign(api: ApiFixture):
+    """GET /v0/campaigns/{id} returns the campaign with status and stop reason."""
     body = _create_body(str(uuid.uuid4()), api.repo_path)
     response = api.client.post("/v0/campaigns", json=body)
     assert response.status_code == 201
@@ -45,6 +46,7 @@ def test_get_campaign(api: ApiFixture):
 
 
 def test_list_campaigns(api: ApiFixture):
+    """GET /v0/campaigns lists every campaign with its status and progress."""
     assert api.client.get("/v0/campaigns").json() == []
     ids = [str(uuid.uuid4()) for _ in range(2)]
     for cid in ids:
@@ -71,17 +73,17 @@ def test_campaign_progress(api: ApiFixture):
     (log_dir / f"{camp_id}:1.out").write_text("val_bpb: 1.10\n")
     (log_dir / f"{camp_id}:2.out").write_text("val_bpb: 1.20\n")
     (log_dir / f"{camp_id}:3.out").write_text("val_bpb: 1.00\n")
-    response = api.client.post(
-        "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
-    )
+    body = _create_body(camp_id, api.repo_path)
+    body["plan"]["gpus"] = 2
+    response = api.client.post("/v0/campaigns", json=body)
     assert response.status_code == 201
     DBOS.retrieve_workflow(response.json()["workflow_id"]).get_result()
 
     info = api.client.get(f"/v0/campaigns/{camp_id}").json()
     progress = info["progress"]
     assert progress["experiments_done"] == 3
-    # The fake executor reports 60 elapsed seconds per job.
-    assert progress["gpu_hours_burned"] == pytest.approx(3 * 60.0 / 3600.0)
+    # The fake executor reports 60 elapsed seconds per job on 2 GPUs.
+    assert progress["gpu_hours_burned"] == pytest.approx(3 * 2 * 60.0 / 3600.0)
     assert progress["baseline"] == 1.23
     assert progress["best_metric"] == 1.00
 
@@ -105,11 +107,38 @@ def test_campaign_progress_without_keeps(api: ApiFixture):
     assert progress["best_metric"] is None
 
 
-def test_get_unknown_campaign(api: ApiFixture):
+def test_create_caps_gpus(repo):
+    """A plan requesting more GPUs than the deployment cap is rejected."""
+    DBOS.destroy()
+    app = create_app(
+        executor=FakeExecutor(JobState.COMPLETED, exit_code=0),
+        config_name=f"api-test-{uuid.uuid4().hex}",
+        max_gpus=2,
+    )
+    _reset_databases()
+    with TestClient(app) as client:
+        body = _create_body(str(uuid.uuid4()), str(repo))
+        body["plan"]["gpus"] = 4
+        response = client.post("/v0/campaigns", json=body)
+        assert response.status_code == 422
+        assert "4 GPUs" in response.json()["detail"]
+        # At the cap, the campaign is accepted.
+        body = _create_body(str(uuid.uuid4()), str(repo))
+        body["plan"]["gpus"] = 2
+        assert client.post("/v0/campaigns", json=body).status_code == 201
+    DBOS.destroy()
+
+
+def test_unknown_campaign(api: ApiFixture):
+    """Unknown campaign IDs get a 404 from every campaign-scoped route."""
     unknown = "00000000-0000-0000-0000-000000000099"
     assert api.client.get(f"/v0/campaigns/{unknown}").status_code == 404
     assert api.client.get(f"/v0/campaigns/{unknown}/events").status_code == 404
     assert api.client.get(f"/v0/campaigns/{unknown}/events.jsonl").status_code == 404
+
+    post_idea = api.client.post(f"/v0/campaigns/{unknown}/ideas", json=_inject_body())
+    assert post_idea.status_code == 404
+    assert api.client.post(f"/v0/campaigns/{unknown}/resume").status_code == 404
 
 
 def _inject_body(text: str = "try a cosine schedule") -> dict:
@@ -117,6 +146,7 @@ def _inject_body(text: str = "try a cosine schedule") -> dict:
 
 
 def test_inject_idea(api: ApiFixture):
+    """An injected idea lands in the ledger."""
     camp_id = str(uuid.uuid4())
     created = api.client.post(
         "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
@@ -141,13 +171,8 @@ def test_inject_idea(api: ApiFixture):
     assert ideas[0]["payload"]["source"] == "api"
 
 
-def test_inject_idea_unknown_campaign(api: ApiFixture):
-    unknown = "00000000-0000-0000-0000-000000000099"
-    response = api.client.post(f"/v0/campaigns/{unknown}/ideas", json=_inject_body())
-    assert response.status_code == 404
-
-
 def test_inject_idea_ended_campaign(api: ApiFixture):
+    """Injecting into an ended campaign is a 409 and records no event."""
     camp_id = str(uuid.uuid4())
     created = api.client.post(
         "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
@@ -164,6 +189,7 @@ def test_inject_idea_ended_campaign(api: ApiFixture):
 
 
 def test_inject_idea_requires_reason(api: ApiFixture):
+    """A missing or empty reason on idea injection is a 422."""
     camp_id = str(uuid.uuid4())
     created = api.client.post(
         "/v0/campaigns", json=_create_body(camp_id, api.repo_path)
@@ -185,6 +211,7 @@ def test_inject_idea_requires_reason(api: ApiFixture):
 
 
 def test_events_jsonl(api: ApiFixture):
+    """Serve the events as ndjson. Optionally, an `after` arg skips earlier events."""
     camp_id = str(uuid.uuid4())
     other_id = str(uuid.uuid4())
     for cid in (camp_id, other_id):
@@ -200,7 +227,7 @@ def test_events_jsonl(api: ApiFixture):
     events = [json.loads(line) for line in response.text.splitlines()]
     assert events[0]["type"] == EventType.CAMPAIGN_CREATED
     assert EventType.EXPERIMENT_JUDGED in {e["type"] for e in events}
-    # The path scopes the read: no events from the other campaign.
+    # Ensure that there are no events from the other campaign.
     assert all(e["campaign_id"] == camp_id for e in events)
 
     # `after` skips earlier events.
@@ -213,12 +240,14 @@ def test_events_jsonl(api: ApiFixture):
 
 
 def test_healthz(api: ApiFixture):
+    """The health check always answers ok."""
     response = api.client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
 def test_auth(tmp_path, repo):
+    """With an auth token configured, /v0 requires it and /healthz stays open."""
     DBOS.destroy()
 
     executor = FakeExecutor(JobState.COMPLETED, exit_code=0)
@@ -299,6 +328,7 @@ def test_died_campaign_status(api: ApiFixture):
 
 
 def test_resume_ended_campaign_rejected(api: ApiFixture):
+    """Resuming an ended campaign is a 409."""
     response = api.client.post(
         "/v0/campaigns",
         json=_create_body(str(uuid.uuid4()), api.repo_path),
@@ -310,11 +340,6 @@ def test_resume_ended_campaign_rejected(api: ApiFixture):
 
     resumed = api.client.post(f"/v0/campaigns/{campaign_id}/resume")
     assert resumed.status_code == 409
-
-
-def test_resume_unknown_campaign(api: ApiFixture):
-    unknown = "00000000-0000-0000-0000-000000000042"
-    assert api.client.post(f"/v0/campaigns/{unknown}/resume").status_code == 404
 
 
 def test_upgrade_ends_outdated_campaign(tmp_path, repo):
@@ -461,6 +486,7 @@ def _read_sse_until(client: httpx2.Client, path: str, marker: str) -> list[str]:
 
 
 def test_events_stream_resume(live_server: LiveServer):
+    """The SSE stream replays from the start or resumes after a seq cursor."""
     timeout = httpx2.Timeout(10.0, read=10.0)
     camp_id = str(uuid.uuid4())
     with httpx2.Client(base_url=live_server.base_url, timeout=timeout) as client:
