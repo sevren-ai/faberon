@@ -280,7 +280,9 @@ def test_restart_in_new_process_recovers_running_job(tmp_path):
     os.waitpid(submitter, 0)
 
     restarted = _make_executor(state_dir)
-    assert restarted.get_status(key).state == JobState.RUNNING
+    info = restarted.get_status(key)
+    assert info.state == JobState.RUNNING
+    assert info.exit_code is None
     assert _wait_terminal(restarted, key).state == JobState.COMPLETED
 
 
