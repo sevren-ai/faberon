@@ -25,6 +25,14 @@ for key in slurm_account model; do
     fi
 done
 
+# Start the personal Postgres when this node has the no-sudo install.
+# The script is idempotent: it exits 0 when Postgres is already running.
+env_file="${XDG_CONFIG_HOME:-$HOME/.config}/faberon/postgres.env"
+if [ -f "$env_file" ]; then
+    echo ">> start-postgres.sh"
+    bash "$repo_root/scripts/db/start-postgres.sh"
+fi
+
 # Compute nodes cannot see the login node's /tmp, so use the shared home.
 # pytest wipes this directory on each run.
 basetemp="${XDG_CACHE_HOME:-$HOME/.cache}/faberon-pytest"
