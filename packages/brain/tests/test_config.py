@@ -17,25 +17,30 @@ def config_file(tmp_path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_config_path_default(monkeypatch: pytest.MonkeyPatch):
+    """Without FABERON_CONFIG, the config path is the platform default."""
     monkeypatch.delenv("FABERON_CONFIG", raising=False)
     assert config.config_path() == config._DEFAULT_CONFIG_PATH
 
 
 def test_config_path_env_override(config_file):
+    """FABERON_CONFIG overrides the config path."""
     assert config.config_path() == config_file
 
 
 def test_load_missing_file(config_file):
+    """A missing config file loads as empty."""
     assert config.load() == {}
 
 
 def test_load_invalid_toml(config_file):
+    """Unparseable TOML raises a ConfigError."""
     config_file.write_text("this is = = not toml\n")
     with pytest.raises(config.ConfigError, match="invalid config"):
         config.load()
 
 
 def test_get_reads_the_file(config_file):
+    """config._get returns the file's value, or None when absent."""
     assert config._get("api_token") is None
 
     config_file.write_text('api_token = "from-file"\n')
@@ -60,6 +65,7 @@ def test_api_url(config_file):
 
 
 def test_get_keeps_toml_types(config_file):
+    """Values keep their TOML types: ints stay ints, strings stay strings."""
     config_file.write_text('port = 9000\nhost = "0.0.0.0"\n')
     assert config.port() == 9000
     assert config.host() == "0.0.0.0"
@@ -101,6 +107,7 @@ def test_apply_env(config_file, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_write_roundtrip_and_permissions(config_file):
+    """write persists settings and env vars with owner-only permissions."""
     config.write(
         config_file,
         {
@@ -121,6 +128,7 @@ def test_write_roundtrip_and_permissions(config_file):
 
 
 def test_write_creates_private_parent(tmp_path):
+    """write creates a missing parent directory as owner-only."""
     path = tmp_path / "newdir" / "config.toml"
     config.write(path, {"api_token": "tok"}, {})
     mode = stat.S_IMODE(path.parent.stat().st_mode)

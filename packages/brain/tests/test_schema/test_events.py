@@ -15,6 +15,7 @@ from faberon.schema import (
 
 
 def test_event_round_trip():
+    """An event is unchanged after a JSON round trip."""
     event = Event(
         campaign_id=uuid4(),
         actor=Actor.AGENT,
@@ -28,6 +29,7 @@ def test_event_round_trip():
 
 
 def test_event_ended_stop_reason():
+    """Ending a campaign requires a valid stop_reason in its payload."""
     # Raises if stop reason not present
     with pytest.raises(ValidationError):
         Event(
@@ -59,6 +61,7 @@ def test_event_ended_stop_reason():
 
 
 def test_event_requires_reason():
+    """An empty reason for an event is rejected."""
     with pytest.raises(ValidationError):
         Event(
             campaign_id=uuid4(),

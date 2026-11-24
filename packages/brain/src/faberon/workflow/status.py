@@ -52,7 +52,7 @@ def get_campaign_info(ledger: Ledger, campaign: Campaign) -> CampaignInfo:
 def _derive_progress(campaign: Campaign, events: list[Event]) -> CampaignProgress:
     """Derive live progress from the ledger."""
     gpu_seconds = sum(
-        float(e.payload["elapsed_seconds"])
+        float(e.payload["elapsed_seconds"]) * int(e.payload["gpus"])
         for e in events
         if e.type == EventType.EXPERIMENT_COMPLETED
         and e.payload.get("elapsed_seconds") is not None
@@ -71,6 +71,18 @@ def _derive_progress(campaign: Campaign, events: list[Event]) -> CampaignProgres
         baseline=campaign.plan.baseline,
         best_metric=best_metric,
     )
+
+
+def get_best_kept_sha(ledger: Ledger, campaign: Campaign) -> str:
+    """Return the campaign's best kept commit: the sha of its last keep (or if
+    None, its start commit)."""
+    sha = campaign.start_sha
+    for event in ledger.get_campaign_events(campaign.campaign_id):
+        if event.type != EventType.EXPERIMENT_JUDGED:
+            continue
+        if event.payload.get("judgment") == "keep" and event.payload.get("sha"):
+            sha = str(event.payload["sha"])
+    return sha
 
 
 def end_outdated_campaigns(ledger: Ledger) -> list[UUID]:

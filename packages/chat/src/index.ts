@@ -22,6 +22,7 @@ import { drafterPrompt } from "./drafter.js";
 import { campaignEventsTool, formatEvents } from "./tools/campaign-events.js";
 import { cancelCampaignTool } from "./tools/cancel-campaign.js";
 import { createCampaignTool, formatCreated } from "./tools/create-campaign.js";
+import { createSuccessorTool } from "./tools/create-successor.js";
 import { injectIdeaTool } from "./tools/inject-idea.js";
 import { formatCampaigns, listCampaignsTool } from "./tools/list-campaigns.js";
 import { resumeCampaignTool } from "./tools/resume-campaign.js";
@@ -66,6 +67,7 @@ export default function faberonChat(pi: ExtensionAPI): void {
   pi.registerTool(showCampaignTool(client));
   pi.registerTool(campaignEventsTool(client));
   pi.registerTool(createCampaignTool(client));
+  pi.registerTool(createSuccessorTool(client));
   pi.registerTool(cancelCampaignTool(client));
   pi.registerTool(injectIdeaTool(client));
   pi.registerTool(resumeCampaignTool(client));
@@ -132,6 +134,47 @@ export default function faberonChat(pi: ExtensionAPI): void {
       if (!planPath) return;
       const repoPath = tokens[1] ?? ctx.cwd;
       await notify(ctx, createFromFile(ctx, client, planPath, repoPath));
+    },
+  });
+
+  pi.registerCommand("faberon-successor", {
+    description:
+      "Start a successor campaign from a finished campaign's best kept " +
+      "commit: /faberon-successor <campaign-id> <budget-gpu-hours> " +
+      "<max-experiments>. Keeps the research plan; use /faberon-create " +
+      "to change it",
+    getArgumentCompletions: () => null,
+    handler: async (args, ctx) => {
+      const tokens = args.split(/\s+/).filter((t) => t.length > 0);
+      const campaignId =
+        tokens[0] ?? (await promptNonEmpty(ctx, "Campaign ID"));
+      if (!campaignId) return;
+      const budgetToken =
+        tokens[1] ?? (await promptNonEmpty(ctx, "Budget in GPU-hours"));
+      if (!budgetToken) return;
+      const budget = Number(budgetToken);
+      if (!Number.isFinite(budget) || budget <= 0) {
+        ctx.ui.notify("Budget must be a positive number of GPU-hours", "error");
+        return;
+      }
+      const maxExperimentsToken =
+        tokens[2] ?? (await promptNonEmpty(ctx, "Max experiments"));
+      if (!maxExperimentsToken) return;
+      const maxExperiments = Number(maxExperimentsToken);
+      if (!Number.isInteger(maxExperiments) || maxExperiments < 1) {
+        ctx.ui.notify("Max experiments must be a positive integer", "error");
+        return;
+      }
+      await notify(
+        ctx,
+        client
+          .createSuccessor(campaignId, {
+            campaign_id: randomUUID(),
+            budget_gpu_hours: budget,
+            max_experiments: maxExperiments,
+          })
+          .then(formatCreated),
+      );
     },
   });
 

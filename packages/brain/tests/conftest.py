@@ -14,6 +14,9 @@ from sqlalchemy.exc import ArgumentError
 from faberon import config
 from faberon.schema import ResearchPlan
 
+# Force plain output for Typer for easier text assertions.
+os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
+
 TEST_DB_NAME = "faberon_test"
 
 # The test database name can never collide with the maintenance

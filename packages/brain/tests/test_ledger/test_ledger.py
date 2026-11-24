@@ -7,7 +7,7 @@ import pytest
 
 from faberon import config
 from faberon.ledger import Ledger
-from faberon.schema import Actor, Event, EventType
+from faberon.schema import Actor, Event, EventType, Predecessor
 
 from ..conftest import make_plan
 
@@ -35,6 +35,7 @@ def _event(**overrides) -> Event:
 
 
 def test_append_assigns_seq(ledger):
+    """Appended events get sequential seq numbers and keep their fields."""
     event = _event()
     stored = ledger.append(event)
     assert stored.seq == 1
@@ -43,6 +44,7 @@ def test_append_assigns_seq(ledger):
 
 
 def test_tail_orders_by_seq(ledger):
+    """tail returns a campaign's events in seq order."""
     camp_id = uuid.uuid4()
     first = ledger.append(_event(campaign_id=camp_id))
     second = ledger.append(_event(campaign_id=camp_id))
@@ -51,6 +53,7 @@ def test_tail_orders_by_seq(ledger):
 
 
 def test_tail_after_cursor(ledger):
+    """tail with `after` skips events before the provided seq number."""
     camp_id = uuid.uuid4()
     first = ledger.append(_event(campaign_id=camp_id))
     ledger.append(_event(campaign_id=camp_id))
@@ -60,6 +63,7 @@ def test_tail_after_cursor(ledger):
 
 
 def test_tail_scopes_to_campaign(ledger):
+    """tail returns only the requested campaign's events."""
     camp_id = uuid.uuid4()
     ledger.append(_event(campaign_id=camp_id))
     ledger.append(_event())
@@ -67,6 +71,7 @@ def test_tail_scopes_to_campaign(ledger):
 
 
 def test_append_preserves_fields(ledger):
+    """A stored event can be retrieved with reason and payload intact."""
     event = _event(reason="plan accepted", payload={"k": "v"})
     stored = ledger.append(event)
     again = next(ledger.tail(stored.campaign_id))
@@ -76,6 +81,7 @@ def test_append_preserves_fields(ledger):
 
 
 def test_get_campaign(ledger):
+    """get_campaign returns None for unknown IDs and the full row otherwise."""
     camp_id = uuid.uuid4()
     assert ledger.get_campaign(camp_id) is None
     plan = make_plan()
@@ -94,6 +100,7 @@ def test_get_campaign(ledger):
 
 
 def test_list_campaigns(ledger):
+    """list_campaigns returns every campaign in creation order."""
     assert ledger.list_campaigns() == []
     camp_a = uuid.uuid4()
     camp_b = uuid.uuid4()
@@ -108,6 +115,7 @@ def test_list_campaigns(ledger):
 
 
 def test_create_campaign_idempotent(ledger):
+    """Creating the same campaign twice records one campaign.created event."""
     camp_id = uuid.uuid4()
     plan = make_plan()
     assert (
@@ -127,7 +135,33 @@ def test_create_campaign_idempotent(ledger):
     assert events[0].type == EventType.CAMPAIGN_CREATED
 
 
+def test_predecessor_is_recorded(ledger):
+    """Check that campaign.created records the predecessor's campaign ID and sha."""
+    camp_id = uuid.uuid4()
+    pred_id = uuid.uuid4()
+    plan = make_plan()
+    ledger.create_campaign(
+        camp_id,
+        str(camp_id),
+        plan,
+        "/repo/a",
+        30.0,
+        branch="main",
+        start_sha="a",
+        predecessor=Predecessor(campaign_id=pred_id, sha="abc123"),
+    )
+    events = list(ledger.tail(camp_id))
+    assert len(events) == 1
+    assert events[0].payload["predecessor"] == {
+        "campaign_id": str(pred_id),
+        "sha": "abc123",
+    }
+    # The payload still carries the plan itself.
+    assert events[0].payload["goal"] == plan.goal
+
+
 def test_campaigns_on_repo(ledger):
+    """get_campaigns_on_repo returns only the campaigns on that repo."""
     repo = "/repo/a"
     assert ledger.get_campaigns_on_repo(repo) == []
 
@@ -142,6 +176,7 @@ def test_campaigns_on_repo(ledger):
 
 
 def test_campaign_events(ledger):
+    """get_campaign_events returns one campaign's events in seq order."""
     camp_a = uuid.uuid4()
     camp_b = uuid.uuid4()
     ledger.append(_event(campaign_id=camp_a))

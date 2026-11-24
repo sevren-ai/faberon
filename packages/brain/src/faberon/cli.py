@@ -386,7 +386,7 @@ def init() -> None:
             default=existing.get("slurm_account"),
         )
         values["slurm_gpus"] = typer.prompt(
-            "GPUs per job", type=int, default=int(existing.get("slurm_gpus", 1))
+            "Max GPUs per job", type=int, default=int(existing.get("slurm_gpus", 1))
         )
     else:
         values.pop("slurm_account", None)
@@ -413,7 +413,10 @@ def create_campaign(
         None,
         "--branch",
         "-b",
-        help="Working branch to adopt or create; defaults to the current branch.",
+        help=(
+            "Working branch to adopt or create. "
+            "Defaults to a fresh faberon/<short-id> branch."
+        ),
     ),
 ) -> None:
     """Submit a new campaign from a research plan."""
@@ -441,6 +444,42 @@ def create_campaign(
         payload["branch"] = branch
     with _make_client() as client:
         response = _check(client.post("/v0/campaigns", json=payload))
+        created = response.json()
+        echo(f"campaign: {created['campaign_id']}")
+        echo(f"workflow: {created['workflow_id']}")
+
+
+@app.command("successor")
+def create_successor(
+    campaign_id: UUID,
+    budget_gpu_hours: float = Option(
+        ..., "--budget-gpu-hours", help="Fresh GPU-hour budget for the successor."
+    ),
+    max_experiments: int = Option(
+        ..., "--max-experiments", help="Fresh experiment cap for the successor."
+    ),
+    branch: str | None = Option(
+        None,
+        "--branch",
+        "-b",
+        help=(
+            "Working branch for the successor."
+            " Defaults to a fresh faberon/<short-id> branch."
+        ),
+    ),
+) -> None:
+    """Start a successor from a finished campaign's best kept commit."""
+    payload: dict[str, object] = {
+        "campaign_id": str(uuid4()),
+        "budget_gpu_hours": budget_gpu_hours,
+        "max_experiments": max_experiments,
+    }
+    if branch is not None:
+        payload["branch"] = branch
+    with _make_client() as client:
+        response = _check(
+            client.post(f"/v0/campaigns/{campaign_id}/successor", json=payload)
+        )
         created = response.json()
         echo(f"campaign: {created['campaign_id']}")
         echo(f"workflow: {created['workflow_id']}")

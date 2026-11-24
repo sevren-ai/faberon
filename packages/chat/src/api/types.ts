@@ -12,6 +12,7 @@ export interface ResearchPlan {
   budget_gpu_hours: number;
   max_experiments: number;
   max_concurrency: number;
+  gpus: number;
   walltime: number;
   stop_conditions: string[];
 }
@@ -56,6 +57,14 @@ export interface CampaignCreate {
 export interface CampaignCreated {
   campaign_id: string;
   workflow_id: string;
+}
+
+/** POST /v0/campaigns/{id}/successor body. */
+export interface SuccessorCreate {
+  campaign_id: string;
+  branch?: string;
+  budget_gpu_hours: number;
+  max_experiments: number;
 }
 
 /** Status body returned by the write endpoints. */

@@ -94,6 +94,7 @@ This runs `uv sync --locked` and `uv run pytest` in `packages/brain/`, mirroring
 
 - Test functional behaviour through the public API of the unit under test. Do not assert on internals that a refactor could change without changing behaviour.
 - Keep tests small and focused. One behaviour per test when practical.
+- Give each Python test a docstring (preferably on a single line) that states the behaviour it protects.
 - Roughly one test file per Python module, mirroring the package layout (for example `schema/plan.py` → `tests/test_schema/test_plan.py`).
 - Every test should protect a behaviour we care about. Prefer a few meaningful tests over many trivial ones that only restate the implementation.
 - Tests that start DBOS workflows must wait for them to finish before DBOS teardown. A running parent can otherwise remain blocked on a child workflow during Python shutdown.
@@ -109,7 +110,7 @@ They are included in the local tests, but skip themselves when Postgres is unrea
 bash scripts/test/cluster.sh
 ```
 
-Run this on a Slurm login node before every PR. It runs what CI cannot: the Slurm job-submission tests, the LLM tests, and the CLI tests that need `sbatch` on `PATH` (the `sbatch` marker; they submit nothing). The script requires `slurm_account` and `model` in the Faberon config file, plus the provider key in its `[env]` table.
+Run this on a Slurm login node before every PR. It runs what CI cannot: the Slurm job-submission tests, the LLM tests, and the CLI tests that need `sbatch` on `PATH` (the `sbatch` marker; they submit nothing). The script requires `slurm_account` and `model` in the Faberon config file, plus the provider key in its `[env]` table. When the node has the no-sudo Postgres install, the script starts it first (idempotent), so the postgres-marked tests run instead of skipping.
 
 To iterate on one area, run pytest directly:
 
@@ -143,6 +144,7 @@ This runs `uv sync --locked`, `ruff format`, `ruff check --fix`, and `ty check` 
 ## Coding style
 
 - Prefer the simplest implementation that works. Do not add optional fields, defaults, or forward-looking abstractions until the current feature needs them.
+- Avoid hidden defaults. Do not paper over missing or unexpected data with silent fallbacks.
 - Docstrings are succinct. One short paragraph that says what the unit is and, when useful, why. Do not narrate mechanics, and do not duplicate what design docs, tests, or the type signature already say elsewhere.
 - Production code is written for production, not for the tests. Keep test accommodations out of the main package:
   - Do not add parameters, constructors, or protocols whose primary purpose is to let a test substitute a fake.

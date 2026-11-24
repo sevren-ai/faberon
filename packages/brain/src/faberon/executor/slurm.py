@@ -1,13 +1,16 @@
 """Slurm executor: real sbatch/sacct/scancel adapter."""
 
+import logging
 import shlex
 import subprocess
 from collections.abc import Sequence
 
-from .protocol import JobInfo, JobState, SubmitRequest
+from .protocol import JobInfo, JobState, SubmitRequest, SubmitResult
 
 # Prefix keeps Faberon job names apart from unrelated jobs on a shared cluster
 JOB_NAME_PREFIX = "faberon:"
+
+logger = logging.getLogger(__name__)
 
 # Slurm states grouped by how they map onto JobState
 _LIVE_STATES = {
@@ -111,24 +114,46 @@ class SlurmExecutor:
         self,
         account: str,
         *,
-        gpus: int = 1,
+        max_gpus: int | None = None,
         max_walltime: int | None = None,
     ) -> None:
         self._account = account
-        self._gpus = gpus
+        self._max_gpus = max_gpus
         self._max_walltime = max_walltime
 
     def _get_effective_walltime(self, request: SubmitRequest) -> int:
         """Clamp the request's walltime to the deployment-side cap, if set."""
         if self._max_walltime is None:
             return request.walltime
+        if request.walltime > self._max_walltime:
+            logger.warning(
+                "job %s requested %d min, clamped to the deployment cap of %d",
+                request.submission_key,
+                request.walltime,
+                self._max_walltime,
+            )
         return min(request.walltime, self._max_walltime)
 
-    def submit(self, request: SubmitRequest) -> str:
+    def _effective_gpus(self, request: SubmitRequest) -> int:
+        """Clamp the request's GPU count to the deployment-side cap, if set."""
+        if self._max_gpus is None:
+            return request.gpus
+        if request.gpus > self._max_gpus:
+            logger.warning(
+                "job %s requested %d GPUs, clamped to the deployment cap of %d",
+                request.submission_key,
+                request.gpus,
+                self._max_gpus,
+            )
+        return min(request.gpus, self._max_gpus)
+
+    def submit(self, request: SubmitRequest) -> SubmitResult:
         job_name = JOB_NAME_PREFIX + request.submission_key
+        gpus = self._effective_gpus(request)
+        walltime = self._get_effective_walltime(request)
         existing = self._find_job_by_name(job_name)
         if existing is not None:
-            return existing
+            return SubmitResult(job_id=existing, gpus=gpus, walltime=walltime)
         result = subprocess.run(
             _render_sbatch(
                 job_name,
@@ -136,8 +161,8 @@ class SlurmExecutor:
                 request.argv,
                 cwd=request.cwd,
                 output=request.output_path,
-                gpus=self._gpus,
-                time_limit=self._get_effective_walltime(request),
+                gpus=gpus,
+                time_limit=walltime,
             ),
             capture_output=True,
             text=True,
@@ -147,7 +172,7 @@ class SlurmExecutor:
         job_id = result.stdout.strip()
         if not job_id:
             raise RuntimeError("sbatch returned no job id")
-        return job_id
+        return SubmitResult(job_id=job_id, gpus=gpus, walltime=walltime)
 
     def get_status(self, job_id: str) -> JobInfo:
         live = self._get_squeue_state(job_id)

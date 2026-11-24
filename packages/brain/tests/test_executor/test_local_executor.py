@@ -9,6 +9,7 @@ minute-scale sleeps.
 
 import json
 import os
+import logging
 import time
 import uuid
 
@@ -88,21 +89,23 @@ def _submit_orphaning_wrapper(executor: LocalExecutor, tmp_path) -> tuple[str, i
     pidfile = tmp_path / "child.pid"
     job_id = executor.submit(
         _request(f"sh -c 'sleep 30 & echo $! > {pidfile}; wait'", _key())
-    )
+    ).job_id
     child_pid = _wait_for_pidfile(pidfile)
     assert _is_pid_alive(child_pid)
     return job_id, child_pid
 
 
 def test_success(executor: LocalExecutor):
-    job_id = executor.submit(_request("true", _key()))
+    """A successful command completes with exit code 0."""
+    job_id = executor.submit(_request("true", _key())).job_id
     info = _wait_terminal(executor, job_id)
     assert info.state == JobState.COMPLETED
     assert info.exit_code == 0
 
 
 def test_failure(executor: LocalExecutor):
-    job_id = executor.submit(_request("false", _key()))
+    """A failing command returns a nonzero exit code."""
+    job_id = executor.submit(_request("false", _key())).job_id
     info = _wait_terminal(executor, job_id)
     assert info.state == JobState.FAILED
     assert info.exit_code != 0
@@ -118,20 +121,22 @@ def test_log_file_is_owner_only(executor: LocalExecutor, tmp_path):
         output_path=str(out),
         cwd=str(tmp_path),
     )
-    job_id = executor.submit(request)
+    job_id = executor.submit(request).job_id
     _wait_terminal(executor, job_id)
     assert out.stat().st_mode & 0o077 == 0, oct(out.stat().st_mode)
 
 
 def test_nonzero_exit(executor: LocalExecutor):
-    job_id = executor.submit(_request("sh -c 'exit 3'", _key()))
+    """The job's own exit code is reported."""
+    job_id = executor.submit(_request("sh -c 'exit 3'", _key())).job_id
     info = _wait_terminal(executor, job_id)
     assert info.state == JobState.FAILED
     assert info.exit_code == 3
 
 
 def test_terminal_reports_elapsed(executor: LocalExecutor):
-    job_id = executor.submit(_request("sleep 0.2", _key()))
+    """Ensure that elapsed_seconds is recorded properly."""
+    job_id = executor.submit(_request("sleep 0.2", _key())).job_id
     info = _wait_terminal(executor, job_id)
     assert info.elapsed_seconds is not None
     assert info.elapsed_seconds >= 0.2
@@ -148,7 +153,7 @@ def test_output_file(executor: LocalExecutor, tmp_path):
         output_path=str(out),
         cwd=str(tmp_path),
     )
-    job_id = executor.submit(request)
+    job_id = executor.submit(request).job_id
     assert job_id == key
     _wait_terminal(executor, job_id)
     assert "val_bpb: 1.10" in out.read_text()
@@ -167,13 +172,14 @@ def test_runs_in_cwd(executor: LocalExecutor, tmp_path):
         output_path=str(out),
         cwd=str(repo),
     )
-    info = _wait_terminal(executor, executor.submit(request))
+    info = _wait_terminal(executor, executor.submit(request).job_id)
     assert info.state == JobState.COMPLETED
     assert "val_bpb: 1.0" in out.read_text()
 
 
 def test_cancel(executor: LocalExecutor):
-    job_id = executor.submit(_request("sleep 30", _key()))
+    """A cancelled job reports CANCELLED with elapsed seconds."""
+    job_id = executor.submit(_request("sleep 30", _key())).job_id
     executor.cancel(job_id)
     info = executor.get_status(job_id)
     assert info.state == JobState.CANCELLED
@@ -183,7 +189,7 @@ def test_cancel(executor: LocalExecutor):
 def test_walltime_enforcement(executor: LocalExecutor, tmp_path):
     """A job past its deadline is killed and reported FAILED."""
     key = _key()
-    job_id = executor.submit(_request("sleep 30", key))
+    job_id = executor.submit(_request("sleep 30", key)).job_id
     # Simulate a nearly-expired deadline so the test does not sleep for minutes.
     record_path = tmp_path / "state" / f"{job_id}.json"
     record = json.loads(record_path.read_text())
@@ -198,7 +204,7 @@ def test_walltime_grace_lets_job_clean_up(executor: LocalExecutor, tmp_path):
     """A job past its deadline gets SIGTERM first and can clean up."""
     ready, cleaned = tmp_path / "ready", tmp_path / "cleaned"
     script = f"trap 'touch {cleaned}; exit 0' TERM; echo $$ > {ready}; sleep 30 & wait"
-    job_id = executor.submit(_request(f'sh -c "{script}"', _key()))
+    job_id = executor.submit(_request(f'sh -c "{script}"', _key())).job_id
     _wait_for_pidfile(ready)
     _expire_deadline(tmp_path / "state", job_id)
     # The clean exit on SIGTERM is still a walltime failure.
@@ -223,25 +229,27 @@ def test_cancel_reaches_group(executor: LocalExecutor, tmp_path):
 
 
 def test_same_key_returns_same_id(executor: LocalExecutor):
+    """A duplicate submission key returns the same job and starts no second process."""
     key = _key()
     first = executor.submit(_request("sleep 0.2", key))
     second = executor.submit(_request("echo other", key))
     assert first == second
     # The duplicate submit did not start a second process: only one runs.
-    info = _wait_terminal(executor, first)
+    info = _wait_terminal(executor, first.job_id)
     assert info.state == JobState.COMPLETED
 
 
 def test_idempotency_survives_restart(executor: LocalExecutor, tmp_path):
     """A new executor on the same state dir dedupes an in-flight submission."""
     key = _key()
-    job_id = executor.submit(_request("sleep 0.3", key))
+    job_id = executor.submit(_request("sleep 0.3", key)).job_id
     restarted = _make_executor(tmp_path / "state")
-    assert restarted.submit(_request("sleep 0.3", key)) == job_id
+    assert restarted.submit(_request("sleep 0.3", key)).job_id == job_id
     executor.cancel(job_id)
 
 
 def test_status_unknown_job(executor: LocalExecutor):
+    """Status for an unknown job raises KeyError."""
     with pytest.raises(KeyError):
         executor.get_status("no-such-job")
 
@@ -250,7 +258,7 @@ def test_restart_recovers_running_job(tmp_path):
     """A job started before a restart is still tracked and reapable after."""
     state_dir = tmp_path / "state"
     first = _make_executor(state_dir)
-    job_id = first.submit(_request("sleep 0.3", _key()))
+    job_id = first.submit(_request("sleep 0.3", _key())).job_id
 
     # Simulate a brain restart: a fresh executor on the same dir.
     restarted = _make_executor(state_dir)
@@ -277,9 +285,10 @@ def test_restart_in_new_process_recovers_running_job(tmp_path):
 
 
 def test_restart_recovers_finished_job(tmp_path):
+    """A job finished before a restart still reads its final state after."""
     state_dir = tmp_path / "state"
     first = _make_executor(state_dir)
-    job_id = first.submit(_request("true", _key()))
+    job_id = first.submit(_request("true", _key())).job_id
     _wait_terminal(first, job_id)
 
     restarted = _make_executor(state_dir)
@@ -298,6 +307,15 @@ def test_restart_recovers_finished_job(tmp_path):
     ],
 )
 def test_effective_walltime(walltime, max_walltime, expected, tmp_path):
+    """The walltime is clamped to the configured cap, unchanged at or under it."""
     executor = _make_executor(tmp_path / "state", max_walltime=max_walltime)
     request = _request("true", _key(), walltime=walltime)
     assert executor._get_effective_walltime(request) == expected
+
+
+def test_walltime_clamp_warning(caplog, tmp_path):
+    executor = _make_executor(tmp_path / "state", max_walltime=1)
+    with caplog.at_level(logging.WARNING, logger="faberon.executor.local"):
+        result = executor.submit(_request("true", _key(), walltime=5))
+    assert result.walltime == 1
+    assert "requested 5 min, clamped to the deployment cap of 1" in caplog.text

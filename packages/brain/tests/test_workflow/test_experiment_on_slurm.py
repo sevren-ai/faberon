@@ -44,6 +44,7 @@ def dbos() -> Iterator[None]:
 
 
 def test_experiment_on_slurm(dbos, tmp_path):
+    """One experiment runs on Slurm end to end: submit, poll, parse, judge, record."""
     # The job prints the metric to stdout, which lands in the job log at
     # {repo}/.faberon/{submission_key}.out; the workflow parses it from there.
     command = "echo 'val_bpb: 1.10'"

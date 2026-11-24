@@ -227,6 +227,7 @@ def test_serve_prints_settings(
 
 @pytest.mark.sbatch
 def test_serve_defaults_to_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """With sbatch on PATH, serve picks the Slurm executor."""
     captured = _serve_setup(
         tmp_path,
         monkeypatch,
@@ -242,6 +243,7 @@ def test_serve_defaults_to_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
 def test_serve_slurm_requires_token_and_account(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ):
+    """The Slurm executor needs api_token and slurm_account in the config."""
     _serve_setup(tmp_path, monkeypatch)
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 2
@@ -251,6 +253,7 @@ def test_serve_slurm_requires_token_and_account(
 
 @pytest.mark.no_sbatch
 def test_serve_defaults_to_local(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Without sbatch on PATH, serve picks the local executor."""
     captured = _serve_setup(tmp_path, monkeypatch)
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 0
@@ -268,6 +271,7 @@ def test_serve_executor_from_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_serve_unknown_executor(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """An unrecognized executor in the config file is an error."""
     _serve_setup(tmp_path, monkeypatch, 'executor = "kubernetes"\n')
     result = runner.invoke(cli.app, ["serve"])
     assert result.exit_code == 2
@@ -350,6 +354,7 @@ def test_init_notes_unknown_provider(tmp_path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_init_writes_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """init writes a complete config file and never echoes the API key."""
     config_file = _init_env(tmp_path, monkeypatch)
     # Postgres URL (default), model, OpenRouter key, executor.
     result = runner.invoke(
@@ -374,6 +379,7 @@ def test_init_writes_config(tmp_path, monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.sbatch
 def test_init_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """With sbatch present, init defaults to Slurm and asks for the account."""
     config_file = _init_env(tmp_path, monkeypatch)
     # Postgres URL (default), model, executor (default: slurm), account, GPUs (default).
     result = runner.invoke(cli.app, ["init"], input="\ntest-model\n\nacct01\n\n")
@@ -389,6 +395,7 @@ def test_init_slurm(tmp_path, monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.no_sbatch
 def test_init_defaults_to_local(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Without sbatch, init defaults to the local executor."""
     config_file = _init_env(tmp_path, monkeypatch)
     # Postgres URL (default), model, executor (default: local).
     result = runner.invoke(cli.app, ["init"], input="\ntest-model\n\n")
@@ -462,6 +469,7 @@ def test_init_fails_when_createdb_fails(tmp_path, monkeypatch: pytest.MonkeyPatc
 
 
 def test_list(api_client):
+    """list renders a table with one row per campaign."""
     api_client[("GET", "/v0/campaigns")] = [_CAMPAIGN_INFO]
     result = runner.invoke(cli.app, ["list"])
     assert result.exit_code == 0
@@ -488,6 +496,7 @@ def test_list(api_client):
 
 
 def test_list_json(api_client):
+    """list --json prints the raw CampaignInfo list."""
     api_client[("GET", "/v0/campaigns")] = [_CAMPAIGN_INFO]
     result = runner.invoke(cli.app, ["list", "--json"])
     assert result.exit_code == 0
@@ -496,6 +505,7 @@ def test_list_json(api_client):
 
 
 def test_show(api_client):
+    """show renders one campaign's status, plan, and progress."""
     api_client[("GET", f"/v0/campaigns/{CAMPAIGN_ID}")] = _CAMPAIGN_INFO
     result = runner.invoke(cli.app, ["show", CAMPAIGN_ID])
     assert result.exit_code == 0
@@ -518,6 +528,7 @@ def _no_best_info() -> dict:
 
 
 def test_list_baseline(api_client):
+    """Without a kept experiment, 'list' shows the baseline performance."""
     api_client[("GET", "/v0/campaigns")] = [_no_best_info()]
     result = runner.invoke(cli.app, ["list"])
     assert result.exit_code == 0
@@ -526,6 +537,7 @@ def test_list_baseline(api_client):
 
 
 def test_show_baseline(api_client):
+    """Without a kept experiment, 'show' labels the baseline as best."""
     api_client[("GET", f"/v0/campaigns/{CAMPAIGN_ID}")] = _no_best_info()
     result = runner.invoke(cli.app, ["show", CAMPAIGN_ID])
     assert result.exit_code == 0
@@ -533,6 +545,7 @@ def test_show_baseline(api_client):
 
 
 def test_show_json(api_client):
+    """show --json prints the raw CampaignInfo."""
     api_client[("GET", f"/v0/campaigns/{CAMPAIGN_ID}")] = _CAMPAIGN_INFO
     result = runner.invoke(cli.app, ["show", CAMPAIGN_ID, "--json"])
     assert result.exit_code == 0
@@ -552,6 +565,7 @@ def _events_handler(request: httpx2.Request) -> httpx2.Response:
 
 
 def test_events(monkeypatch: pytest.MonkeyPatch):
+    """Listing events is non-verbose by default."""
     monkeypatch.setattr(
         cli, "_make_client", lambda: _client_from_handler(_events_handler)
     )
@@ -564,6 +578,7 @@ def test_events(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_events_json(monkeypatch: pytest.MonkeyPatch):
+    """Listing events with --json prints the raw ndjson events."""
     monkeypatch.setattr(
         cli, "_make_client", lambda: _client_from_handler(_events_handler)
     )
@@ -574,7 +589,7 @@ def test_events_json(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_events_after(monkeypatch: pytest.MonkeyPatch):
-    """--after is forwarded to the API as the seq lower bound."""
+    """Listing events with --after sets the seq lower bound."""
     captured = {}
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -588,6 +603,7 @@ def test_events_after(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_cancel(api_client):
+    """A cancellation posts the reason and reports the request."""
     api_client[("POST", f"/v0/campaigns/{CAMPAIGN_ID}/cancel")] = {
         "campaign_id": CAMPAIGN_ID,
         "status": "cancel requested",
@@ -621,6 +637,7 @@ def test_cancel_prompt(api_client, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_resume(api_client):
+    """A resume post reports the request."""
     api_client[("POST", f"/v0/campaigns/{CAMPAIGN_ID}/resume")] = {
         "campaign_id": CAMPAIGN_ID,
         "status": "resume requested",
@@ -631,6 +648,7 @@ def test_resume(api_client):
 
 
 def test_create(api_client, tmp_path):
+    """A create submits the plan file and prints the campaign and workflow IDs."""
     api_client[("POST", "/v0/campaigns")] = {
         "campaign_id": CAMPAIGN_ID,
         "workflow_id": CAMPAIGN_ID,
@@ -641,6 +659,72 @@ def test_create(api_client, tmp_path):
     assert result.exit_code == 0
     assert CAMPAIGN_ID in result.output
     assert "workflow" in result.output
+
+
+def test_successor(api_client):
+    """`faberon successor` posts to the successor endpoint and prints the new IDs."""
+    api_client[("POST", f"/v0/campaigns/{CAMPAIGN_ID}/successor")] = {
+        "campaign_id": CAMPAIGN_ID,
+        "workflow_id": CAMPAIGN_ID,
+    }
+    result = runner.invoke(
+        cli.app,
+        ["successor", CAMPAIGN_ID, "--budget-gpu-hours", "5", "--max-experiments", "2"],
+    )
+    assert result.exit_code == 0
+    assert CAMPAIGN_ID in result.output
+    assert "workflow" in result.output
+
+
+def test_successor_posts_explicit_limits(monkeypatch: pytest.MonkeyPatch):
+    """The body carries the fresh limits and a new campaign ID, not the old one."""
+    captured = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        captured["path"] = request.url.path
+        captured["body"] = json.loads(request.content)
+        return httpx2.Response(
+            201, json={"campaign_id": CAMPAIGN_ID, "workflow_id": CAMPAIGN_ID}
+        )
+
+    monkeypatch.setattr(cli, "_make_client", lambda: _client_from_handler(handler))
+    result = runner.invoke(
+        cli.app,
+        [
+            "successor",
+            CAMPAIGN_ID,
+            "--budget-gpu-hours",
+            "5.5",
+            "--max-experiments",
+            "2",
+            "--branch",
+            "follow-up",
+        ],
+    )
+    assert result.exit_code == 0
+    assert captured["path"] == f"/v0/campaigns/{CAMPAIGN_ID}/successor"
+    assert captured["body"]["budget_gpu_hours"] == 5.5
+    assert captured["body"]["max_experiments"] == 2
+    assert captured["body"]["branch"] == "follow-up"
+    assert captured["body"]["campaign_id"] != CAMPAIGN_ID
+
+
+def test_successor_requires_gpu_budget(api_client):
+    """The GPU budget is a required option for a successor"""
+    result = runner.invoke(
+        cli.app, ["successor", CAMPAIGN_ID, "--max-experiments", "5"]
+    )
+    assert result.exit_code == 2
+    assert "budget-gpu-hours" in result.output
+
+
+def test_successor_requires_max_experiments(api_client):
+    """The max experiments setting is required for a successor"""
+    result = runner.invoke(
+        cli.app, ["successor", CAMPAIGN_ID, "--budget-gpu-hours", "5"]
+    )
+    assert result.exit_code == 2
+    assert "max-experiments" in result.output
 
 
 def test_chat_uses_pi(monkeypatch: pytest.MonkeyPatch):
