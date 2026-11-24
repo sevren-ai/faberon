@@ -39,7 +39,7 @@ export function createSuccessorTool(client: FaberonClient) {
         Type.String({
           description:
             "Working branch for the successor. Defaults to a fresh " +
-            "faberon/<id> branch created at the succession commit.",
+            "faberon/<short-id> branch created at the succession commit.",
           minLength: 1,
         }),
       ),

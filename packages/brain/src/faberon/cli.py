@@ -415,7 +415,7 @@ def create_campaign(
         "-b",
         help=(
             "Working branch to adopt or create. "
-            "Defaults to a fresh faberon/<id> branch."
+            "Defaults to a fresh faberon/<short-id> branch."
         ),
     ),
 ) -> None:
