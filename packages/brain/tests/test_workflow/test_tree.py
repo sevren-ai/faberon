@@ -26,6 +26,7 @@ def _get_head(repo: Path) -> str:
 
 
 def test_commit_file(tmp_path: Path) -> None:
+    """commit_file commits the target and returns the new and parent shas."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     baseline_sha = _get_head(repo)
     train_loc = repo / "train.py"
@@ -37,6 +38,7 @@ def test_commit_file(tmp_path: Path) -> None:
 
 
 def test_commit_file_errors(tmp_path: Path) -> None:
+    """Committing without changes or a missing file raises."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     with pytest.raises(RuntimeError):
         tree.commit_file(repo, "train.py", "no change")
@@ -46,6 +48,7 @@ def test_commit_file_errors(tmp_path: Path) -> None:
 
 
 def test_discard(tmp_path: Path) -> None:
+    """reset_hard moves HEAD back and restores the baseline content."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     train_loc = repo / "train.py"
     train_loc.write_text("experiment S\n")
@@ -58,6 +61,7 @@ def test_discard(tmp_path: Path) -> None:
 
 
 def test_keep_continue(tmp_path: Path) -> None:
+    """After a keep, the next experiment builds on the kept commit."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     train_loc = repo / "train.py"
     train_loc.write_text("experiment 1\n")
@@ -70,6 +74,7 @@ def test_keep_continue(tmp_path: Path) -> None:
 
 
 def test_discard_continue(tmp_path: Path) -> None:
+    """After a discard, the next experiment builds on the baseline commit."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     baseline_sha = _get_head(repo)
     train_loc = repo / "train.py"
@@ -87,6 +92,7 @@ def test_discard_continue(tmp_path: Path) -> None:
 
 
 def test_create_tag(tmp_path: Path) -> None:
+    """create_tag points the tag at the commit without moving HEAD."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     head = _get_head(repo)
     tree.create_tag(repo, "faberon/some-campaign/exp-1", head)
@@ -96,6 +102,7 @@ def test_create_tag(tmp_path: Path) -> None:
 
 
 def test_tagged_discard_stays_reachable(tmp_path: Path) -> None:
+    """A tagged discard leaves the branch but stays reachable through the tag."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     train_loc = repo / "train.py"
     train_loc.write_text("experiment 1\n")
@@ -109,6 +116,7 @@ def test_tagged_discard_stays_reachable(tmp_path: Path) -> None:
 
 
 def test_discard_uncommitted_changes(tmp_path: Path) -> None:
+    """reset_hard clears uncommitted changes to the target file."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     train_loc = repo / "train.py"
     train_loc.write_text("experiment 1\n")
@@ -121,10 +129,11 @@ def test_discard_uncommitted_changes(tmp_path: Path) -> None:
 
 
 def test_uncommitted_changes(tmp_path: Path) -> None:
+    """Uncommited changes are checked only in tracked files"""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     assert tree.get_uncommitted_changes(repo) == []
 
-    # Untracked files do not count.
+    # Untracked files are not included in this check.
     (repo / "notes.txt").write_text("scratch\n")
     assert tree.get_uncommitted_changes(repo) == []
 
@@ -136,6 +145,7 @@ def test_uncommitted_changes(tmp_path: Path) -> None:
 
 
 def test_untracked_files(tmp_path: Path) -> None:
+    """Untracked files are listed unless git exclude rules cover them."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     assert tree.get_untracked_files(repo) == []
 
@@ -153,6 +163,7 @@ def test_untracked_files(tmp_path: Path) -> None:
 
 
 def test_has_commits(tmp_path: Path) -> None:
+    """has_commits is False for an empty repo and an error outside any repo."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "-b", "main")
@@ -171,6 +182,7 @@ def test_has_commits(tmp_path: Path) -> None:
 
 
 def test_branch_helpers(tmp_path: Path) -> None:
+    """Test git helpers: exists, tip, create, checkout."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     head = _get_head(repo)
     assert tree.branch_exists(repo, "main")
@@ -190,6 +202,7 @@ def test_branch_helpers(tmp_path: Path) -> None:
 
 
 def test_ensure_exclude(tmp_path: Path) -> None:
+    """ensure_exclude adds the pattern to .git/info/exclude exactly once."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     tree.ensure_exclude(repo, ".faberon/")
     exclude = repo / ".git" / "info" / "exclude"
@@ -201,6 +214,7 @@ def test_ensure_exclude(tmp_path: Path) -> None:
 
 
 def test_ensure_branch(tmp_path: Path) -> None:
+    """ensure_branch passes on the campaign branch and fails off it or detached."""
     repo = make_repo(tmp_path, _BASELINE_EXPERIMENT)
     tree.ensure_branch(repo, "main")
 

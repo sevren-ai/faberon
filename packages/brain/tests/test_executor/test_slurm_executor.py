@@ -7,6 +7,8 @@ not tested here; it is verified on-cluster by
 test_slurm_integration.py.
 """
 
+import logging
+
 import pytest
 
 from faberon.executor import JobState
@@ -22,12 +24,14 @@ from faberon.executor.slurm import (
 
 
 def test_render_script():
+    """The batch script is a strict sh script that execs the quoted command."""
     script = _render_script(["echo", "a b", "$X"])
     assert script.startswith("#!/bin/sh\nset -eu\nexec ")
     assert "echo 'a b' '$X'" in script
 
 
 def test_render_sbatch():
+    """The sbatch argv carries job name, account, GPU, time limit, cwd, and script."""
     args = _render_sbatch(
         "faberon:exp-1",
         "minerva",
@@ -59,6 +63,7 @@ def test_render_sbatch():
     ],
 )
 def test_effective_walltime(walltime, max_walltime, expected):
+    """The walltime is clamped to the configured cap, unchanged at or under it."""
     executor = SlurmExecutor("minerva", max_walltime=max_walltime)
     request = SubmitRequest(
         command="echo hello",
@@ -71,6 +76,7 @@ def test_effective_walltime(walltime, max_walltime, expected):
 
 
 def test_effective_walltime_no_cap():
+    """Without a configured cap, the requested walltime passes through."""
     executor = SlurmExecutor("minerva")
     request = SubmitRequest(
         command="echo hello",
@@ -80,6 +86,58 @@ def test_effective_walltime_no_cap():
         cwd="/r",
     )
     assert executor._get_effective_walltime(request) == 90
+
+
+@pytest.mark.parametrize(
+    "gpus,max_gpus,expected",
+    [
+        (4, None, 4),  # no cap set: request passes through
+        (2, 4, 2),  # under the cap: unchanged
+        (8, 4, 4),  # over the cap: clamped
+        (4, 4, 4),  # exactly at the cap: unchanged
+        (1, 1, 1),  # smallest valid values
+    ],
+)
+def test_effective_gpus(gpus, max_gpus, expected):
+    executor = SlurmExecutor("minerva", max_gpus=max_gpus)
+    request = SubmitRequest(
+        command="echo hello",
+        submission_key="k",
+        walltime=90,
+        gpus=gpus,
+        output_path="/o",
+        cwd="/r",
+    )
+    assert executor._effective_gpus(request) == expected
+
+
+def test_gpu_clamp_warning(caplog):
+    executor = SlurmExecutor("minerva", max_gpus=4)
+    request = SubmitRequest(
+        command="echo hello",
+        submission_key="k",
+        walltime=90,
+        gpus=8,
+        output_path="/o",
+        cwd="/r",
+    )
+    with caplog.at_level(logging.WARNING, logger="faberon.executor.slurm"):
+        assert executor._effective_gpus(request) == 4
+    assert "requested 8 GPUs, clamped to the deployment cap of 4" in caplog.text
+
+
+def test_walltime_clamp_warning(caplog):
+    executor = SlurmExecutor("minerva", max_walltime=60)
+    request = SubmitRequest(
+        command="echo hello",
+        submission_key="k",
+        walltime=90,
+        output_path="/o",
+        cwd="/r",
+    )
+    with caplog.at_level(logging.WARNING, logger="faberon.executor.slurm"):
+        assert executor._get_effective_walltime(request) == 60
+    assert "requested 90 min, clamped to the deployment cap of 60" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -93,6 +151,7 @@ def test_effective_walltime_no_cap():
     ],
 )
 def test_parse_exit_code(exit_string, expected):
+    """sacct's exit string parses to an int or None."""
     assert _parse_exit_code(exit_string) == expected
 
 
@@ -108,6 +167,7 @@ def test_parse_exit_code(exit_string, expected):
     ],
 )
 def test_parse_sacct_line(line, expected):
+    """A sacct line splits into state, exit code, and elapsed seconds."""
     assert _parse_sacct_line(line) == expected
 
 
@@ -126,6 +186,7 @@ def test_parse_sacct_line(line, expected):
     ],
 )
 def test_map_state(slurm_state, exit_string, expected_state, expected_exit):
+    """Slurm states map to job states, with elapsed only for terminal jobs."""
     assert _map_state(slurm_state, exit_string, 60.0) == (
         expected_state,
         expected_exit,
@@ -134,15 +195,18 @@ def test_map_state(slurm_state, exit_string, expected_state, expected_exit):
 
 
 def test_map_state_unknown_raises():
+    """An unmapped Slurm state raises an error."""
     with pytest.raises(ValueError):
         _map_state("UNKNOWN_ISSUE", "0:0")
 
 
 def test_jobinfo_terminal_requires_elapsed():
+    """A terminal JobInfo without elapsed seconds is invalid."""
     with pytest.raises(ValueError, match="elapsed_seconds"):
         JobInfo(job_id="j1", state=JobState.COMPLETED, elapsed_seconds=None)
 
 
 def test_jobinfo_running_allows_no_elapsed():
+    """A running JobInfo lacks info on elapsed seconds."""
     info = JobInfo(job_id="j1", state=JobState.RUNNING, elapsed_seconds=None)
     assert info.elapsed_seconds is None

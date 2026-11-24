@@ -27,6 +27,7 @@ class SubmitRequest(BaseModel):
     command: str = Field(min_length=1)
     submission_key: str = Field(min_length=1)
     walltime: int = Field(gt=0)  # in minutes
+    gpus: int = Field(default=1, ge=1)
     output_path: str = Field(min_length=1)
     cwd: str = Field(min_length=1)
 
@@ -34,6 +35,15 @@ class SubmitRequest(BaseModel):
     def argv(self) -> list[str]:
         """The command as an argument vector."""
         return shlex.split(self.command)
+
+
+class SubmitResult(BaseModel):
+    """What a submit actually started: the job id and the values in effect
+    (after potential clamping)."""
+
+    job_id: str = Field(min_length=1)
+    gpus: int = Field(ge=1)
+    walltime: int = Field(gt=0)  # in minutes
 
 
 class JobInfo(BaseModel):
@@ -53,8 +63,8 @@ class JobInfo(BaseModel):
 
 
 class Executor(Protocol):
-    def submit(self, request: SubmitRequest) -> str:
-        """Start a job. Returns a job id. Same submission_key returns the same id."""
+    def submit(self, request: SubmitRequest) -> SubmitResult:
+        """Start a job. Same submission_key returns the same result."""
 
     def get_status(self, job_id: str) -> JobInfo:
         """Return the current status of a job."""

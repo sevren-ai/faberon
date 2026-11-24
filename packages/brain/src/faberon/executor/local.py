@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .protocol import JobInfo, JobState, SubmitRequest
+from .protocol import JobInfo, JobState, SubmitRequest, SubmitResult
 
 _JOB_ID_SAFE = re.compile(r"[^A-Za-z0-9._-]")
 _WAIT_EXIT_TIMEOUT_S = 1.0
@@ -73,12 +73,20 @@ class LocalExecutor:
         """Clamp the request's walltime to the deployment-side cap, if set."""
         if self._max_walltime is None:
             return request.walltime
+        if request.walltime > self._max_walltime:
+            logger.warning(
+                "job %s requested %d min, clamped to the deployment cap of %d",
+                request.submission_key,
+                request.walltime,
+                self._max_walltime,
+            )
         return min(request.walltime, self._max_walltime)
 
-    def submit(self, request: SubmitRequest) -> str:
-        """Start the job, or return the existing id for a duplicate key."""
+    def submit(self, request: SubmitRequest) -> SubmitResult:
+        """Start the job, or return the existing result for a duplicate key."""
         job_id = _sanitize_job_id(request.submission_key)
         path = self._get_record_path(job_id)
+        walltime = self._get_effective_walltime(request)
 
         # Serialize submitters so two concurrent submits of the same key
         # cannot both spawn a process.
@@ -86,11 +94,10 @@ class LocalExecutor:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX)
             existing = _read_record(path)
-            if existing is not None:
-                return job_id
-            record = self._spawn(job_id, request)
-            self._write_record(path, record)
-            return job_id
+            if existing is None:
+                record = self._spawn(job_id, request, walltime)
+                self._write_record(path, record)
+            return SubmitResult(job_id=job_id, gpus=request.gpus, walltime=walltime)
         finally:
             fcntl.flock(lock, fcntl.LOCK_UN)
             lock.close()
@@ -119,7 +126,9 @@ class LocalExecutor:
     def _get_record_path(self, job_id: str) -> Path:
         return self._dir / f"{job_id}.json"
 
-    def _spawn(self, job_id: str, request: SubmitRequest) -> dict[str, Any]:
+    def _spawn(
+        self, job_id: str, request: SubmitRequest, walltime: int
+    ) -> dict[str, Any]:
         stdout_path = Path(request.output_path)
         stdout_path.parent.mkdir(parents=True, exist_ok=True)
         start = time.time()
@@ -143,7 +152,7 @@ class LocalExecutor:
             "submission_key": request.submission_key,
             "pid": proc.pid,
             "start_time": start,
-            "deadline": start + self._get_effective_walltime(request) * 60,
+            "deadline": start + walltime * 60,
             "exit_code": None,
             "cancelled": False,
             "timed_out": False,
