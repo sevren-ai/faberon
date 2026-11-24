@@ -445,6 +445,7 @@ def _register_routes(app: FastAPI) -> None:
             plan=plan,
             repo_path=predecessor.repo_path,
             branch=body.branch,
+            max_gpus=app.state.max_gpus,
             poll_interval_seconds=predecessor.poll_interval_seconds,
             succession_sha=succession_sha,
             lineage=lineage,
