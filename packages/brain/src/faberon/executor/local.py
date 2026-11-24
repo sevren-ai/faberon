@@ -229,17 +229,20 @@ class LocalExecutor:
 
 
 def _wait_pid(pid: int, timeout: float) -> int | None:
-    """Wait for a child pid, returning its exit code, or None if still running.
+    """Wait for a job pid, returning its exit code, or None if still running.
 
-    Returns 0 when the process is gone but no longer waitable (already reaped
-    by a prior wait, or not our child), since its true code is unrecoverable.
+    The pid may not be our child after a brain restart; a live one then reads
+    as still running. Returns 0 when the process is gone but no longer
+    waitable (already reaped by a prior wait, or not our child), since its
+    true code is unrecoverable.
     """
     deadline = time.monotonic() + timeout
     while True:
         try:
             wpid, status = os.waitpid(pid, os.WNOHANG)
         except ChildProcessError:
-            return 0
+            # The job may still be running.
+            wpid, status = 0, 0
         if wpid == pid:
             return _status_to_exit_code(status)
         if not _is_pid_alive(pid):
