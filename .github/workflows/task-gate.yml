@@ -1,0 +1,25 @@
+name: task-gate
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  enforce-maintainer-only:
+    # Task issues are an escape hatch for maintainers only.
+    # Close them when opened by anyone else.
+    if: >-
+      contains(github.event.issue.labels.*.name, 'type/task') &&
+      !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment and close
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+        run: |
+          gh issue comment "$ISSUE_URL" --body "Tasks are restricted to maintainers. Please file a bug report instead, or post in Discussions for questions and feature requests. Closing this issue."
+          gh issue close "$ISSUE_URL" --reason "invalid"
