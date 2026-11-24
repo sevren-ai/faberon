@@ -211,7 +211,7 @@ def test_inject_idea_requires_reason(api: ApiFixture):
 
 
 def test_events_jsonl(api: ApiFixture):
-    """events.jsonl serves one campaign's events as ndjson and honors `after`."""
+    """Serve the events as ndjson. Optionally, an `after` arg skips earlier events."""
     camp_id = str(uuid.uuid4())
     other_id = str(uuid.uuid4())
     for cid in (camp_id, other_id):
