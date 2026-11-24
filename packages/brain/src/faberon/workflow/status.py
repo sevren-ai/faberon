@@ -73,6 +73,18 @@ def _derive_progress(campaign: Campaign, events: list[Event]) -> CampaignProgres
     )
 
 
+def get_best_kept_sha(ledger: Ledger, campaign: Campaign) -> str:
+    """Return the campaign's best kept commit: the sha of its last keep (or if
+    None, its start commit)."""
+    sha = campaign.start_sha
+    for event in ledger.get_campaign_events(campaign.campaign_id):
+        if event.type != EventType.EXPERIMENT_JUDGED:
+            continue
+        if event.payload.get("judgment") == "keep" and event.payload.get("sha"):
+            sha = str(event.payload["sha"])
+    return sha
+
+
 def end_outdated_campaigns(ledger: Ledger) -> list[UUID]:
     """End active campaigns started before a Faberon upgrade. Return their ids.
 
