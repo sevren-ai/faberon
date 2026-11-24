@@ -12,7 +12,7 @@ jobs:
     # Task issues are an escape hatch for maintainers only.
     # Close them when opened by anyone else.
     if: >-
-      contains(github.event.issue.labels.*.name, 'type/task') &&
+      github.event.issue.type.name == 'Task' &&
       !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
     runs-on: ubuntu-latest
     steps:
