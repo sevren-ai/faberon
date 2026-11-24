@@ -83,6 +83,16 @@ def test_plan_target_file_must_be_python():
     assert plan.target_file == "src/train.py"
 
 
+def test_plan_metric_bare_name():
+    """Metric names should be atomic and not include comments or spaces."""
+    with pytest.raises(ValidationError):
+        _minimal_plan(metric="val_bpb (lower = better)")
+    with pytest.raises(ValidationError):
+        _minimal_plan(metric="val_bpb(lower=better)")
+    plan = _minimal_plan(metric="train/val_bpb")
+    assert plan.metric == "train/val_bpb"
+
+
 def test_resolve_target_in_repo_accepts_nested(tmp_path):
     """A relative path that stays inside the repo resolves under it."""
     resolved = resolve_target_in_repo(str(tmp_path), "src/train.py")
