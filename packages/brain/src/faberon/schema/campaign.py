@@ -17,6 +17,11 @@ class Predecessor(BaseModel):
     sha: str = Field(min_length=1)
 
 
+def get_default_branch(campaign_id: UUID) -> str:
+    """The campaign's default working branch: faberon/ plus its short id."""
+    return f"faberon/{campaign_id.hex[:8]}"
+
+
 class CampaignStatus(StrEnum):
     """Whether a campaign is running, finished, or died without an end event."""
 

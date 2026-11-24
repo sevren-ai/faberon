@@ -661,6 +661,72 @@ def test_create(api_client, tmp_path):
     assert "workflow" in result.output
 
 
+def test_successor(api_client):
+    """`faberon successor` posts to the successor endpoint and prints the new IDs."""
+    api_client[("POST", f"/v0/campaigns/{CAMPAIGN_ID}/successor")] = {
+        "campaign_id": CAMPAIGN_ID,
+        "workflow_id": CAMPAIGN_ID,
+    }
+    result = runner.invoke(
+        cli.app,
+        ["successor", CAMPAIGN_ID, "--budget-gpu-hours", "5", "--max-experiments", "2"],
+    )
+    assert result.exit_code == 0
+    assert CAMPAIGN_ID in result.output
+    assert "workflow" in result.output
+
+
+def test_successor_posts_explicit_limits(monkeypatch: pytest.MonkeyPatch):
+    """The body carries the fresh limits and a new campaign ID, not the old one."""
+    captured = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        captured["path"] = request.url.path
+        captured["body"] = json.loads(request.content)
+        return httpx2.Response(
+            201, json={"campaign_id": CAMPAIGN_ID, "workflow_id": CAMPAIGN_ID}
+        )
+
+    monkeypatch.setattr(cli, "_make_client", lambda: _client_from_handler(handler))
+    result = runner.invoke(
+        cli.app,
+        [
+            "successor",
+            CAMPAIGN_ID,
+            "--budget-gpu-hours",
+            "5.5",
+            "--max-experiments",
+            "2",
+            "--branch",
+            "follow-up",
+        ],
+    )
+    assert result.exit_code == 0
+    assert captured["path"] == f"/v0/campaigns/{CAMPAIGN_ID}/successor"
+    assert captured["body"]["budget_gpu_hours"] == 5.5
+    assert captured["body"]["max_experiments"] == 2
+    assert captured["body"]["branch"] == "follow-up"
+    assert captured["body"]["campaign_id"] != CAMPAIGN_ID
+
+
+def test_successor_requires_gpu_budget(api_client):
+    """The GPU budget is a required option for a successor"""
+    result = runner.invoke(
+        cli.app, ["successor", CAMPAIGN_ID, "--max-experiments", "5"]
+    )
+    assert result.exit_code == 2
+    assert "budget-gpu-hours" in result.output
+
+
+def test_successor_requires_max_experiments(api_client):
+    """The max experiments setting is required for a successor"""
+    result = runner.invoke(
+        cli.app, ["successor", CAMPAIGN_ID, "--budget-gpu-hours", "5"]
+    )
+    assert result.exit_code == 2
+    assert "max-experiments" in result.output
+
+
 def test_chat_uses_pi(monkeypatch: pytest.MonkeyPatch):
     """With the extension installed into Pi, `faberon chat` execs plain `pi`."""
     monkeypatch.setattr(cli.shutil, "which", lambda cmd: f"/usr/bin/{cmd}")

@@ -129,6 +129,28 @@ describe("FaberonClient", () => {
     expect(body.repo_path).toBe("/srv/autoresearch");
   });
 
+  it("posts a successor with the explicit limits", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ campaign_id: "s", workflow_id: "w" }), {
+        status: 201,
+      }),
+    );
+    const created = await client().createSuccessor("c", {
+      campaign_id: "s",
+      budget_gpu_hours: 5,
+      max_experiments: 2,
+    });
+    expect(created).toEqual({ campaign_id: "s", workflow_id: "w" });
+    const [url, init] = lastCall();
+    expect(url).toBe("http://x/v0/campaigns/c/successor");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      campaign_id: "s",
+      budget_gpu_hours: 5,
+      max_experiments: 2,
+    });
+  });
+
   it("posts a cancellation with the reason", async () => {
     fetchMock.mockResolvedValue(
       new Response(

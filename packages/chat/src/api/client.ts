@@ -13,6 +13,7 @@ import type {
   CampaignInfo,
   FaberonEvent,
   StatusResponse,
+  SuccessorCreate,
 } from "./types.js";
 
 export interface ClientConfig {
@@ -112,6 +113,21 @@ export class FaberonClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+  }
+
+  /** POST /v0/campaigns/{id}/successor: start a successor from a finished campaign's best kept commit. */
+  createSuccessor(
+    campaignId: string,
+    body: SuccessorCreate,
+  ): Promise<CampaignCreated> {
+    return this.request<CampaignCreated>(
+      `/v0/campaigns/${campaignId}/successor`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
   }
 
   /** POST /v0/campaigns/{id}/cancel: request cancellation of an active campaign. */
