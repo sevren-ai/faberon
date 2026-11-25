@@ -33,9 +33,12 @@ export const planSchema = Type.Object({
   }),
   metric: Type.String({
     description:
-      "Name of the metric under optimization, e.g. 'val_bpb'. The job log must " +
-      "print a line naming it followed by a float, e.g. 'val_bpb: 1.10'.",
+      "Bare name of the metric under optimization, e.g. 'val_bpb'. No spaces " +
+      "or comments such as '(lower is better)': the brain matches the name " +
+      "literally against a job log line like 'val_bpb: 1.10' and rejects the " +
+      "plan otherwise.",
     minLength: 1,
+    pattern: "^[A-Za-z0-9_.:/-]+$",
   }),
   baseline: Type.Number({
     description: "Metric value of the starting commit.",
