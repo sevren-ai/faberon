@@ -28,14 +28,13 @@ function truncateText(text: string): string {
 
 /**
  * Render the plan for the confirm dialog: the full JSON, with long
- * free-text values (goal, command, stop conditions) truncated.
+ * free-text values (goal, stop conditions) truncated.
  */
 export function formatPlanForConfirm(plan: ResearchPlan): string {
   return JSON.stringify(
     {
       ...plan,
       goal: truncateText(plan.goal),
-      command: truncateText(plan.command),
       stop_conditions: plan.stop_conditions.map(truncateText),
     },
     null,

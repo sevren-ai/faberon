@@ -35,7 +35,7 @@ describe("formatPlanForConfirm", () => {
     expect(JSON.parse(formatPlanForConfirm(plan))).toEqual(plan);
   });
 
-  it("truncates free-text values longer than 120 characters", () => {
+  it("truncates long prose values but keeps the command in full", () => {
     const longText = "x".repeat(200);
     const shown = JSON.parse(
       formatPlanForConfirm(
@@ -48,7 +48,7 @@ describe("formatPlanForConfirm", () => {
     ) as ResearchPlan;
     const truncated = `${"x".repeat(120)}...`;
     expect(shown.goal).toBe(truncated);
-    expect(shown.command).toBe(truncated);
+    expect(shown.command).toBe(longText);
     expect(shown.stop_conditions).toEqual([truncated]);
   });
 });
