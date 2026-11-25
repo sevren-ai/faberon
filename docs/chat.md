@@ -1,6 +1,6 @@
 # Faberon Chat reference
 
-Faberon Chat is a [Pi](https://github.com/earendil-works/pi-coding-agent) extension for managing Faberon campaigns from a chat session. Install it following [install.md](install.md#6-install-faberon-chat-optional), start Faberon with the CLI (`faberon serve`), then start a chat session with `faberon chat`.
+Faberon Chat is a [Pi](https://github.com/earendil-works/pi) extension for managing Faberon campaigns from a chat session. Install it following [install.md](install.md#6-install-faberon-chat-optional), start Faberon with the CLI (`faberon serve`), then start a chat session with `faberon chat`.
 
 The extension contains two main parts:
 
