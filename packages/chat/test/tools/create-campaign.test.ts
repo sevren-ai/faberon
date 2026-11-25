@@ -29,7 +29,6 @@ describe("planSchema", () => {
   });
 });
 
-
 describe("formatPlanForConfirm", () => {
   it("renders the full plan as JSON", () => {
     const plan = samplePlan();
