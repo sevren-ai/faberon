@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { Type } from "typebox";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import type { FaberonClient } from "../api/client.js";
-import type { CampaignCreated } from "../api/types.js";
+import type { CampaignCreated, ResearchPlan } from "../api/types.js";
 import { confirmedByHuman } from "./confirm.js";
 
 /**
@@ -14,6 +14,33 @@ import { confirmedByHuman } from "./confirm.js";
  */
 export function formatCreated(created: CampaignCreated): string {
   return `campaign: ${created.campaign_id}\nworkflow: ${created.workflow_id}`;
+}
+
+/** Longest free-text value the confirm dialog shows in full. */
+const MAX_TEXT_LENGTH = 120;
+
+/** Shorten a free-text value so the confirm dialog stays readable. */
+function truncateText(text: string): string {
+  return text.length <= MAX_TEXT_LENGTH
+    ? text
+    : `${text.slice(0, MAX_TEXT_LENGTH)}...`;
+}
+
+/**
+ * Render the plan for the confirm dialog: the full JSON, with long
+ * free-text values (goal, command, stop conditions) truncated.
+ */
+export function formatPlanForConfirm(plan: ResearchPlan): string {
+  return JSON.stringify(
+    {
+      ...plan,
+      goal: truncateText(plan.goal),
+      command: truncateText(plan.command),
+      stop_conditions: plan.stop_conditions.map(truncateText),
+    },
+    null,
+    2,
+  );
 }
 
 export const planSchema = Type.Object({
@@ -97,15 +124,18 @@ export function createCampaignTool(client: FaberonClient) {
     annotations: {},
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const plan = params.plan;
+      const plan: ResearchPlan = {
+        max_concurrency: 1,
+        gpus: 1,
+        ...params.plan,
+      };
       const confirmed = await confirmedByHuman(
         ctx,
         "Submit this Faberon campaign?",
         [
-          `Goal: ${plan.goal}`,
           `Repo: ${params.repo_path}`,
-          `Command: ${plan.command}`,
-          `Budget: ${plan.budget_gpu_hours} GPU-hours, at most ${plan.max_experiments} experiments`,
+          "Plan:",
+          formatPlanForConfirm(plan),
           "",
           `Faberon starts a campaign that edits ${plan.target_file} and runs experiments until the budget is spent or a stop condition is met.`,
         ].join("\n"),
@@ -124,7 +154,7 @@ export function createCampaignTool(client: FaberonClient) {
       }
       const created = await client.createCampaign({
         campaign_id: randomUUID(),
-        plan: { max_concurrency: 1, gpus: 1, ...params.plan },
+        plan,
         repo_path: params.repo_path,
         poll_interval_seconds: params.poll_interval_seconds ?? 30,
       });
