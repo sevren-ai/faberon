@@ -43,7 +43,7 @@ The two packages version independently; the design makes them independently repl
 - **Faberon Chat** (`packages/chat/`): tag `chat-vX.Y.Z`, first release `chat-v0.1.0`. Prefixed so chat tags never collide with brain tags.
 
 Steps to cut a release:
-- Bump the versions on a feature branch (`packages/brain/pyproject.toml`,  `packages/brain/src/faberon/__init__.py`, `packages/brain/uv.lock`, `packages/chat/package.json`)
+- Bump the versions on a feature branch (`packages/brain/pyproject.toml`,  `packages/brain/src/faberon/__init__.py`, `packages/brain/uv.lock`, `packages/chat/package.json`, `packages/chat/package-lock.json` with `npm install --package-lock-only`)
 - Update the reference to the runbook in the readme to a new one (if any)
 - Archive the design doc (if any)
 - Merge the feature branch into `main`
