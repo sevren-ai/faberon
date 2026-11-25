@@ -14,7 +14,6 @@ export interface ResearchPlan {
   max_concurrency: number;
   gpus: number;
   walltime: number;
-  stop_conditions: string[];
 }
 
 export type CampaignStatus = "active" | "ended" | "died";

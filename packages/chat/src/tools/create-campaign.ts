@@ -69,10 +69,6 @@ export const planSchema = Type.Object({
     description: "Per-job walltime in minutes.",
     exclusiveMinimum: 0,
   }),
-  stop_conditions: Type.Array(Type.String(), {
-    description: "Conditions under which the campaign stops early.",
-    minItems: 1,
-  }),
 });
 
 export function createCampaignTool(client: FaberonClient) {
