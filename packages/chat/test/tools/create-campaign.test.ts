@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Check } from "typebox/value";
 import type { ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import { FaberonClient } from "../../src/api/client.js";
 import { samplePlan } from "../fixtures.js";
@@ -6,6 +7,7 @@ import {
   createCampaignTool,
   formatCreated,
   formatPlanForConfirm,
+  planSchema,
 } from "../../src/tools/create-campaign.js";
 import type { ResearchPlan } from "../../src/api/types.js";
 
@@ -15,6 +17,18 @@ describe("formatCreated", () => {
     expect(out).toBe("campaign: c\nworkflow: w");
   });
 });
+
+describe("planSchema", () => {
+  it("accepts a bare metric name", () => {
+    expect(Check(planSchema, samplePlan())).toBe(true);
+  });
+
+  it("rejects a metric name that includes comments or spaces", () => {
+    const plan = samplePlan({ metric: "val_bpb (lower = better)" });
+    expect(Check(planSchema, plan)).toBe(false);
+  });
+});
+
 
 describe("formatPlanForConfirm", () => {
   it("renders the full plan as JSON", () => {
