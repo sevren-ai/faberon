@@ -25,7 +25,7 @@ Faberon runs Machine Learning research autonomously. Give it a research plan and
 - The **brain** is a durable agent loop behind a small HTTP API (FastAPI)
    - An LLM proposes the next experiment (Pydantic AI), DBOS checkpoints, a reboot resumes mid-campaign.
 - The **chat** interface ("Faberon Chat") is a Pi extension for requesting status and steering campaigns from a chat session.
-- The **CLI** (Typer) covers the same operations from a shell (no LLM required).
+- The **CLI** (Typer) covers the campaign operations from a shell (no LLM required). Idea injection is currently chat-only.
 - Two **executors** are currently implemented: a Slurm cluster or a local workstation.
 - The **ledger** is an append-only event log in Postgres. Every decision is recorded with its actor and reason.
 
@@ -59,13 +59,15 @@ faberon successor <id> --budget-gpu-hours 2 --max-experiments 10
                                   # continue a finished campaign from its best kept commit
 ```
 
+The full command and flag reference lives in [docs/cli.md](docs/cli.md).
+
 Or do the same from a Pi chat session with the Faberon Chat extension loaded: ask it to list campaigns, inject an idea, draft a plan, etc.
 
 ```bash
 faberon chat
 ```
 
-The chat interface and CLI speak to the same API; use whichever suits the moment.
+The slash commands and tools are listed in [docs/chat.md](docs/chat.md). The chat interface and CLI speak to the same API, use whichever is most convenient to you.
 
 > See this [runbook](https://github.com/sevren-ai/faberon/discussions/95) for using v0.3.1 with a Slurm cluster.
 
