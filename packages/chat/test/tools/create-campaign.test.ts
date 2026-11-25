@@ -80,7 +80,7 @@ describe("createCampaignTool", () => {
     expect(message).toContain("10 GPU-hours, at most 5 experiments");
     expect(message).toContain("train.py");
     expect(message).toMatch(
-      /until the budget is spent or the experiment limit is reached/i,
+      /until the budget is spent or a stop condition is met/i,
     );
   });
 
