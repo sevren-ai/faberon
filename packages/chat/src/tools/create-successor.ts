@@ -48,18 +48,14 @@ export function createSuccessorTool(client: FaberonClient) {
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const info = await client.getCampaign(params.campaign_id);
-      const best =
-        info.progress.best_metric != null
-          ? `${info.progress.best_metric}`
-          : "none kept";
       const confirmed = await confirmedByHuman(
         ctx,
         "Start a successor campaign?",
         [
           `Predecessor: ${params.campaign_id} (${info.status})`,
-          `Goal: ${info.campaign.plan.goal}`,
-          `Best kept ${info.campaign.plan.metric}: ${best}`,
-          `Fresh limits: ${params.budget_gpu_hours} GPU-hours, at most ${params.max_experiments} experiments`,
+          `budget_gpu_hours: ${params.budget_gpu_hours}`,
+          `max_experiments: ${params.max_experiments}`,
+          ...(params.branch !== undefined ? [`branch: ${params.branch}`] : []),
           "",
           "Faberon starts a new campaign from the predecessor's best kept commit and runs experiments until the fresh budget is spent or a stop condition is met.",
         ].join("\n"),

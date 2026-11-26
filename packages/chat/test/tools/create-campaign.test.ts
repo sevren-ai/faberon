@@ -6,8 +6,10 @@ import { samplePlan } from "../fixtures.js";
 import {
   createCampaignTool,
   formatCreated,
+  formatPlanForConfirm,
   planSchema,
 } from "../../src/tools/create-campaign.js";
+import type { ResearchPlan } from "../../src/api/types.js";
 
 describe("formatCreated", () => {
   it("names the campaign and workflow ids", () => {
@@ -24,6 +26,30 @@ describe("planSchema", () => {
   it("rejects a metric name that includes comments or spaces", () => {
     const plan = samplePlan({ metric: "val_bpb (lower = better)" });
     expect(Check(planSchema, plan)).toBe(false);
+  });
+});
+
+describe("formatPlanForConfirm", () => {
+  it("renders the full plan as JSON", () => {
+    const plan = samplePlan();
+    expect(JSON.parse(formatPlanForConfirm(plan))).toEqual(plan);
+  });
+
+  it("truncates long prose values but keeps the command in full", () => {
+    const longText = "x".repeat(200);
+    const shown = JSON.parse(
+      formatPlanForConfirm(
+        samplePlan({
+          goal: longText,
+          command: longText,
+          stop_conditions: [longText],
+        }),
+      ),
+    ) as ResearchPlan;
+    const truncated = `${"x".repeat(120)}...`;
+    expect(shown.goal).toBe(truncated);
+    expect(shown.command).toBe(longText);
+    expect(shown.stop_conditions).toEqual([truncated]);
   });
 });
 
@@ -68,17 +94,28 @@ describe("createCampaignTool", () => {
     });
   });
 
-  it("summarizes the plan & consequence in the dialog", async () => {
+  it("shows the full plan as JSON with the consequence in the dialog", async () => {
     mockCreate();
     const confirm = vi.fn().mockResolvedValue(true);
     await tool.execute("call", params, undefined, undefined, ctxWith(confirm));
     const [title, message] = confirm.mock.calls[0] as [string, string];
     expect(title).toMatch(/submit/i);
-    expect(message).toContain("Lower val_bpb on the baseline task");
     expect(message).toContain("/srv/autoresearch");
-    expect(message).toContain("python3 train.py");
-    expect(message).toContain("10 GPU-hours, at most 5 experiments");
-    expect(message).toContain("train.py");
+    for (const field of [
+      `"goal": "Lower val_bpb on the baseline task"`,
+      `"command": "python3 train.py"`,
+      `"target_file": "train.py"`,
+      `"metric": "val_bpb"`,
+      `"baseline": 1.23`,
+      `"budget_gpu_hours": 10`,
+      `"max_experiments": 5`,
+      `"max_concurrency": 1`,
+      `"gpus": 1`,
+      `"walltime": 30`,
+      `"budget exhausted"`,
+    ]) {
+      expect(message).toContain(field);
+    }
     expect(message).toMatch(
       /until the budget is spent or a stop condition is met/i,
     );

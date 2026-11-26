@@ -60,7 +60,7 @@ describe("createSuccessorTool", () => {
     });
   });
 
-  it("names the predecessor, its best kept metric, and the fresh limits", async () => {
+  it("names the predecessor and the fresh limits", async () => {
     mockGetCampaign();
     mockCreate();
     const confirm = vi.fn().mockResolvedValue(true);
@@ -69,9 +69,29 @@ describe("createSuccessorTool", () => {
     expect(title).toMatch(/successor/i);
     expect(message).toContain(params.campaign_id);
     expect(message).toContain("ended");
-    expect(message).toContain("1.1");
-    expect(message).toContain("5 GPU-hours");
-    expect(message).toContain("2 experiments");
+    expect(message).toContain("budget_gpu_hours: 5");
+    expect(message).toContain("max_experiments: 2");
+    expect(message).not.toContain("branch:");
+  });
+
+  it("names the branch in the dialog and request when given", async () => {
+    mockGetCampaign();
+    const create = mockCreate();
+    const confirm = vi.fn().mockResolvedValue(true);
+    const withBranch = { ...params, branch: "my-branch" };
+    await tool.execute(
+      "call",
+      withBranch,
+      undefined,
+      undefined,
+      ctxWith(confirm),
+    );
+    const [, message] = confirm.mock.calls[0] as [string, string];
+    expect(message).toContain("branch: my-branch");
+    expect(create).toHaveBeenCalledWith(
+      params.campaign_id,
+      expect.objectContaining({ branch: "my-branch" }),
+    );
   });
 
   it("does not create when the human declines", async () => {
