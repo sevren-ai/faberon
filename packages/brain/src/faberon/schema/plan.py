@@ -25,14 +25,6 @@ class ResearchPlan(BaseModel):
     gpus: int = Field(default=1, ge=1)
     walltime: int = Field(gt=0)  # in minutes
 
-    @field_validator("target_file")
-    @classmethod
-    def _target_is_python(cls, value: str) -> str:
-        """The proposer's output is parsed as Python, so the target must be one."""
-        if not value.lower().endswith(".py"):
-            raise ValueError("target_file must be a Python file (.py)")
-        return value
-
     @field_validator("metric")
     @classmethod
     def _metric_is_a_bare_name(cls, value: str) -> str:

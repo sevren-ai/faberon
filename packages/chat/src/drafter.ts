@@ -21,7 +21,7 @@ The final plan needs these fields:
 - repo_path: path to the experiment repo on the shared filesystem. Confirmed up front.
 - goal: what the campaign tries to achieve, in plain prose.
 - command: the command that kicks of each experiment, e.g. "python3 train.py".
-- target_file: the Python file the proposer edits, relative to the repo root, e.g. "train.py". Must end in .py.
+- target_file: the file the proposer edits, relative to the repo root, e.g. "train.py".
 - metric: the metric under optimization, e.g. "val_bpb". The job log must print a line naming it followed by a float, e.g. "val_bpb: 1.10". Use the bare name only, without comments like "(lower is better)": the brain rejects the plan otherwise.
 - baseline: the metric value of the starting commit.
 - budget_gpu_hours: total GPU-hour budget, above zero. Propose it together with max_experiments as one question, using the typical run duration so the two are consistent: 20 runs of about 6 minutes is about 2 GPU-hours.

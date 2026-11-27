@@ -46,6 +46,7 @@ class ProposalContext:
     events: CampaignEventReader
     campaign_id: UUID
     current_content: str
+    target_file: str
 
 
 class AgentProposer:
@@ -100,12 +101,14 @@ class AgentProposer:
                 raise ModelRetry(
                     "The proposed file content is identical to the current target file."
                 )
-            try:
-                ast.parse(proposal.content)
-            except SyntaxError as e:
-                raise ModelRetry(
-                    f"The proposed file content is not valid Python: {e}"
-                ) from e
+            # Python targets get a syntax check
+            if ctx.deps.target_file.lower().endswith(".py"):
+                try:
+                    ast.parse(proposal.content)
+                except SyntaxError as e:
+                    raise ModelRetry(
+                        f"The proposed file content is not valid Python: {e}"
+                    ) from e
             return proposal
 
     @classmethod
@@ -152,6 +155,7 @@ class AgentProposer:
                         events=self._events,
                         campaign_id=campaign_id,
                         current_content=current_content,
+                        target_file=plan.target_file,
                     ),
                 ),
             )

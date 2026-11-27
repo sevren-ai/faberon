@@ -27,7 +27,7 @@ export const planSchema = Type.Object({
   }),
   target_file: Type.String({
     description:
-      "Path of the Python file the proposer edits, relative to the repo root, " +
+      "Path of the file the proposer edits, relative to the repo root, " +
       "e.g. 'train.py'.",
     minLength: 1,
   }),
