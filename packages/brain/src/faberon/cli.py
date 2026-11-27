@@ -280,9 +280,12 @@ def _create_db(db_url: str, pg_env: dict[str, str]) -> None:
 
 
 def _ensure_schema(db_url: str, *, migrate: bool = False) -> str | None:
-    """When migrate is set to True, upgrade an outdated schema step by step, keeping the data.
+    """When migrate is set to True, upgrade an outdated schema step by step,
+    keeping the data.
 
-    Creates the tables on an empty database. Return the version mismatch reason when the DB couldn't be migrated. Return None when the database has the correct schema after this function call.
+    Creates the tables on an empty database. Return the version mismatch
+    reason when the DB couldn't be migrated. Return None when the database
+    has the correct schema after this function call.
     """
     try:
         with psycopg.connect(db_url, autocommit=True) as conn:

@@ -152,7 +152,7 @@ def test_pre_versioning_database(ledger):
     """A database from before versioning is rejected, not adopted."""
     ledger._conn.execute("DROP TABLE schema_version")
     try:
-        with pytest.raises(SchemaError, match="predates schema versioning"):
+        with pytest.raises(SchemaError, match="out-dated"):
             ensure_schema(ledger._conn)
     finally:
         ledger._conn.execute(_CREATE_SCHEMA_VERSION)

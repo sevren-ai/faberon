@@ -475,12 +475,15 @@ def test_init_schema_mismatch(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         cli,
         "_ensure_schema",
-        lambda url, migrate=False: "the database predates schema versioning",
+        lambda url, migrate=False: (
+            "the database is out-dated and does not have schema versioning "
+            "& migration options"
+        ),
     )
     result = runner.invoke(cli.app, ["init"], input="\n")
     assert result.exit_code == 2
     assert "the database schema does not match this Faberon version" in result.output
-    assert "predates schema versioning" in result.output
+    assert "out-dated" in result.output
     assert "no migration path" in result.output
     assert not config_file.exists()
 
