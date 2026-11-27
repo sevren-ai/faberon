@@ -15,6 +15,15 @@ bash install-postgres-no-sudo.sh      # re-run: repairs FABERON_PG_URL
 
 Then re-run `faberon init`.
 
+## `faberon init` reports a schema mismatch
+
+The database was created by a different Faberon version and no migration path covers it. `faberon init` migrates older databases step by step when a path exists, but this error means there is no such migration path found. You'll have to backup your old data, then recreate the database. Note that existing campaign and ledger data will be lost if you don't manually backup!
+
+```bash
+bash scripts/db/drop-faberon-db.sh
+faberon init
+```
+
 ## Postgres broken after logout on a login node
 
 Some login nodes run systemd-logind with `RemoveIPC=yes`, which deletes your IPC objects (including Postgres's `/dev/shm` segments) when your last session ends; some also kill leftover processes. Either way Postgres misbehaves after logout, and `pg_ctl` may still report the postmaster as running while connections fail.

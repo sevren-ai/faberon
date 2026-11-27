@@ -8,7 +8,7 @@ faberon init
 
 The wizard generates the API token, asks for the LLM model and, on a Slurm cluster, the account. It then writes `~/.config/faberon/config.toml` with mode `0600`. Re-run `faberon init` after every upgrade to keep the configuration up-to-date.
 
-The wizard requires a running Postgres. It creates the `faberon` database.
+The wizard requires a running Postgres. It creates the `faberon` database when it is missing and migrates its schema to this Faberon version when needed, keeping the data.
 
 If you want to change the location of this file, you can set an env var `FABERON_CONFIG`.
 
