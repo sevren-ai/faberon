@@ -32,7 +32,6 @@ _PLAN = {
     "max_experiments": 3,
     "max_concurrency": 1,
     "walltime": 10,
-    "stop_conditions": ["n/a"],
 }
 
 _PROGRESS = {

@@ -186,7 +186,6 @@ def make_plan(**overrides) -> ResearchPlan:
         "max_experiments": 3,
         "max_concurrency": 1,
         "walltime": 10,
-        "stop_conditions": ["n/a"],
     }
     data.update(overrides)
     return ResearchPlan.model_validate(data)

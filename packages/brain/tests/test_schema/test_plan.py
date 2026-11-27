@@ -17,7 +17,6 @@ def _minimal_plan(**overrides) -> ResearchPlan:
         "max_experiments": 6,
         "max_concurrency": 1,
         "walltime": 10,
-        "stop_conditions": ["budget exhausted"],
     }
     data.update(overrides)
     return ResearchPlan.model_validate(data)
@@ -81,6 +80,16 @@ def test_plan_target_file_must_be_python():
         _minimal_plan(target_file="train.sh")
     plan = _minimal_plan(target_file="src/train.py")
     assert plan.target_file == "src/train.py"
+
+
+def test_plan_metric_bare_name():
+    """Metric names should be atomic and not include comments or spaces."""
+    with pytest.raises(ValidationError):
+        _minimal_plan(metric="val_bpb (lower = better)")
+    with pytest.raises(ValidationError):
+        _minimal_plan(metric="val_bpb(lower=better)")
+    plan = _minimal_plan(metric="train/val_bpb")
+    assert plan.metric == "train/val_bpb"
 
 
 def test_resolve_target_in_repo_accepts_nested(tmp_path):
