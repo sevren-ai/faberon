@@ -3,10 +3,13 @@
 import uuid
 from collections.abc import Iterator
 
+import psycopg
 import pytest
 
 from faberon import config
-from faberon.ledger import Ledger
+from faberon.ledger import SCHEMA_VERSION, Ledger, SchemaError, ensure_schema
+from faberon.ledger import ledger as ledger_module
+from faberon.ledger.ledger import _CREATE_SCHEMA_VERSION
 from faberon.schema import Actor, Event, EventType, Predecessor
 
 from ..conftest import make_plan
@@ -32,6 +35,132 @@ def _event(**overrides) -> Event:
         reason=overrides.get("reason", "test event"),
         payload=overrides.get("payload", {}),
     )
+
+
+def test_schema_fresh_database(ledger):
+    """A fresh database gets the schema and the current version stamp."""
+    row = ledger._conn.execute("SELECT version FROM schema_version").fetchone()
+    assert row == (SCHEMA_VERSION,)
+
+
+def test_schema_wrong_version(ledger):
+    """A stamp from another release is rejected, not silently used."""
+    ledger._conn.execute("UPDATE schema_version SET version = 999")
+    try:
+        with pytest.raises(SchemaError, match="999"):
+            ensure_schema(ledger._conn)
+    finally:
+        ledger._conn.execute(
+            "UPDATE schema_version SET version = %s", (SCHEMA_VERSION,)
+        )
+
+
+def _restore_stamp(ledger, version: int = SCHEMA_VERSION) -> None:
+    ledger._conn.execute("UPDATE schema_version SET version = %s", (version,))
+
+
+def _campaigns_columns(ledger) -> set[str]:
+    rows = ledger._conn.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = 'campaigns'"
+    )
+    return {row[0] for row in rows}
+
+
+def test_reject_outdated_version(ledger):
+    """An outdated stamp is rejected when migration is not requested."""
+    ledger._conn.execute("UPDATE schema_version SET version = 0")
+    try:
+        with pytest.raises(SchemaError, match="version 0"):
+            ensure_schema(ledger._conn)
+    finally:
+        _restore_stamp(ledger)
+
+
+def test_missing_migration(ledger):
+    """A version with no migration path fails without touching the database."""
+    ledger._conn.execute("UPDATE schema_version SET version = 0")
+    try:
+        with pytest.raises(SchemaError, match="no migration from schema version 0"):
+            ensure_schema(ledger._conn, migrate=True)
+        row = ledger._conn.execute("SELECT version FROM schema_version").fetchone()
+        assert row == (0,)
+    finally:
+        _restore_stamp(ledger)
+
+
+def test_migration(
+    ledger, monkeypatch: pytest.MonkeyPatch
+):
+    """An outdated database migrates step by step and keeps its rows."""
+    camp_id = uuid.uuid4()
+    ledger.create_campaign(
+        camp_id,
+        str(camp_id),
+        make_plan(),
+        "/repo/a",
+        30.0,
+        branch="main",
+        start_sha="a",
+    )
+    monkeypatch.setattr(ledger_module, "SCHEMA_VERSION", 2)
+    monkeypatch.setattr(
+        ledger_module,
+        "_MIGRATIONS",
+        {1: ["ALTER TABLE campaigns ADD COLUMN migration_probe TEXT"]},
+    )
+    ledger._conn.execute("UPDATE schema_version SET version = 1")
+    try:
+        assert ensure_schema(ledger._conn, migrate=True) == 1
+        row = ledger._conn.execute("SELECT version FROM schema_version").fetchone()
+        assert row == (2,)
+        assert "migration_probe" in _campaigns_columns(ledger)
+        assert ledger.get_campaign(camp_id) is not None
+    finally:
+        ledger._conn.execute(
+            "ALTER TABLE campaigns DROP COLUMN IF EXISTS migration_probe"
+        )
+        _restore_stamp(ledger)
+
+
+def test_migration_failure(ledger, monkeypatch: pytest.MonkeyPatch):
+    """A failing migration step leaves the database at its old version."""
+    monkeypatch.setattr(ledger_module, "SCHEMA_VERSION", 2)
+    monkeypatch.setattr(
+        ledger_module,
+        "_MIGRATIONS",
+        {
+            1: [
+                "ALTER TABLE campaigns ADD COLUMN rollback_probe TEXT",
+                "SELECT no_such_function()",
+            ]
+        },
+    )
+    ledger._conn.execute("UPDATE schema_version SET version = 1")
+    try:
+        with pytest.raises(psycopg.Error):
+            ensure_schema(ledger._conn, migrate=True)
+        row = ledger._conn.execute("SELECT version FROM schema_version").fetchone()
+        assert row == (1,)
+        assert "rollback_probe" not in _campaigns_columns(ledger)
+    finally:
+        ledger._conn.execute(
+            "ALTER TABLE campaigns DROP COLUMN IF EXISTS rollback_probe"
+        )
+        _restore_stamp(ledger)
+
+
+def test_pre_versioning_database(ledger):
+    """A database from before versioning is rejected, not adopted."""
+    ledger._conn.execute("DROP TABLE schema_version")
+    try:
+        with pytest.raises(SchemaError, match="predates schema versioning"):
+            ensure_schema(ledger._conn)
+    finally:
+        ledger._conn.execute(_CREATE_SCHEMA_VERSION)
+        ledger._conn.execute(
+            "INSERT INTO schema_version (version) VALUES (%s)", (SCHEMA_VERSION,)
+        )
 
 
 def test_append_assigns_seq(ledger):
