@@ -19,7 +19,6 @@ export function samplePlan(
     max_concurrency: 1,
     gpus: 1,
     walltime: 30,
-    stop_conditions: ["budget exhausted"],
     ...overrides,
   };
 }

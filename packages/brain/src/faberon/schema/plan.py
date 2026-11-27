@@ -1,10 +1,14 @@
 """Research plan: the typed rulebook a campaign is governed by (external model)"""
 
+import re
 from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator
 
 from .constants import MIN_PROSE_LENGTH
+
+# A bare metric name the parser can match literally against the job log.
+_METRIC_NAME_RE = re.compile(r"[A-Za-z0-9_.:/-]+")
 
 
 class ResearchPlan(BaseModel):
@@ -20,7 +24,6 @@ class ResearchPlan(BaseModel):
     max_concurrency: int = Field(default=1, ge=1)
     gpus: int = Field(default=1, ge=1)
     walltime: int = Field(gt=0)  # in minutes
-    stop_conditions: list[str] = Field(min_length=1)
 
     @field_validator("target_file")
     @classmethod
@@ -28,6 +31,17 @@ class ResearchPlan(BaseModel):
         """The proposer's output is parsed as Python, so the target must be one."""
         if not value.lower().endswith(".py"):
             raise ValueError("target_file must be a Python file (.py)")
+        return value
+
+    @field_validator("metric")
+    @classmethod
+    def _metric_is_a_bare_name(cls, value: str) -> str:
+        """Comments like '(lower = better)' would never match the job log."""
+        if not _METRIC_NAME_RE.fullmatch(value):
+            raise ValueError(
+                "metric must be a bare name, e.g. 'val_bpb', "
+                "spaces or additional comments are not allowed"
+            )
         return value
 
 
