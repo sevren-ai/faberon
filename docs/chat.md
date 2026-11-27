@@ -31,6 +31,5 @@ Some notes:
 - Missing arguments are prompted interactively, one at a time. Empty answers are rejected.
 - If a tool that writes campaign state is called by the AI in conversation, e.g. `faberon_create_campaign`, `faberon_create_successor`, `faberon_cancel_campaign` or `faberon_resume_campaign`, explicit confirmation by the human is required.
 - Using the corresponding slash tools to create/cancel a campaign do not require additional human confirmation as the human already gave permission by typing the slash command.
-- Submission of a new campaign either through "create" or "successor" requires an explicit confirmation of the human.
 - A successor campaign keeps the predecessor's research plan and requires a fresh budget of GPU hours & max experiments. If you want a new campaign with changes to the research plan, use `/faberon-create` or `/faberon-draft` instead.
 - `/faberon-idea` is advisory: the idea lands in the ledger as `idea.injected` and the proposer weighs it at its next decision boundary. It does not interrupt an in-flight job and it is not guaranteed that the idea will be executed.
