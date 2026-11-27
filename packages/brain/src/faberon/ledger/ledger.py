@@ -102,6 +102,7 @@ def _migrate(conn: psycopg.Connection, version: int) -> int:
             conn.execute("UPDATE schema_version SET version = %s", (step + 1,))
     return version
 
+
 def _create(conn: psycopg.Connection) -> None:
     conn.execute(_CREATE_EVENTS)
     conn.execute(_CREATE_EVENTS_INDEX)
@@ -141,7 +142,10 @@ def ensure_schema(conn: psycopg.Connection, *, migrate: bool = False) -> int | N
         return _migrate(conn, version)
     # There's an old, non-empty DB without migration options
     if "events" in tables or "campaigns" in tables:
-        raise SchemaError("the database is out-dated and does not have schema versioning & migration options")
+        raise SchemaError(
+            "the database is out-dated and does not have schema versioning "
+            "& migration options"
+        )
     # The old DB is empty: create a new one
     _create(conn)
     return None

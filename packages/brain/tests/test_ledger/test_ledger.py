@@ -89,9 +89,7 @@ def test_missing_migration(ledger):
         _restore_stamp(ledger)
 
 
-def test_migration(
-    ledger, monkeypatch: pytest.MonkeyPatch
-):
+def test_migration(ledger, monkeypatch: pytest.MonkeyPatch):
     """An outdated database migrates step by step and keeps its rows."""
     camp_id = uuid.uuid4()
     ledger.create_campaign(
