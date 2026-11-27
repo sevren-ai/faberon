@@ -19,7 +19,7 @@ Each slash command has a matching tool, and each tool has typed parameters valid
 | `/faberon-list` | `faberon_list_campaigns` | List campaigns with live status |
 | `/faberon-show <campaign-id>` | `faberon_show_campaign` | Show one campaign's status and plan |
 | `/faberon-events <campaign-id> [--verbose]` | `faberon_campaign_events` | Print the campaign's ledger. `--verbose` (or `-v`) adds full event payloads |
-| `/faberon-draft` | (drafter mode) | Draft a research plan conversationally, review it, then submit it |
+| `/faberon-draft` | - | Draft a research plan conversationally, review it, then submit it |
 | `/faberon-create <plan.json> [repo-path]` | `faberon_create_campaign` | Submit a hand-written plan and start a campaign |
 | `/faberon-successor <campaign-id> <budget-gpu-hours> <max-experiments>` | `faberon_create_successor` | Start a successor from a finished campaign's best kept commit |
 | `/faberon-cancel <campaign-id> [reason]` | `faberon_cancel_campaign` | Request cancellation of an active campaign |
