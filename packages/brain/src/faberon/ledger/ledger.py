@@ -10,11 +10,18 @@ order for the SSE stream and for replay.
 The `campaigns` table records campaign-level state.
 `create_campaign` inserts the campaign row and the `campaign.created` event
 in one transaction so a retry never duplicates either.
+
+The `schema_version` table stamps the schema with SCHEMA_VERSION.
+`ensure_schema` creates the tables on an empty database, verifies them on
+an existing one, and migrates an outdated schema step by step when asked,
+keeping the data. A database with no migration path is rejected with a
+SchemaError.
 """
 
 import json
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from typing import LiteralString
 from uuid import UUID
 
 import psycopg
@@ -56,15 +63,96 @@ CREATE TABLE IF NOT EXISTS campaigns (
 )
 """
 
+_CREATE_SCHEMA_VERSION = """
+CREATE TABLE IF NOT EXISTS schema_version (
+    version      INTEGER     NOT NULL
+)
+"""
+
+# The schema this Faberon version expects. Bump on every schema change.
+SCHEMA_VERSION = 1
+
+# Ordered migration steps: _MIGRATIONS[n] upgrades a database at version n
+# to n + 1. Every schema change adds one entry and bumps SCHEMA_VERSION.
+# The key is the version it migrates FROM, so the first entry lands at
+# key 1: {1: [...]} with SCHEMA_VERSION = 2.
+_MIGRATIONS: dict[int, list[LiteralString]] = {}
+
+
+class SchemaError(Exception):
+    """The database schema does not match what this Faberon version expects."""
+
+
+def _migrate(conn: psycopg.Connection, version: int) -> int:
+    """Apply the steps from ``version`` to SCHEMA_VERSION in one transaction.
+
+    Returns the version the database started at. Raises SchemaError before
+    touching the database when a step in the chain is missing.
+    """
+    missing = [
+        step for step in range(version, SCHEMA_VERSION) if step not in _MIGRATIONS
+    ]
+    if missing:
+        step = missing[0]
+        raise SchemaError(f"no migration from schema version {step} to {step + 1}")
+    with conn.transaction():
+        for step in range(version, SCHEMA_VERSION):
+            for statement in _MIGRATIONS[step]:
+                conn.execute(statement)
+            conn.execute("UPDATE schema_version SET version = %s", (step + 1,))
+    return version
+
+def _create(conn: psycopg.Connection) -> None:
+    conn.execute(_CREATE_EVENTS)
+    conn.execute(_CREATE_EVENTS_INDEX)
+    conn.execute(_CREATE_CAMPAIGNS)
+    conn.execute(_CREATE_SCHEMA_VERSION)
+    conn.execute("INSERT INTO schema_version (version) VALUES (%s)", (SCHEMA_VERSION,))
+
+
+def ensure_schema(conn: psycopg.Connection, *, migrate: bool = False) -> int | None:
+    """Create the schema on an empty database, verify it on an existing one.
+
+    Returns the version the database was migrated from, or None when no
+    migration ran. An outdated stamped database is migrated step by step
+    when ``migrate`` is set, and rejected otherwise. A database stamped by
+    a newer Faberon, and any database from before schema versioning, is
+    always rejected. Raises SchemaError on any mismatch.
+    """
+    tables = {
+        row[0]
+        for row in conn.execute(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+        )
+    }
+    # Run a migration or return None if we're good
+    if "schema_version" in tables:
+        row = conn.execute("SELECT version FROM schema_version").fetchone()
+        if row is None:
+            raise SchemaError("the schema_version table is empty")
+        version = row[0]
+        if version == SCHEMA_VERSION:
+            return None
+        if version > SCHEMA_VERSION or not migrate:
+            raise SchemaError(
+                f"the database is at schema version {version}, "
+                f"this Faberon expects {SCHEMA_VERSION}"
+            )
+        return _migrate(conn, version)
+    # There's an old, non-empty DB without migration options
+    if "events" in tables or "campaigns" in tables:
+        raise SchemaError("the database is out-dated and does not have schema versioning & migration options")
+    # The old DB is empty: create a new one
+    _create(conn)
+    return None
+
 
 class Ledger:
     """Append-only event ledger. Postgres is the source of truth."""
 
     def __init__(self, db_url: str) -> None:
         self._conn = psycopg.connect(db_url, autocommit=True)
-        self._conn.execute(_CREATE_EVENTS)
-        self._conn.execute(_CREATE_EVENTS_INDEX)
-        self._conn.execute(_CREATE_CAMPAIGNS)
+        ensure_schema(self._conn)
 
     def close(self) -> None:
         """Close the database connection."""
