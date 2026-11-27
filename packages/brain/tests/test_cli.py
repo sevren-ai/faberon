@@ -167,8 +167,9 @@ def _serve_setup(
     config_file = tmp_path / "config.toml"
     config_file.write_text(_SERVE_CONFIG + extra_config)
     monkeypatch.setenv("FABERON_CONFIG", str(config_file))
-    # Serve preflights the DB; stub the probe, there is no live Postgres here.
+    # Serve preflights the DB; stub the probes, there is no live Postgres here.
     monkeypatch.setattr(cli, "_probe_db", lambda url: None)
+    monkeypatch.setattr(cli, "_ensure_schema", lambda url, migrate=False: None)
     captured = {}
     monkeypatch.setattr(
         uvicorn, "run", lambda *a, **kw: captured.update({"args": a, "kwargs": kw})
@@ -318,6 +319,7 @@ def _init_env(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("FABERON_CONFIG", str(config_file))
     monkeypatch.setattr(cli, "_POSTGRES_ENV_PATH", tmp_path / "postgres.env")
     monkeypatch.setattr(cli, "_probe_db", lambda url: None)
+    monkeypatch.setattr(cli, "_ensure_schema", lambda url, migrate=False: None)
     return config_file
 
 
@@ -465,6 +467,67 @@ def test_init_fails_when_createdb_fails(tmp_path, monkeypatch: pytest.MonkeyPatc
     assert result.exit_code == 2
     assert "could not create the database" in result.output
     assert not config_file.exists()
+
+
+def test_init_schema_mismatch(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """A database with no migration path: init fails before writing anything."""
+    config_file = _init_env(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        cli,
+        "_ensure_schema",
+        lambda url, migrate=False: (
+            "the database is out-dated and does not have schema versioning "
+            "& migration options"
+        ),
+    )
+    result = runner.invoke(cli.app, ["init"], input="\n")
+    assert result.exit_code == 2
+    assert "the database schema does not match this Faberon version" in result.output
+    assert "out-dated" in result.output
+    assert "no migration path" in result.output
+    assert not config_file.exists()
+
+
+def test_init_migrates_outdated_schema(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """init lets the schema check migrate, so upgrades keep their data."""
+    _init_env(tmp_path, monkeypatch)
+    calls = []
+    monkeypatch.setattr(
+        cli,
+        "_ensure_schema",
+        lambda url, migrate=False: calls.append(migrate) or None,
+    )
+    result = runner.invoke(cli.app, ["init"], input="\ntest-model\nlocal\n")
+    assert result.exit_code == 0
+    assert calls == [True]
+
+
+def test_serve_fails_on_schema_mismatch(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """serve refuses to start against a mismatched schema and points at init."""
+    _serve_setup(tmp_path, monkeypatch, _SERVE_LOCAL)
+    monkeypatch.setattr(
+        cli,
+        "_ensure_schema",
+        lambda url, migrate=False: "the database is at schema version 0",
+    )
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 2
+    assert "the database schema does not match this Faberon version" in result.output
+    assert "faberon init" in result.output
+
+
+def test_serve_never_migrates(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """serve only verifies the schema; init is the one that migrates."""
+    _serve_setup(tmp_path, monkeypatch, _SERVE_LOCAL)
+    calls = []
+    monkeypatch.setattr(
+        cli,
+        "_ensure_schema",
+        lambda url, migrate=False: calls.append(migrate) or None,
+    )
+    result = runner.invoke(cli.app, ["serve"])
+    assert result.exit_code == 0
+    assert calls == [False]
 
 
 def test_list(api_client):

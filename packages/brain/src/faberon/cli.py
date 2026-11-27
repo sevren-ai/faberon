@@ -20,6 +20,7 @@ from sqlalchemy.exc import ArgumentError
 from typer import Argument, FileText, Option, echo
 
 from . import __version__, config
+from .ledger import SCHEMA_VERSION, SchemaError, ensure_schema
 from .schema import Event, ResearchPlan
 
 _POSTGRES_ENV_PATH = Path("~/.config/faberon/postgres.env").expanduser()
@@ -161,6 +162,13 @@ def serve(
             err=True,
         )
         raise typer.Exit(code=2)
+    if err := _ensure_schema(db_url, migrate=False):
+        echo(
+            f"the database schema does not match this Faberon version: {err}",
+            err=True,
+        )
+        echo("run `faberon init` to inspect and repair the database", err=True)
+        raise typer.Exit(code=2)
     echo(f"executor: {name}")
     echo(f"database: {_redact(settings['database_url'])}")
     echo(f"model:    {settings['model']}")
@@ -271,12 +279,37 @@ def _create_db(db_url: str, pg_env: dict[str, str]) -> None:
         echo("is Postgres running? Ensure it is, then re-run `faberon init`", err=True)
 
 
+def _ensure_schema(db_url: str, *, migrate: bool) -> str | None:
+    """When migrate is set to True, upgrade an outdated schema step by step,
+    keeping the data.
+
+    Creates the tables on an empty database. Return the version mismatch
+    reason when the DB couldn't be migrated. Return None when the database
+    has the correct schema after this function call.
+    """
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            migrated_from = ensure_schema(conn, migrate=migrate)
+    except SchemaError as exc:
+        return str(exc)
+    except psycopg.Error as exc:
+        return " ".join(str(exc).split())
+    if migrated_from is not None:
+        echo(
+            f"migrated the database schema from version {migrated_from} "
+            f"to {SCHEMA_VERSION}"
+        )
+    return None
+
+
 @app.command("init")
 def init() -> None:
     """Set up Faberon: write the config file and create the database.
 
     Requires a running Postgres.
     Generates the API token and records the model and executor settings.
+    Verifies the database schema, migrating it to this Faberon version
+    when needed.
     """
     path = config.config_path()
     try:
@@ -322,6 +355,18 @@ def init() -> None:
                 err=True,
             )
             raise typer.Exit(code=2)
+    if (err := _ensure_schema(db_url, migrate=True)) is not None:
+        echo(
+            f"the database schema does not match this Faberon version: {err}",
+            err=True,
+        )
+        echo(
+            "there is no migration path for this database: recreate it "
+            "(scripts/db/drop-faberon-db.sh, then re-run `faberon init`); "
+            "the existing campaign and ledger data is discarded",
+            err=True,
+        )
+        raise typer.Exit(code=2)
 
     token = existing.get("api_token") or config.generate_token()
     model = typer.prompt(
