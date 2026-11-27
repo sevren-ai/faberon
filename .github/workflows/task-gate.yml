@@ -22,4 +22,4 @@ jobs:
           ISSUE_URL: ${{ github.event.issue.html_url }}
         run: |
           gh issue comment "$ISSUE_URL" --body "Tasks are restricted to maintainers. Please file a bug report instead, or post in Discussions for questions and feature requests. Closing this issue."
-          gh issue close "$ISSUE_URL" --reason "invalid"
+          gh issue close "$ISSUE_URL" --reason "not planned"
