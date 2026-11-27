@@ -111,12 +111,12 @@ def _create(conn: psycopg.Connection) -> None:
     conn.execute("INSERT INTO schema_version (version) VALUES (%s)", (SCHEMA_VERSION,))
 
 
-def ensure_schema(conn: psycopg.Connection, *, migrate: bool = False) -> int | None:
+def ensure_schema(conn: psycopg.Connection, *, migrate: bool) -> int | None:
     """Create the schema on an empty database, verify it on an existing one.
 
     Returns the version the database was migrated from, or None when no
     migration ran. An outdated stamped database is migrated step by step
-    when ``migrate`` is set, and rejected otherwise. A database stamped by
+    when ``migrate`` is True, and rejected otherwise. A database stamped by
     a newer Faberon, and any database from before schema versioning, is
     always rejected. Raises SchemaError on any mismatch.
     """
@@ -156,7 +156,7 @@ class Ledger:
 
     def __init__(self, db_url: str) -> None:
         self._conn = psycopg.connect(db_url, autocommit=True)
-        ensure_schema(self._conn)
+        ensure_schema(self._conn, migrate=False)
 
     def close(self) -> None:
         """Close the database connection."""

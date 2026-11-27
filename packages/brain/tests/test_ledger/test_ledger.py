@@ -48,7 +48,7 @@ def test_schema_wrong_version(ledger):
     ledger._conn.execute("UPDATE schema_version SET version = 999")
     try:
         with pytest.raises(SchemaError, match="999"):
-            ensure_schema(ledger._conn)
+            ensure_schema(ledger._conn, migrate=False)
     finally:
         ledger._conn.execute(
             "UPDATE schema_version SET version = %s", (SCHEMA_VERSION,)
@@ -72,7 +72,7 @@ def test_reject_outdated_version(ledger):
     ledger._conn.execute("UPDATE schema_version SET version = 0")
     try:
         with pytest.raises(SchemaError, match="version 0"):
-            ensure_schema(ledger._conn)
+            ensure_schema(ledger._conn, migrate=False)
     finally:
         _restore_stamp(ledger)
 
@@ -153,7 +153,7 @@ def test_pre_versioning_database(ledger):
     ledger._conn.execute("DROP TABLE schema_version")
     try:
         with pytest.raises(SchemaError, match="out-dated"):
-            ensure_schema(ledger._conn)
+            ensure_schema(ledger._conn, migrate=False)
     finally:
         ledger._conn.execute(_CREATE_SCHEMA_VERSION)
         ledger._conn.execute(

@@ -162,7 +162,7 @@ def serve(
             err=True,
         )
         raise typer.Exit(code=2)
-    if err := _ensure_schema(db_url):
+    if err := _ensure_schema(db_url, migrate=False):
         echo(
             f"the database schema does not match this Faberon version: {err}",
             err=True,
@@ -279,7 +279,7 @@ def _create_db(db_url: str, pg_env: dict[str, str]) -> None:
         echo("is Postgres running? Ensure it is, then re-run `faberon init`", err=True)
 
 
-def _ensure_schema(db_url: str, *, migrate: bool = False) -> str | None:
+def _ensure_schema(db_url: str, *, migrate: bool) -> str | None:
     """When migrate is set to True, upgrade an outdated schema step by step,
     keeping the data.
 
