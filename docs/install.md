@@ -174,4 +174,4 @@ pi install ./packages/chat   # run from the repo root
 
 With a system-wide Node (Track A on Linux), the global npm prefix is outside your home, so run the `npm install -g` command with `sudo`. Homebrew Node on macOS and the user-space Node from Track B need no sudo.
 
-Then continue with the [quickstart](../README.md#quickstart).
+Then continue with the [quickstart](../README.md#quickstart). All slash commands and tools are listed in [chat.md](chat.md).
