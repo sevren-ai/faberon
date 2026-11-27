@@ -174,6 +174,17 @@ Placement rules:
 - Client-facing shapes live in `schema/`; workflow-internal shapes live in `workflow/models.py`.
 - Group a model with its siblings, not inside the module that happens to produce it.
 
+## Database schema changes
+
+The brain's Postgres schema is versioned (`packages/brain/src/faberon/ledger/ledger.py`). A `schema_version` table stamps the database. `faberon init` migrates an outdated database step by step, keeping its data. `faberon serve` only verifies the stamp and refuses an unexpected version.
+
+Every schema change ships its migration in the same PR:
+
+- Bump `SCHEMA_VERSION` by one.
+- Add the step to `_MIGRATIONS`: `_MIGRATIONS[n]` holds the statements that take a database from version `n` to `n + 1`. The key is the version it migrates from, so the first migration ever added is `{1: [...]}` (1 to 2), not index 0. The steps run in one transaction, so a failed step leaves the database untouched.
+- Migrations keep the data. Use `ALTER`, never drop and recreate. Adding a `NOT NULL` column to a populated table needs a default or a backfill in the same step.
+- Add a migration test in `tests/test_ledger/`: stamp the old version, migrate, and assert the new code works against the result with its data intact. `test_migration_applies_steps_and_keeps_data` is the pattern.
+- Call the schema change out in the release's design doc.
 
 ## GitHub Actions
 
