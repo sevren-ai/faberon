@@ -17,7 +17,6 @@ def _minimal_plan(**overrides) -> ResearchPlan:
         "max_experiments": 6,
         "max_concurrency": 1,
         "walltime": 10,
-        "stop_conditions": ["budget exhausted"],
     }
     data.update(overrides)
     return ResearchPlan.model_validate(data)

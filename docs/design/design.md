@@ -14,8 +14,8 @@ Requirements:
 * **human steering**: goal up front, ideas mid-run, gates on high-impact actions
 
 Terminology:
-* A **campaign** is one autonomous research run end-to-end, from intake to budget exhaustion or stop condition.
-* The **drafter** (chat-side, no autonomous authority) interviews the human and drafts the **plan** (research plan: goal, metric, scope, budget, stop conditions, judgment rules, approval policy)
+* A **campaign** is one autonomous research run end-to-end, from intake to a hard stop condition (budget, experiment cap, or cancel).
+* The **drafter** (chat-side, no autonomous authority) interviews the human and drafts the **plan** (research plan: goal, metric, scope, budget, judgment rules, approval policy)
 * The **loop** then runs experiments under the plan until the campaign ends.
 
 ## 2. Architecture

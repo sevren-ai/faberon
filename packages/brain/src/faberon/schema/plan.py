@@ -24,7 +24,6 @@ class ResearchPlan(BaseModel):
     max_concurrency: int = Field(default=1, ge=1)
     gpus: int = Field(default=1, ge=1)
     walltime: int = Field(gt=0)  # in minutes
-    stop_conditions: list[str] = Field(min_length=1)
 
     @field_validator("target_file")
     @classmethod
